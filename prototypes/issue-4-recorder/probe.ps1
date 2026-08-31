@@ -56,5 +56,5 @@ if ($Command -eq 'deploy') {
     New-Item -ItemType Directory -Force -Path $pluginDirectory | Out-Null
     Copy-Item -LiteralPath (Join-Path $output 'DSPDreamer.CaptureProbe.dll') -Destination $pluginDirectory -Force
     Write-Host "Deployed to $pluginDirectory"
-    Write-Host 'Start DSP, load the benchmark save, then use Ctrl+F8, Ctrl+F9, and F12 as described in README.md.'
+    Write-Host 'Set DSP to 1280x720 at 60 FPS. Then use Ctrl+F8, Ctrl+F9, and Ctrl+Shift+F11 as described in README.md.'
 }

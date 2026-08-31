@@ -67,6 +67,10 @@ namespace DSPDreamer.CaptureProbe
         private long actionLatencyTicksMax;
         private long lastObservedActionId;
         private int lastObservedActionFrame = -1;
+        private long inputSamples;
+        private int sourceWidth;
+        private int sourceHeight;
+        private string sourceDisplayMode;
         private int outstandingReadbacks;
         private long releaseWAtTicks;
         private bool injectedWHeld;
@@ -84,17 +88,18 @@ namespace DSPDreamer.CaptureProbe
             harmony = new Harmony(PluginGuid);
             harmony.PatchAll(typeof(CaptureProbePlugin).Assembly);
             StartCoroutine(CaptureLoop());
-            Logger.LogInfo("Capture probe loaded. Ctrl+F8 starts/stops; Ctrl+F9 injects a W pulse and mouse move; F12 aborts.");
+            Logger.LogInfo("Capture probe loaded. Ctrl+F8 starts/stops; Ctrl+F9 injects a W pulse and mouse move; Ctrl+Shift+F11 aborts.");
         }
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.F12))
+            bool control = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            if (control && shift && Input.GetKeyDown(KeyCode.F11))
             {
-                Abort("F12 emergency abort");
+                Abort("Ctrl+Shift+F11 emergency abort");
             }
 
-            bool control = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             if (control && Input.GetKeyDown(KeyCode.F8))
             {
                 if (recording || stopping) StopProbe("manual stop"); else StartProbe();
@@ -153,6 +158,15 @@ namespace DSPDreamer.CaptureProbe
                 return;
             }
 
+            sourceWidth = Screen.width;
+            sourceHeight = Screen.height;
+            sourceDisplayMode = Screen.fullScreenMode.ToString();
+            if ((long)sourceWidth * captureHeight.Value != (long)sourceHeight * captureWidth.Value)
+            {
+                lastMessage = "拒絕擷取：來源與輸出長寬比不同。請使用 1280×720";
+                return;
+            }
+
             ResetCounters();
             Directory.CreateDirectory(outputRoot.Value);
             runDirectory = Path.Combine(outputRoot.Value, DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", Invariant));
@@ -187,8 +201,9 @@ namespace DSPDreamer.CaptureProbe
                 "width", captureWidth.Value,
                 "height", captureHeight.Value,
                 "duration_seconds", durationSeconds.Value,
-                "screen_width", Screen.width,
-                "screen_height", Screen.height,
+                "source_width", sourceWidth,
+                "source_height", sourceHeight,
+                "source_display_mode", sourceDisplayMode,
                 "unity_frame", Time.frameCount,
                 "game_tick", SafeGameTick()));
             recording = true;
@@ -327,6 +342,7 @@ namespace DSPDreamer.CaptureProbe
         internal void RecordInputSample()
         {
             if (!recording) return;
+            inputSamples++;
             List<string> down = new List<string>();
             List<string> up = new List<string>();
             foreach (KeyCode key in DesktopKeys)
@@ -426,6 +442,7 @@ namespace DSPDreamer.CaptureProbe
             long totalDrops = schedulerDrops + inFlightDrops + readbackErrors + writerDrops;
             double dropRate = expectedFrames == 0 ? 1.0 : (double)totalDrops / expectedFrames;
             double effectiveHz = elapsed <= 0 ? 0 : writtenFrames / elapsed;
+            double measuredRenderedFps = elapsed <= 0 ? 0 : inputSamples / elapsed;
             double averageActionLatencyMs = observedActions == 0 ? 0 : TicksToMilliseconds(actionLatencyTicksTotal / observedActions);
             string verdict = elapsed >= Math.Min(durationSeconds.Value, 60)
                 && dropRate < 0.01
@@ -444,6 +461,10 @@ namespace DSPDreamer.CaptureProbe
                 "configured_hz", captureHz.Value,
                 "width", captureWidth.Value,
                 "height", captureHeight.Value,
+                "source_width", sourceWidth,
+                "source_height", sourceHeight,
+                "source_display_mode", sourceDisplayMode,
+                "measured_rendered_fps", measuredRenderedFps,
                 "effective_hz", effectiveHz,
                 "expected_frames", expectedFrames,
                 "requested_frames", requestedFrames,
@@ -555,7 +576,7 @@ namespace DSPDreamer.CaptureProbe
             {
                 overlayStyle = new GUIStyle(GUI.skin.box) { alignment = TextAnchor.UpperLeft, fontSize = 16, wordWrap = true };
             }
-            string status = "DSP Dreamer 擷取原型\n" + lastMessage + "\nCtrl+F8 開始/停止 | Ctrl+F9 注入測試 | F12 緊急停止";
+            string status = "DSP Dreamer 擷取原型\n" + lastMessage + "\nCtrl+F8 開始/停止 | Ctrl+F9 注入測試 | Ctrl+Shift+F11 緊急停止";
             if (recording || stopping)
             {
                 long drops = schedulerDrops + inFlightDrops + readbackErrors + writerDrops;
@@ -578,6 +599,7 @@ namespace DSPDreamer.CaptureProbe
             expectedFrames = requestedFrames = writtenFrames = schedulerDrops = inFlightDrops = 0;
             readbackErrors = writerDrops = writerBytes = maxWriterQueue = 0;
             injectedActions = observedActions = actionLatencyTicksTotal = actionLatencyTicksMax = 0;
+            inputSamples = 0;
             outstandingReadbacks = 0;
             nextCaptureId = 0;
             lastObservedActionId = 0;
