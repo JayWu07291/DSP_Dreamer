@@ -195,6 +195,9 @@ if ($Command -eq 'export-event-frames') {
             $name = '{0}-{1:D2}-event-tick-{2}-capture-{3}.png' -f $target.Label, $target.Ordinal, $target.Event.game_tick, $capture.capture_id
             $path = Join-Path $run.FullName $name
             Export-RgbaFrame $stream $summary $capture $path
+            if ($capture.PSObject.Properties.Name -contains 'cursor_composited' -and -not $capture.cursor_composited) {
+                Write-Warning "Capture $($capture.capture_id) did not composite a cursor."
+            }
             $index.Add([PSCustomObject]@{
                 label = $target.Label
                 event_type = $target.Event.type
@@ -206,6 +209,13 @@ if ($Command -eq 'export-event-frames') {
                 capture_ticks = $capture.requested_ticks
                 capture_unity_frame = $capture.unity_frame
                 capture_game_tick = $capture.game_tick
+                cursor_visible = $capture.cursor_visible
+                cursor_composited = $capture.cursor_composited
+                cursor_composited_pixels = $capture.cursor_composited_pixels
+                cursor_x = $capture.cursor_x
+                cursor_y = $capture.cursor_y
+                cursor_index = $capture.cursor_index
+                cursor_glyph_source = $capture.cursor_glyph_source
                 path = $path
             })
             Write-Host $path

@@ -86,6 +86,8 @@
 
 命令會選取每次科技樹開啟後 0.5 秒、科技樹關閉後的第一幀，以及可用的 episode 結束前與新 episode 開始後畫面，輸出 PNG 和 `event-frames.json` 索引。用這些畫面確認完整世界視野、科技樹、游標、方向與色彩，並確認錄製模組狀態面板沒有入鏡。指定舊 run 時可加上 `-RunDirectory '<run 路徑>'`；`show-latest`、`export-frame` 與下方的驗證命令也接受相同參數。
 
+Probe 0.1.10 會在擷取要求當下保存游標位置、顯示狀態與 DSP cursor index。Unity 的 `ScreenCapture` 不包含 `Cursor.SetCursor` 交給視窗系統繪製的游標，所以 GPU frame 回讀後，probe 會把 DSP 當下的 cursor texture 和 hotspot 合成進 640×360 RGBA frame；若貼圖無法讀取，就改用固定黑白箭頭。`capture_written` 會記錄 `cursor_composited`、位置、合成像素數與貼圖來源，`summary.json` 則提供可見、已合成與 fallback frame 數量。事件 PNG 仍需人工確認游標位置正確。
+
 建立逐幀 transition 並驗證時間對齊：
 
 ```powershell

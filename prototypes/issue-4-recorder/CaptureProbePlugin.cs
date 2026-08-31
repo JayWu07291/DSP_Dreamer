@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -22,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.9";
+        public const string PluginVersion = "0.1.10";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -47,6 +48,9 @@ namespace DSPDreamer.CaptureProbe
             "UIReplicatorWindow",
             "UITechTree",
         };
+        private static readonly FieldInfo CursorTexturesField = AccessTools.Field(typeof(UICursor), "cursorTexs");
+        private static readonly FieldInfo CursorHotspotsField = AccessTools.Field(typeof(UICursor), "cursorHots");
+        private static readonly CursorGlyph FallbackCursorGlyph = CreateFallbackCursorGlyph();
         internal static CaptureProbePlugin Current;
 
         private readonly object eventLock = new object();
@@ -56,6 +60,8 @@ namespace DSPDreamer.CaptureProbe
         private readonly List<PendingAcquisition> pendingAcquisitions = new List<PendingAcquisition>();
         private readonly HashSet<string> semanticAcquisitionKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> taskEventKinds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<int, CursorGlyph> cursorGlyphCache = new Dictionary<int, CursorGlyph>();
+        private readonly HashSet<int> unreadableCursorTextureIds = new HashSet<int>();
         private ConfigEntry<int> captureHz;
         private ConfigEntry<int> captureWidth;
         private ConfigEntry<int> captureHeight;
@@ -92,6 +98,9 @@ namespace DSPDreamer.CaptureProbe
         private long actionLatencyTicksMax;
         private long taskEventCount;
         private long suppressedAcquisitionDuplicates;
+        private long cursorVisibleFrames;
+        private long cursorCompositedFrames;
+        private long cursorFallbackFrames;
         private int pendingDismantleObjectId;
         private int pendingDismantleProtoId;
         private string pendingDismantleProtoName;
@@ -239,7 +248,7 @@ namespace DSPDreamer.CaptureProbe
                 "source_width", sourceWidth,
                 "source_height", sourceHeight,
                 "source_display_mode", sourceDisplayMode,
-                "capture_strategy", "full_frame_then_bilinear_gpu_scale",
+                "capture_strategy", "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
                 "unity_frame", Time.frameCount,
                 "game_tick", SafeGameTick()));
             recording = true;
@@ -272,6 +281,7 @@ namespace DSPDreamer.CaptureProbe
             long actionId = lastObservedActionFrame == unityFrame
                 ? lastObservedActionId
                 : pendingActions.Count == 0 ? 0 : pendingActions.Peek().Id;
+            CursorSnapshot cursor = CaptureCursorSnapshot();
             requestedFrames++;
             Interlocked.Increment(ref outstandingReadbacks);
             WriteEvent("capture_requested", Fields(
@@ -280,13 +290,18 @@ namespace DSPDreamer.CaptureProbe
                 "requested_ticks", requestedTicks,
                 "unity_frame", unityFrame,
                 "game_tick", gameTick,
-                "pending_action_id", actionId));
+                "pending_action_id", actionId,
+                "cursor_visible", cursor.Visible,
+                "cursor_x", cursor.HotspotX,
+                "cursor_y", cursor.HotspotY,
+                "cursor_index", cursor.Index,
+                "cursor_glyph_source", cursor.GlyphSource));
 
             try
             {
                 ScreenCapture.CaptureScreenshotIntoRenderTexture(slot.SourceTarget);
                 Graphics.Blit(slot.SourceTarget, slot.Target);
-                AsyncGPUReadback.Request(slot.Target, 0, TextureFormat.RGBA32, request => CompleteReadback(request, slot, captureId, requestedTicks, unityFrame, gameTick, actionId));
+                AsyncGPUReadback.Request(slot.Target, 0, TextureFormat.RGBA32, request => CompleteReadback(request, slot, captureId, requestedTicks, unityFrame, gameTick, actionId, cursor));
             }
             catch (Exception exception)
             {
@@ -297,7 +312,123 @@ namespace DSPDreamer.CaptureProbe
             }
         }
 
-        private void CompleteReadback(AsyncGPUReadbackRequest request, CaptureSlot slot, long captureId, long requestedTicks, int unityFrame, long gameTick, long actionId)
+        private CursorSnapshot CaptureCursorSnapshot()
+        {
+            bool visible;
+            try { visible = Cursor.visible && Application.isFocused; }
+            catch { visible = false; }
+            if (!visible) return CursorSnapshot.Hidden;
+
+            Vector3 mouse = Input.mousePosition;
+            float scaleX = captureWidth.Value / (float)sourceWidth;
+            float scaleY = captureHeight.Value / (float)sourceHeight;
+            int hotspotX = (int)Math.Round(mouse.x * scaleX);
+            int hotspotY = (int)Math.Round((sourceHeight - mouse.y) * scaleY);
+            int cursorIndex = -1;
+            CursorGlyph glyph;
+            Vector2 hotspot;
+            string glyphSource;
+            try { cursorIndex = UICursor.cursorIndexApply; }
+            catch { cursorIndex = -1; }
+
+            if (TryGetDspCursorGlyph(cursorIndex, out glyph, out hotspot))
+            {
+                glyphSource = "dsp_texture";
+                int left = (int)Math.Round((mouse.x - hotspot.x) * scaleX);
+                int top = (int)Math.Round((sourceHeight - mouse.y - hotspot.y) * scaleY);
+                int drawWidth = Math.Max(1, (int)Math.Round(glyph.Width * scaleX));
+                int drawHeight = Math.Max(1, (int)Math.Round(glyph.Height * scaleY));
+                return new CursorSnapshot(true, hotspotX, hotspotY, cursorIndex, glyphSource, glyph, left, top, drawWidth, drawHeight);
+            }
+
+            glyphSource = "fallback";
+            return new CursorSnapshot(true, hotspotX, hotspotY, cursorIndex, glyphSource, FallbackCursorGlyph, hotspotX, hotspotY, FallbackCursorGlyph.Width, FallbackCursorGlyph.Height);
+        }
+
+        private bool TryGetDspCursorGlyph(int cursorIndex, out CursorGlyph glyph, out Vector2 hotspot)
+        {
+            glyph = null;
+            hotspot = Vector2.zero;
+            if (cursorIndex < 0 || CursorTexturesField == null || CursorHotspotsField == null) return false;
+            int textureId = 0;
+            try
+            {
+                Texture2D[] textures = CursorTexturesField.GetValue(null) as Texture2D[];
+                Vector2[] hotspots = CursorHotspotsField.GetValue(null) as Vector2[];
+                if (textures == null || hotspots == null || cursorIndex >= textures.Length || cursorIndex >= hotspots.Length) return false;
+                Texture2D texture = textures[cursorIndex];
+                if (texture == null) return false;
+                hotspot = hotspots[cursorIndex];
+                textureId = texture.GetInstanceID();
+                if (unreadableCursorTextureIds.Contains(textureId)) return false;
+                if (cursorGlyphCache.TryGetValue(textureId, out glyph)) return true;
+
+                Color32[] colors = texture.GetPixels32();
+                byte[] rgbaTopDown = new byte[checked(texture.width * texture.height * 4)];
+                for (int topY = 0; topY < texture.height; topY++)
+                {
+                    int sourceY = texture.height - 1 - topY;
+                    for (int x = 0; x < texture.width; x++)
+                    {
+                        Color32 color = colors[sourceY * texture.width + x];
+                        int offset = 4 * (topY * texture.width + x);
+                        rgbaTopDown[offset] = color.r;
+                        rgbaTopDown[offset + 1] = color.g;
+                        rgbaTopDown[offset + 2] = color.b;
+                        rgbaTopDown[offset + 3] = color.a;
+                    }
+                }
+                glyph = new CursorGlyph(texture.width, texture.height, rgbaTopDown);
+                cursorGlyphCache[textureId] = glyph;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                if (textureId != 0 && !unreadableCursorTextureIds.Add(textureId)) return false;
+                Logger.LogWarning("Could not read DSP cursor texture; using fallback cursor. " + exception.Message);
+                return false;
+            }
+        }
+
+        private static CursorGlyph CreateFallbackCursorGlyph()
+        {
+            string[] mask =
+            {
+                "B...........",
+                "BB..........",
+                "BWB.........",
+                "BWWB........",
+                "BWWWB.......",
+                "BWWWWB......",
+                "BWWWWWB.....",
+                "BWWWWWWB....",
+                "BWWWWWWWB...",
+                "BWWWWBBBB...",
+                "BWWBWB......",
+                "BWB.BWB.....",
+                "BB..BWB.....",
+                "B....BWB....",
+                ".....BWB....",
+                "......BB...."
+            };
+            int width = mask[0].Length;
+            byte[] rgba = new byte[width * mask.Length * 4];
+            for (int y = 0; y < mask.Length; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    char pixel = mask[y][x];
+                    if (pixel == '.') continue;
+                    int offset = 4 * (y * width + x);
+                    byte value = pixel == 'W' ? (byte)255 : (byte)0;
+                    rgba[offset] = rgba[offset + 1] = rgba[offset + 2] = value;
+                    rgba[offset + 3] = 255;
+                }
+            }
+            return new CursorGlyph(width, mask.Length, rgba);
+        }
+
+        private void CompleteReadback(AsyncGPUReadbackRequest request, CaptureSlot slot, long captureId, long requestedTicks, int unityFrame, long gameTick, long actionId, CursorSnapshot cursor)
         {
             try
             {
@@ -319,7 +450,10 @@ namespace DSPDreamer.CaptureProbe
                 }
 
                 data.CopyTo(slot.Buffer);
-                FramePacket packet = new FramePacket(slot, captureId, requestedTicks, clock.ElapsedTicks, unityFrame, gameTick, actionId);
+                cursor.CompositedPixels = cursor.Visible
+                    ? CursorCompositor.Composite(slot.Buffer, captureWidth.Value, captureHeight.Value, cursor.Glyph, cursor.Left, cursor.Top, cursor.DrawWidth, cursor.DrawHeight)
+                    : 0;
+                FramePacket packet = new FramePacket(slot, captureId, requestedTicks, clock.ElapsedTicks, unityFrame, gameTick, actionId, cursor);
                 if (!writeQueue.TryAdd(packet))
                 {
                     writerDrops++;
@@ -354,6 +488,9 @@ namespace DSPDreamer.CaptureProbe
                     frameWriter.Write(packet.Slot.Buffer, 0, packet.Slot.Buffer.Length);
                     writerBytes += packet.Slot.Buffer.Length;
                     writtenFrames++;
+                    if (packet.Cursor.Visible) cursorVisibleFrames++;
+                    if (packet.Cursor.CompositedPixels > 0) cursorCompositedFrames++;
+                    if (packet.Cursor.CompositedPixels > 0 && packet.Cursor.GlyphSource == "fallback") cursorFallbackFrames++;
                     WriteEvent("capture_written", Fields(
                         "capture_id", packet.CaptureId,
                         "file_offset", offset,
@@ -362,7 +499,14 @@ namespace DSPDreamer.CaptureProbe
                         "completed_ticks", packet.CompletedTicks,
                         "unity_frame", packet.UnityFrame,
                         "game_tick", packet.GameTick,
-                        "pending_action_id", packet.ActionId));
+                        "pending_action_id", packet.ActionId,
+                        "cursor_visible", packet.Cursor.Visible,
+                        "cursor_composited", packet.Cursor.CompositedPixels > 0,
+                        "cursor_composited_pixels", packet.Cursor.CompositedPixels,
+                        "cursor_x", packet.Cursor.HotspotX,
+                        "cursor_y", packet.Cursor.HotspotY,
+                        "cursor_index", packet.Cursor.Index,
+                        "cursor_glyph_source", packet.Cursor.GlyphSource));
                     Interlocked.Exchange(ref packet.Slot.Busy, 0);
                 }
                 frameWriter.Flush(true);
@@ -507,7 +651,7 @@ namespace DSPDreamer.CaptureProbe
                 "source_width", sourceWidth,
                 "source_height", sourceHeight,
                 "source_display_mode", sourceDisplayMode,
-                "capture_strategy", "full_frame_then_bilinear_gpu_scale",
+                "capture_strategy", "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
                 "measured_rendered_fps", measuredRenderedFps,
                 "effective_hz", effectiveHz,
                 "expected_frames", expectedFrames,
@@ -524,6 +668,10 @@ namespace DSPDreamer.CaptureProbe
                 "task_event_kinds", string.Join(",", SortedTaskEventKinds()),
                 "missing_task_event_kinds", string.Join(",", missingTaskEventKinds),
                 "suppressed_item_acquisition_duplicates", suppressedAcquisitionDuplicates,
+                "cursor_visible_frames", cursorVisibleFrames,
+                "cursor_composited_frames", cursorCompositedFrames,
+                "cursor_fallback_frames", cursorFallbackFrames,
+                "cursor_composite_verdict", cursorCompositedFrames > 0 ? "pass" : "not_observed",
                 "injected_actions", injectedActions,
                 "observed_actions", observedActions,
                 "average_action_latency_ms", averageActionLatencyMs,
@@ -770,6 +918,8 @@ namespace DSPDreamer.CaptureProbe
         internal void OnGameBegin()
         {
             if (!recording) return;
+            cursorGlyphCache.Clear();
+            unreadableCursorTextureIds.Clear();
             BindTaskEvents();
             WriteEvent("episode_begin", Fields("ticks", clock.ElapsedTicks, "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
         }
@@ -813,7 +963,10 @@ namespace DSPDreamer.CaptureProbe
             injectedActions = observedActions = actionLatencyTicksTotal = actionLatencyTicksMax = 0;
             taskEventCount = 0;
             suppressedAcquisitionDuplicates = 0;
+            cursorVisibleFrames = cursorCompositedFrames = cursorFallbackFrames = 0;
             taskEventKinds.Clear();
+            cursorGlyphCache.Clear();
+            unreadableCursorTextureIds.Clear();
             inputSamples = 0;
             outstandingReadbacks = 0;
             nextCaptureId = 0;
@@ -1021,10 +1174,10 @@ namespace DSPDreamer.CaptureProbe
 
         private sealed class FramePacket
         {
-            public FramePacket(CaptureSlot slot, long captureId, long requestedTicks, long completedTicks, int unityFrame, long gameTick, long actionId)
+            public FramePacket(CaptureSlot slot, long captureId, long requestedTicks, long completedTicks, int unityFrame, long gameTick, long actionId, CursorSnapshot cursor)
             {
                 Slot = slot; CaptureId = captureId; RequestedTicks = requestedTicks; CompletedTicks = completedTicks;
-                UnityFrame = unityFrame; GameTick = gameTick; ActionId = actionId;
+                UnityFrame = unityFrame; GameTick = gameTick; ActionId = actionId; Cursor = cursor;
             }
             public CaptureSlot Slot { get; private set; }
             public long CaptureId { get; private set; }
@@ -1033,6 +1186,38 @@ namespace DSPDreamer.CaptureProbe
             public int UnityFrame { get; private set; }
             public long GameTick { get; private set; }
             public long ActionId { get; private set; }
+            public CursorSnapshot Cursor { get; private set; }
+        }
+
+        private sealed class CursorSnapshot
+        {
+            public static readonly CursorSnapshot Hidden = new CursorSnapshot(false, -1, -1, -1, "none", FallbackCursorGlyph, 0, 0, 0, 0);
+
+            public CursorSnapshot(bool visible, int hotspotX, int hotspotY, int index, string glyphSource, CursorGlyph glyph, int left, int top, int drawWidth, int drawHeight)
+            {
+                Visible = visible;
+                HotspotX = hotspotX;
+                HotspotY = hotspotY;
+                Index = index;
+                GlyphSource = glyphSource;
+                Glyph = glyph;
+                Left = left;
+                Top = top;
+                DrawWidth = drawWidth;
+                DrawHeight = drawHeight;
+            }
+
+            public bool Visible { get; private set; }
+            public int HotspotX { get; private set; }
+            public int HotspotY { get; private set; }
+            public int Index { get; private set; }
+            public string GlyphSource { get; private set; }
+            public CursorGlyph Glyph { get; private set; }
+            public int Left { get; private set; }
+            public int Top { get; private set; }
+            public int DrawWidth { get; private set; }
+            public int DrawHeight { get; private set; }
+            public int CompositedPixels { get; set; }
         }
 
         private sealed class PendingAction
