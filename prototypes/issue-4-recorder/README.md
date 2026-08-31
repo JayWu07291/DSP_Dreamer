@@ -12,7 +12,7 @@
 2. 下一個 `VFInput.OnUpdate` postfix 記錄 DSP 實際讀到的鍵鼠狀態。若該樣本看到注入內容，它會記錄相同 `action_id`。
 3. 同一 rendered frame 的 `WaitForEndOfFrame` 建立 RGB 擷取要求，固定保存要求當下的 `unity_frame`、`game_tick` 與待對齊的 `action_id`。
 4. GPU callback 只補上 `completed_ticks`。它不得改寫要求當下的 frame、tick 或 action 身分。
-5. 科技樹、研究佇列、手作、手採、建造與登陸艙拆除事件保存事件發生當下的 `unity_frame` 與 `game_tick`。資料載入器日後可把 `action_id` 對到同 rendered frame 結束時的 RGB 與 task label，形成 `observation_t, action_t, next_state_t`。
+5. 物品進入背包、面板開關、科技樹、研究佇列、手作、手採、建造與登陸艙拆除事件保存發生當下的 `unity_frame` 與 `game_tick`。錄製開始時另存一份已開啟面板快照。資料載入器日後可把 `action_id` 對到同 rendered frame 結束時的 RGB 與 task label，形成 `observation_t, action_t, next_state_t`。
 
 這個原型故意同時保存要求時間與完成時間。GPU callback 的完成順序不是資料時間順序。
 
@@ -30,7 +30,7 @@
 
 - `Ctrl+F8` 開始或停止擷取。預設 10 分鐘後自動停止。
 - 錄製期間至少按三次 `Ctrl+F9`。每次會送出 100 ms 的 W 與 16 px 相對滑鼠移動，用來量 action-to-observation latency。
-- 依序拆除登陸艙、開啟科技樹、加入研究佇列、手作並完成一項物品、完成一項科技、手動採礦，再放置至少一棟建築。這是事件涵蓋率 smoke test。
+- 依序拆除登陸艙、開啟再關閉科技樹、加入研究佇列、手作並完成一項物品、完成一項科技、手動採礦，再放置至少一棟建築。這是事件涵蓋率 smoke test。
 - `Ctrl+Shift+F11` 是緊急停止。它會先送出 W key-up。原型不使用 `F12`，因為 Steam 會攔截它做截圖。
 
 錄製開始後，狀態面板會消失，避免污染 RGB 資料。停止擷取後，面板會重新出現並顯示結果。
@@ -47,7 +47,7 @@
 .\prototypes\issue-4-recorder\probe.ps1 show-latest
 ```
 
-這個命令也會列出 `task_event` 的總數與內容，包括科技樹開啟、研究排隊、手作排隊與完成、科技完成、手採產出、建造、一般拆除與登陸艙拆除。
+這個命令也會列出錄製開始時的面板快照，以及 `task_event` 的總數與內容，包括物品取得、面板開關、科技樹開啟、研究排隊、手作排隊與完成、科技完成、手採產出、建造、一般拆除與登陸艙拆除。
 
 事件名稱與成功判定如下：
 
@@ -61,6 +61,11 @@
 | `tech_unlocked` | 遊戲送出科技解鎖事件 |
 | `manual_mining_yield` | `PlayerAction_Mine` 登記實際產出 |
 | `factory_build` | 工廠送出完成建造事件 |
+| `item_acquired` | 物品實際進入玩家背包，保存 item ID、數量與增產點數 |
+| `panel_opened` | 一個頂層視窗、面板或主要畫面完成開啟，保存型別與 run 內 instance ID |
+| `panel_closed` | 一個頂層視窗、面板或主要畫面完成關閉，保存型別與 run 內 instance ID |
+
+`panel_state_snapshot` 不是 task event。它在每次錄製開始時列出當下所有已開啟面板，之後可依 `panel_opened` 與 `panel_closed` 重建任一時間點的 UI 狀態。
 
 把最近一次結果的第一幀轉成上下方向不同的兩張 PNG：
 
@@ -78,7 +83,7 @@
 - 總掉幀率低於 1%。總掉幀分成排程錯過、沒有空閒 GPU slot、GPU readback 錯誤與 writer backpressure。
 - 有效寫入率至少是設定 Hz 的 95%。
 - GPU readback 與 writer backpressure 都是零。
-- 上表八種必要 task event 都至少記錄一次；`summary.json` 的 `missing_task_event_kinds` 必須是空字串。
+- 上表十一種必要 task event 都至少記錄一次；`summary.json` 的 `missing_task_event_kinds` 必須是空字串。
 - 至少做過三次注入，而且每個注入都在 100 ms 內由 `VFInput.OnUpdate` 觀察到。
 
 數值門檻通過後，整體 `verdict` 仍是 `metrics_pass_visual_pending`。正式結論需要人工確認 frame 包含完整世界視野、科技樹 UI 與游標，不包含錄製模組狀態面板，且上下方向與 RGBA channel 正確。先跑 10 Hz。人工確認通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。

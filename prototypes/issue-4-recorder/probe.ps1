@@ -19,8 +19,13 @@ if ($Command -eq 'show-latest') {
         $event = $_ | ConvertFrom-Json
         if ($event.type -eq 'task_event') { $event }
     }
+    $panelSnapshot = Get-Content -LiteralPath (Join-Path $latest.FullName 'events.ndjson') | ForEach-Object {
+        $event = $_ | ConvertFrom-Json
+        if ($event.type -eq 'panel_state_snapshot') { $event }
+    } | Select-Object -First 1
+    Write-Host "Initial open panels: $($panelSnapshot.open_panels)"
     Write-Host "Task events: $($taskEvents.Count)"
-    $taskEvents | Select-Object name, game_tick, unity_frame, tech_id, queued_count, recipe_id, count, product_ids, product_counts, item_id, item_count, mining_type, mining_proto_id, entity_id, prebuild_id, proto_id, object_id, vege_id | Format-Table -AutoSize
+    $taskEvents | Select-Object name, game_tick, unity_frame, panel, panel_instance_id, tech_id, queued_count, recipe_id, count, product_ids, product_counts, item_id, item_count, item_inc, destination, mining_type, mining_proto_id, entity_id, prebuild_id, proto_id, object_id, vege_id | Format-Table -AutoSize
     exit
 }
 

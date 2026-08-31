@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.4";
+        public const string PluginVersion = "0.1.5";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -36,7 +36,29 @@ namespace DSPDreamer.CaptureProbe
             "craft_completed",
             "tech_unlocked",
             "manual_mining_yield",
-            "factory_build"
+            "factory_build",
+            "item_acquired",
+            "panel_opened",
+            "panel_closed"
+        };
+        private static readonly HashSet<string> MajorPanelTypeNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "UIBlueprintBrowser",
+            "UICredits",
+            "UIDashboard",
+            "UIDysonEditor",
+            "UIEscMenu",
+            "UIGalaxySelect",
+            "UIGameMenu",
+            "UIGlobemap",
+            "UIMainMenu",
+            "UIMechaEditor",
+            "UIMechaLab",
+            "UIMilkyWay",
+            "UISandboxMenu",
+            "UIStarmap",
+            "UITechTree",
+            "UIZScreen"
         };
         internal static CaptureProbePlugin Current;
 
@@ -56,6 +78,7 @@ namespace DSPDreamer.CaptureProbe
         private Thread writerThread;
         private StreamWriter eventWriter;
         private FileStream frameWriter;
+        private Player boundPlayer;
         private string runDirectory;
         private bool recording;
         private bool stopping;
@@ -225,6 +248,7 @@ namespace DSPDreamer.CaptureProbe
                 "unity_frame", Time.frameCount,
                 "game_tick", SafeGameTick()));
             recording = true;
+            RecordPanelSnapshot();
             lastMessage = "擷取中：" + runDirectory;
         }
 
@@ -541,6 +565,8 @@ namespace DSPDreamer.CaptureProbe
         {
             UnbindTaskEvents();
             if (GameMain.history != null) GameMain.history.onTechUnlocked += OnTechUnlocked;
+            boundPlayer = GameMain.mainPlayer;
+            if (boundPlayer != null) boundPlayer.onPackageAddItem += OnPackageAddItem;
             PlanetFactory.onFactoryBuildEntity += OnFactoryBuild;
             PlanetFactory.beforeFactoryDismantleObject += OnBeforeDismantle;
             PlanetFactory.onFactoryDismantleObject += OnAfterDismantle;
@@ -549,6 +575,8 @@ namespace DSPDreamer.CaptureProbe
         private void UnbindTaskEvents()
         {
             if (GameMain.history != null) GameMain.history.onTechUnlocked -= OnTechUnlocked;
+            if (boundPlayer != null) boundPlayer.onPackageAddItem -= OnPackageAddItem;
+            boundPlayer = null;
             PlanetFactory.onFactoryBuildEntity -= OnFactoryBuild;
             PlanetFactory.beforeFactoryDismantleObject -= OnBeforeDismantle;
             PlanetFactory.onFactoryDismantleObject -= OnAfterDismantle;
@@ -557,6 +585,12 @@ namespace DSPDreamer.CaptureProbe
         private void OnTechUnlocked(int techId, int level, bool direct)
         {
             WriteTaskEvent("tech_unlocked", Fields("tech_id", techId, "level", level, "direct", direct));
+        }
+
+        private void OnPackageAddItem(int itemId, int count, int inc)
+        {
+            if (count <= 0) return;
+            WriteTaskEvent("item_acquired", Fields("item_id", itemId, "item_count", count, "item_inc", inc, "destination", "player_package"));
         }
 
         private void OnFactoryBuild(PlanetFactory factory, int entityId, int prebuildId)
@@ -617,6 +651,52 @@ namespace DSPDreamer.CaptureProbe
         internal void RecordLandingCapsuleDismantled(int vegeId)
         {
             WriteTaskEvent("landing_capsule_dismantled", Fields("vege_id", vegeId, "proto_id", SpaceCapsuleProtoId));
+        }
+
+        internal void RecordPanelOpened(ManualBehaviour panel)
+        {
+            if (!IsPanel(panel)) return;
+            WriteTaskEvent("panel_opened", Fields("panel", panel.GetType().Name, "panel_instance_id", panel.GetInstanceID()));
+        }
+
+        internal void RecordPanelClosed(ManualBehaviour panel)
+        {
+            if (!IsPanel(panel)) return;
+            WriteTaskEvent("panel_closed", Fields("panel", panel.GetType().Name, "panel_instance_id", panel.GetInstanceID()));
+        }
+
+        private void RecordPanelSnapshot()
+        {
+            ManualBehaviour[] behaviours = Resources.FindObjectsOfTypeAll<ManualBehaviour>();
+            HashSet<string> openPanels = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                ManualBehaviour behaviour = behaviours[i];
+                if (IsPanel(behaviour) && behaviour.active) openPanels.Add(PanelKey(behaviour));
+            }
+            string[] names = new string[openPanels.Count];
+            openPanels.CopyTo(names);
+            Array.Sort(names, StringComparer.Ordinal);
+            WriteEvent("panel_state_snapshot", Fields(
+                "open_panels", string.Join(",", names),
+                "unity_frame", Time.frameCount,
+                "game_tick", SafeGameTick(),
+                "ticks", clock.ElapsedTicks));
+        }
+
+        private static bool IsPanel(ManualBehaviour behaviour)
+        {
+            if (behaviour == null) return false;
+            string typeName = behaviour.GetType().Name;
+            if (!typeName.StartsWith("UI", StringComparison.Ordinal)) return false;
+            return typeName.EndsWith("Window", StringComparison.Ordinal)
+                || typeName.EndsWith("Panel", StringComparison.Ordinal)
+                || MajorPanelTypeNames.Contains(typeName);
+        }
+
+        private static string PanelKey(ManualBehaviour panel)
+        {
+            return panel.GetType().Name + "#" + panel.GetInstanceID().ToString(Invariant);
         }
 
         private void WriteTaskEvent(string name, IDictionary<string, object> fields)
@@ -953,6 +1033,24 @@ namespace DSPDreamer.CaptureProbe
             {
                 CaptureProbePlugin.Current.RecordLandingCapsuleDismantled(id);
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(ManualBehaviour), nameof(ManualBehaviour._Open))]
+    internal static class ManualBehaviourOpenPatch
+    {
+        private static void Postfix(ManualBehaviour __instance)
+        {
+            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordPanelOpened(__instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(ManualBehaviour), nameof(ManualBehaviour._Close))]
+    internal static class ManualBehaviourClosePatch
+    {
+        private static void Postfix(ManualBehaviour __instance)
+        {
+            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordPanelClosed(__instance);
         }
     }
 }
