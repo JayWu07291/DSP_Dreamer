@@ -20,7 +20,7 @@ if ($Command -eq 'show-latest') {
         if ($event.type -eq 'task_event') { $event }
     }
     Write-Host "Task events: $($taskEvents.Count)"
-    $taskEvents | Select-Object name, game_tick, unity_frame, tech_id, level, entity_id, prebuild_id, proto_id, object_id | Format-Table -AutoSize
+    $taskEvents | Select-Object name, game_tick, unity_frame, tech_id, queued_count, recipe_id, count, product_ids, product_counts, item_id, item_count, mining_type, mining_proto_id, entity_id, prebuild_id, proto_id, object_id, vege_id | Format-Table -AutoSize
     exit
 }
 

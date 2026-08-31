@@ -22,16 +22,29 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.3";
+        public const string PluginVersion = "0.1.4";
 
         private const int SlotCount = 12;
+        private const int SpaceCapsuleProtoId = 9999;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
+        private static readonly string[] RequiredTaskEventKinds =
+        {
+            "landing_capsule_dismantled",
+            "tech_tree_opened",
+            "tech_enqueued",
+            "craft_enqueued",
+            "craft_completed",
+            "tech_unlocked",
+            "manual_mining_yield",
+            "factory_build"
+        };
         internal static CaptureProbePlugin Current;
 
         private readonly object eventLock = new object();
         private readonly Stopwatch clock = new Stopwatch();
         private readonly Dictionary<KeyCode, bool> keyState = new Dictionary<KeyCode, bool>();
         private readonly Queue<PendingAction> pendingActions = new Queue<PendingAction>();
+        private readonly HashSet<string> taskEventKinds = new HashSet<string>(StringComparer.Ordinal);
         private ConfigEntry<int> captureHz;
         private ConfigEntry<int> captureWidth;
         private ConfigEntry<int> captureHeight;
@@ -450,12 +463,13 @@ namespace DSPDreamer.CaptureProbe
             double effectiveHz = elapsed <= 0 ? 0 : writtenFrames / elapsed;
             double measuredRenderedFps = elapsed <= 0 ? 0 : inputSamples / elapsed;
             double averageActionLatencyMs = observedActions == 0 ? 0 : TicksToMilliseconds(actionLatencyTicksTotal / observedActions);
+            string[] missingTaskEventKinds = GetMissingTaskEventKinds();
             bool metricsPassed = elapsed >= Math.Min(durationSeconds.Value, 60)
                 && dropRate < 0.01
                 && effectiveHz >= captureHz.Value * 0.95
                 && readbackErrors == 0
                 && writerDrops == 0
-                && taskEventCount > 0
+                && missingTaskEventKinds.Length == 0
                 && injectedActions >= 3
                 && observedActions == injectedActions
                 && TicksToMilliseconds(actionLatencyTicksMax) <= 100.0;
@@ -486,6 +500,8 @@ namespace DSPDreamer.CaptureProbe
                 "writer_bytes", writerBytes,
                 "max_writer_queue", maxWriterQueue,
                 "task_events", taskEventCount,
+                "task_event_kinds", string.Join(",", SortedTaskEventKinds()),
+                "missing_task_event_kinds", string.Join(",", missingTaskEventKinds),
                 "injected_actions", injectedActions,
                 "observed_actions", observedActions,
                 "average_action_latency_ms", averageActionLatencyMs,
@@ -559,9 +575,55 @@ namespace DSPDreamer.CaptureProbe
             WriteTaskEvent("after_dismantle", Fields("object_id", objectId));
         }
 
+        internal void RecordTechTreeOpened()
+        {
+            WriteTaskEvent("tech_tree_opened", Fields());
+        }
+
+        internal void RecordTechEnqueued(int techId, int queuedCount)
+        {
+            WriteTaskEvent("tech_enqueued", Fields("tech_id", techId, "queued_count", queuedCount));
+        }
+
+        internal void RecordCraftEnqueued(int recipeId, int count, ForgeTask task)
+        {
+            WriteTaskEvent("craft_enqueued", Fields(
+                "recipe_id", recipeId,
+                "count", count,
+                "product_ids", JoinInts(task == null ? null : task.productIds),
+                "product_counts", JoinInts(task == null ? null : task.productCounts)));
+        }
+
+        internal void RecordCraftCompleted(ForgeTask task)
+        {
+            if (task == null) return;
+            WriteTaskEvent("craft_completed", Fields(
+                "recipe_id", task.recipeId,
+                "product_ids", JoinInts(task.productIds),
+                "product_counts", JoinInts(task.productCounts)));
+        }
+
+        internal void RecordManualMiningYield(PlayerAction_Mine action, int itemId, int itemCount, PlanetFactory factory)
+        {
+            WriteTaskEvent("manual_mining_yield", Fields(
+                "item_id", itemId,
+                "item_count", itemCount,
+                "mining_type", action == null ? "unknown" : action.miningType.ToString(),
+                "mining_id", action == null ? 0 : action.miningId,
+                "mining_proto_id", action == null ? 0 : action.miningProtoId,
+                "planet_id", factory == null || factory.planet == null ? 0 : factory.planet.id));
+        }
+
+        internal void RecordLandingCapsuleDismantled(int vegeId)
+        {
+            WriteTaskEvent("landing_capsule_dismantled", Fields("vege_id", vegeId, "proto_id", SpaceCapsuleProtoId));
+        }
+
         private void WriteTaskEvent(string name, IDictionary<string, object> fields)
         {
+            if (!recording) return;
             taskEventCount++;
+            taskEventKinds.Add(name);
             fields["name"] = name;
             fields["unity_frame"] = Time.frameCount;
             fields["game_tick"] = SafeGameTick();
@@ -614,6 +676,7 @@ namespace DSPDreamer.CaptureProbe
             readbackErrors = writerDrops = writerBytes = maxWriterQueue = 0;
             injectedActions = observedActions = actionLatencyTicksTotal = actionLatencyTicksMax = 0;
             taskEventCount = 0;
+            taskEventKinds.Clear();
             inputSamples = 0;
             outstandingReadbacks = 0;
             nextCaptureId = 0;
@@ -646,6 +709,32 @@ namespace DSPDreamer.CaptureProbe
             Dictionary<string, object> fields = new Dictionary<string, object>();
             for (int i = 0; i < values.Length; i += 2) fields[(string)values[i]] = values[i + 1];
             return fields;
+        }
+
+        private string[] SortedTaskEventKinds()
+        {
+            string[] result = new string[taskEventKinds.Count];
+            taskEventKinds.CopyTo(result);
+            Array.Sort(result, StringComparer.Ordinal);
+            return result;
+        }
+
+        private string[] GetMissingTaskEventKinds()
+        {
+            List<string> missing = new List<string>();
+            for (int i = 0; i < RequiredTaskEventKinds.Length; i++)
+            {
+                if (!taskEventKinds.Contains(RequiredTaskEventKinds[i])) missing.Add(RequiredTaskEventKinds[i]);
+            }
+            return missing.ToArray();
+        }
+
+        private static string JoinInts(int[] values)
+        {
+            if (values == null || values.Length == 0) return string.Empty;
+            string[] text = new string[values.Length];
+            for (int i = 0; i < values.Length; i++) text[i] = values[i].ToString(Invariant);
+            return string.Join(",", text);
         }
 
         private static string JsonObject(IDictionary<string, object> fields)
@@ -784,6 +873,86 @@ namespace DSPDreamer.CaptureProbe
         private static void Prefix()
         {
             if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.OnGameEnd();
+        }
+    }
+
+    [HarmonyPatch(typeof(UITechTree), "_OnOpen")]
+    internal static class UITechTreeOnOpenPatch
+    {
+        private static void Postfix()
+        {
+            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordTechTreeOpened();
+        }
+    }
+
+    [HarmonyPatch(typeof(GameHistoryData), nameof(GameHistoryData.EnqueueTech))]
+    internal static class GameHistoryDataEnqueueTechPatch
+    {
+        private static void Prefix(GameHistoryData __instance, int techId, out int __state)
+        {
+            __state = __instance.TechQueuedCount(techId);
+        }
+
+        private static void Postfix(GameHistoryData __instance, int techId, int __state)
+        {
+            int queuedCount = __instance.TechQueuedCount(techId);
+            if (queuedCount > __state && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordTechEnqueued(techId, queuedCount);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(MechaForge), nameof(MechaForge.AddTask))]
+    internal static class MechaForgeAddTaskPatch
+    {
+        private static void Postfix(int recipeId, int count, ForgeTask __result)
+        {
+            if (__result != null && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordCraftEnqueued(recipeId, count, __result);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(MechaForge), "TaskDeliver")]
+    internal static class MechaForgeTaskDeliverPatch
+    {
+        private static void Prefix(ForgeTask task)
+        {
+            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordCraftCompleted(task);
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerAction_Mine), "AddProductionStat")]
+    internal static class PlayerActionMineAddProductionStatPatch
+    {
+        private static void Postfix(PlayerAction_Mine __instance, int itemId, int itemCount, PlanetFactory factory)
+        {
+            if (itemCount > 0 && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordManualMiningYield(__instance, itemId, itemCount, factory);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(PlanetFactory), nameof(PlanetFactory.RemoveVegeWithComponents))]
+    internal static class PlanetFactoryRemoveVegeWithComponentsPatch
+    {
+        private static void Prefix(PlanetFactory __instance, int id, out bool __state)
+        {
+            __state = id > 0
+                && id < __instance.vegeCursor
+                && id < __instance.vegePool.Length
+                && __instance.vegePool[id].protoId == 9999;
+        }
+
+        private static void Postfix(int id, bool __state)
+        {
+            if (__state && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordLandingCapsuleDismantled(id);
+            }
         }
     }
 }
