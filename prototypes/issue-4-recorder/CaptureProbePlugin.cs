@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.2";
+        public const string PluginVersion = "0.1.3";
 
         private const int SlotCount = 12;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
@@ -65,6 +65,7 @@ namespace DSPDreamer.CaptureProbe
         private long observedActions;
         private long actionLatencyTicksTotal;
         private long actionLatencyTicksMax;
+        private long taskEventCount;
         private long lastObservedActionId;
         private int lastObservedActionFrame = -1;
         private long inputSamples;
@@ -454,6 +455,7 @@ namespace DSPDreamer.CaptureProbe
                 && effectiveHz >= captureHz.Value * 0.95
                 && readbackErrors == 0
                 && writerDrops == 0
+                && taskEventCount > 0
                 && injectedActions >= 3
                 && observedActions == injectedActions
                 && TicksToMilliseconds(actionLatencyTicksMax) <= 100.0;
@@ -483,6 +485,7 @@ namespace DSPDreamer.CaptureProbe
                 "drop_rate", dropRate,
                 "writer_bytes", writerBytes,
                 "max_writer_queue", maxWriterQueue,
+                "task_events", taskEventCount,
                 "injected_actions", injectedActions,
                 "observed_actions", observedActions,
                 "average_action_latency_ms", averageActionLatencyMs,
@@ -558,6 +561,7 @@ namespace DSPDreamer.CaptureProbe
 
         private void WriteTaskEvent(string name, IDictionary<string, object> fields)
         {
+            taskEventCount++;
             fields["name"] = name;
             fields["unity_frame"] = Time.frameCount;
             fields["game_tick"] = SafeGameTick();
@@ -581,6 +585,7 @@ namespace DSPDreamer.CaptureProbe
 
         private void OnGUI()
         {
+            if (recording) return;
             if (overlayStyle == null)
             {
                 overlayStyle = new GUIStyle(GUI.skin.box) { alignment = TextAnchor.UpperLeft, fontSize = 16, wordWrap = true };
@@ -608,6 +613,7 @@ namespace DSPDreamer.CaptureProbe
             expectedFrames = requestedFrames = writtenFrames = schedulerDrops = inFlightDrops = 0;
             readbackErrors = writerDrops = writerBytes = maxWriterQueue = 0;
             injectedActions = observedActions = actionLatencyTicksTotal = actionLatencyTicksMax = 0;
+            taskEventCount = 0;
             inputSamples = 0;
             outstandingReadbacks = 0;
             nextCaptureId = 0;

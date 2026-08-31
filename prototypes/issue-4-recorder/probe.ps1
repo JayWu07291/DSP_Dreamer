@@ -15,6 +15,12 @@ if ($Command -eq 'show-latest') {
     $latest = Get-ChildItem -LiteralPath $runsDirectory -Directory | Sort-Object Name -Descending | Select-Object -First 1
     if ($null -eq $latest) { throw "No probe run exists under $runsDirectory" }
     Get-Content -LiteralPath (Join-Path $latest.FullName 'summary.json')
+    $taskEvents = Get-Content -LiteralPath (Join-Path $latest.FullName 'events.ndjson') | ForEach-Object {
+        $event = $_ | ConvertFrom-Json
+        if ($event.type -eq 'task_event') { $event }
+    }
+    Write-Host "Task events: $($taskEvents.Count)"
+    $taskEvents | Select-Object name, game_tick, unity_frame, tech_id, level, entity_id, prebuild_id, proto_id, object_id | Format-Table -AutoSize
     exit
 }
 

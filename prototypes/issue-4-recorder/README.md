@@ -33,6 +33,8 @@
 - 開啟科技樹，移動、點擊、拖曳、滾輪操作，並在可行時觸發一個科技或建造事件。
 - `Ctrl+Shift+F11` 是緊急停止。它會先送出 W key-up。原型不使用 `F12`，因為 Steam 會攔截它做截圖。
 
+錄製開始後，狀態面板會消失，避免污染 RGB 資料。停止擷取後，面板會重新出現並顯示結果。
+
 結果位於 `BepInEx/plugins/DSPDreamerCaptureProbe/runs/<UTC>/`：
 
 - `frames.rgba`：依 `capture_written.file_offset` 排列的 640×360 RGBA frame。
@@ -44,6 +46,8 @@
 ```powershell
 .\prototypes\issue-4-recorder\probe.ps1 show-latest
 ```
+
+這個命令也會列出 `task_event` 的總數與內容，包括科技、建造和拆除事件。
 
 把最近一次結果的第一幀轉成上下方向不同的兩張 PNG：
 
@@ -61,6 +65,7 @@
 - 總掉幀率低於 1%。總掉幀分成排程錯過、沒有空閒 GPU slot、GPU readback 錯誤與 writer backpressure。
 - 有效寫入率至少是設定 Hz 的 95%。
 - GPU readback 與 writer backpressure 都是零。
+- 至少記錄一個 task event。
 - 至少做過三次注入，而且每個注入都在 100 ms 內由 `VFInput.OnUpdate` 觀察到。
 
 數值門檻通過後，整體 `verdict` 仍是 `metrics_pass_visual_pending`。正式結論需要人工確認 frame 包含完整世界視野、科技樹 UI、游標與 overlay，且上下方向與 RGBA channel 正確。先跑 10 Hz。人工確認通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。
