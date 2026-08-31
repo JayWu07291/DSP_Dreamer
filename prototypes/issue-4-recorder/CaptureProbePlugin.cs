@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.5";
+        public const string PluginVersion = "0.1.6";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -102,6 +102,9 @@ namespace DSPDreamer.CaptureProbe
         private long actionLatencyTicksTotal;
         private long actionLatencyTicksMax;
         private long taskEventCount;
+        private int pendingDismantleObjectId;
+        private int pendingDismantleProtoId;
+        private string pendingDismantleProtoName;
         private long lastObservedActionId;
         private int lastObservedActionFrame = -1;
         private long inputSamples;
@@ -584,29 +587,36 @@ namespace DSPDreamer.CaptureProbe
 
         private void OnTechUnlocked(int techId, int level, bool direct)
         {
-            WriteTaskEvent("tech_unlocked", Fields("tech_id", techId, "level", level, "direct", direct));
+            WriteTaskEvent("tech_unlocked", Fields("tech_id", techId, "tech_name", TechName(techId), "level", level, "direct", direct));
         }
 
         private void OnPackageAddItem(int itemId, int count, int inc)
         {
             if (count <= 0) return;
-            WriteTaskEvent("item_acquired", Fields("item_id", itemId, "item_count", count, "item_inc", inc, "destination", "player_package"));
+            WriteTaskEvent("item_acquired", Fields("item_id", itemId, "item_name", ItemName(itemId), "item_count", count, "item_inc", inc, "destination", "player_package"));
         }
 
         private void OnFactoryBuild(PlanetFactory factory, int entityId, int prebuildId)
         {
             int protoId = entityId > 0 && entityId < factory.entityPool.Length ? factory.entityPool[entityId].protoId : 0;
-            WriteTaskEvent("factory_build", Fields("entity_id", entityId, "prebuild_id", prebuildId, "proto_id", protoId));
+            WriteTaskEvent("factory_build", Fields("entity_id", entityId, "prebuild_id", prebuildId, "proto_id", protoId, "proto_name", ItemName(protoId)));
         }
 
         private void OnBeforeDismantle(PlanetFactory factory, int objectId)
         {
-            WriteTaskEvent("before_dismantle", Fields("object_id", objectId));
+            pendingDismantleObjectId = objectId;
+            pendingDismantleProtoId = FactoryObjectProtoId(factory, objectId);
+            pendingDismantleProtoName = ItemName(pendingDismantleProtoId);
+            WriteTaskEvent("before_dismantle", Fields("object_id", objectId, "proto_id", pendingDismantleProtoId, "proto_name", pendingDismantleProtoName));
         }
 
         private void OnAfterDismantle(PlanetFactory factory, int objectId)
         {
-            WriteTaskEvent("after_dismantle", Fields("object_id", objectId));
+            int protoId = objectId == pendingDismantleObjectId ? pendingDismantleProtoId : 0;
+            string protoName = objectId == pendingDismantleObjectId ? pendingDismantleProtoName : string.Empty;
+            WriteTaskEvent("after_dismantle", Fields("object_id", objectId, "proto_id", protoId, "proto_name", protoName));
+            pendingDismantleObjectId = pendingDismantleProtoId = 0;
+            pendingDismantleProtoName = string.Empty;
         }
 
         internal void RecordTechTreeOpened()
@@ -616,15 +626,17 @@ namespace DSPDreamer.CaptureProbe
 
         internal void RecordTechEnqueued(int techId, int queuedCount)
         {
-            WriteTaskEvent("tech_enqueued", Fields("tech_id", techId, "queued_count", queuedCount));
+            WriteTaskEvent("tech_enqueued", Fields("tech_id", techId, "tech_name", TechName(techId), "queued_count", queuedCount));
         }
 
         internal void RecordCraftEnqueued(int recipeId, int count, ForgeTask task)
         {
             WriteTaskEvent("craft_enqueued", Fields(
                 "recipe_id", recipeId,
+                "recipe_name", RecipeName(recipeId),
                 "count", count,
                 "product_ids", JoinInts(task == null ? null : task.productIds),
+                "product_names", JoinItemNames(task == null ? null : task.productIds),
                 "product_counts", JoinInts(task == null ? null : task.productCounts)));
         }
 
@@ -633,7 +645,9 @@ namespace DSPDreamer.CaptureProbe
             if (task == null) return;
             WriteTaskEvent("craft_completed", Fields(
                 "recipe_id", task.recipeId,
+                "recipe_name", RecipeName(task.recipeId),
                 "product_ids", JoinInts(task.productIds),
+                "product_names", JoinItemNames(task.productIds),
                 "product_counts", JoinInts(task.productCounts)));
         }
 
@@ -641,16 +655,19 @@ namespace DSPDreamer.CaptureProbe
         {
             WriteTaskEvent("manual_mining_yield", Fields(
                 "item_id", itemId,
+                "item_name", ItemName(itemId),
                 "item_count", itemCount,
                 "mining_type", action == null ? "unknown" : action.miningType.ToString(),
                 "mining_id", action == null ? 0 : action.miningId,
                 "mining_proto_id", action == null ? 0 : action.miningProtoId,
-                "planet_id", factory == null || factory.planet == null ? 0 : factory.planet.id));
+                "mining_proto_name", MiningProtoName(action),
+                "planet_id", factory == null || factory.planet == null ? 0 : factory.planet.id,
+                "planet_name", factory == null || factory.planet == null ? string.Empty : factory.planet.displayName));
         }
 
         internal void RecordLandingCapsuleDismantled(int vegeId)
         {
-            WriteTaskEvent("landing_capsule_dismantled", Fields("vege_id", vegeId, "proto_id", SpaceCapsuleProtoId));
+            WriteTaskEvent("landing_capsule_dismantled", Fields("vege_id", vegeId, "proto_id", SpaceCapsuleProtoId, "proto_name", VegeName(SpaceCapsuleProtoId)));
         }
 
         internal void RecordPanelOpened(ManualBehaviour panel)
@@ -764,6 +781,8 @@ namespace DSPDreamer.CaptureProbe
             lastObservedActionFrame = -1;
             pendingActions.Clear();
             keyState.Clear();
+            pendingDismantleObjectId = pendingDismantleProtoId = 0;
+            pendingDismantleProtoName = string.Empty;
             recording = stopping = writerFinished = false;
         }
 
@@ -815,6 +834,59 @@ namespace DSPDreamer.CaptureProbe
             string[] text = new string[values.Length];
             for (int i = 0; i < values.Length; i++) text[i] = values[i].ToString(Invariant);
             return string.Join(",", text);
+        }
+
+        private static string JoinItemNames(int[] itemIds)
+        {
+            if (itemIds == null || itemIds.Length == 0) return string.Empty;
+            string[] names = new string[itemIds.Length];
+            for (int i = 0; i < itemIds.Length; i++) names[i] = ItemName(itemIds[i]);
+            return string.Join(",", names);
+        }
+
+        private static int FactoryObjectProtoId(PlanetFactory factory, int objectId)
+        {
+            if (factory == null) return 0;
+            if (objectId > 0 && objectId < factory.entityPool.Length) return factory.entityPool[objectId].protoId;
+            int prebuildId = -objectId;
+            if (prebuildId > 0 && prebuildId < factory.prebuildPool.Length) return factory.prebuildPool[prebuildId].protoId;
+            return 0;
+        }
+
+        private static string ItemName(int id)
+        {
+            ItemProto proto = id > 0 ? LDB.items.Select(id) : null;
+            return proto == null ? string.Empty : proto.name;
+        }
+
+        private static string TechName(int id)
+        {
+            TechProto proto = id > 0 ? LDB.techs.Select(id) : null;
+            return proto == null ? string.Empty : proto.name;
+        }
+
+        private static string RecipeName(int id)
+        {
+            RecipeProto proto = id > 0 ? LDB.recipes.Select(id) : null;
+            return proto == null ? string.Empty : proto.name;
+        }
+
+        private static string VegeName(int id)
+        {
+            VegeProto proto = id > 0 ? LDB.veges.Select(id) : null;
+            return proto == null ? string.Empty : proto.name;
+        }
+
+        private static string MiningProtoName(PlayerAction_Mine action)
+        {
+            if (action == null || action.miningProtoId <= 0) return string.Empty;
+            if (action.miningType == EObjectType.Vein)
+            {
+                VeinProto vein = LDB.veins.Select(action.miningProtoId);
+                return vein == null ? string.Empty : vein.name;
+            }
+            if (action.miningType == EObjectType.Vegetable) return VegeName(action.miningProtoId);
+            return string.Empty;
         }
 
         private static string JsonObject(IDictionary<string, object> fields)

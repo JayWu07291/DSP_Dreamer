@@ -11,6 +11,23 @@ $output = Join-Path $PSScriptRoot 'bin\Release'
 $pluginDirectory = Join-Path $DspRoot 'BepInEx\plugins\DSPDreamerCaptureProbe'
 $runsDirectory = Join-Path $pluginDirectory 'runs'
 
+function Format-TaskEventDetails($Event) {
+    $parts = [Collections.Generic.List[string]]::new()
+    if ($null -ne $Event.tech_id) { $parts.Add("科技 $($Event.tech_id) $($Event.tech_name)") }
+    if ($null -ne $Event.recipe_id) { $parts.Add("配方 $($Event.recipe_id) $($Event.recipe_name)") }
+    if ($null -ne $Event.product_ids) { $parts.Add("產物 $($Event.product_ids) $($Event.product_names) ×$($Event.product_counts)") }
+    if ($null -ne $Event.item_id) { $parts.Add("物品 $($Event.item_id) $($Event.item_name) ×$($Event.item_count)") }
+    if ($null -ne $Event.mining_proto_id) { $parts.Add("採集物 $($Event.mining_proto_id) $($Event.mining_proto_name)") }
+    if ($null -ne $Event.planet_id) { $parts.Add("行星 $($Event.planet_id) $($Event.planet_name)") }
+    if ($null -ne $Event.entity_id) { $parts.Add("實體ID $($Event.entity_id)") }
+    if ($null -ne $Event.prebuild_id -and $Event.prebuild_id -ne 0) { $parts.Add("預建物ID $($Event.prebuild_id)") }
+    if ($null -ne $Event.object_id) { $parts.Add("拆除物ID $($Event.object_id)") }
+    if ($null -ne $Event.vege_id) { $parts.Add("植被實例ID $($Event.vege_id)") }
+    if ($null -ne $Event.proto_id) { $parts.Add("原型 $($Event.proto_id) $($Event.proto_name)") }
+    if ($null -ne $Event.panel_instance_id) { $parts.Add("面板 $($Event.panel)#$($Event.panel_instance_id)") }
+    return $parts -join '; '
+}
+
 if ($Command -eq 'show-latest') {
     $latest = Get-ChildItem -LiteralPath $runsDirectory -Directory | Sort-Object Name -Descending | Select-Object -First 1
     if ($null -eq $latest) { throw "No probe run exists under $runsDirectory" }
@@ -25,7 +42,13 @@ if ($Command -eq 'show-latest') {
     } | Select-Object -First 1
     Write-Host "Initial open panels: $($panelSnapshot.open_panels)"
     Write-Host "Task events: $($taskEvents.Count)"
-    $taskEvents | Select-Object name, game_tick, unity_frame, panel, panel_instance_id, tech_id, queued_count, recipe_id, count, product_ids, product_counts, item_id, item_count, item_inc, destination, mining_type, mining_proto_id, entity_id, prebuild_id, proto_id, object_id, vege_id | Format-Table -AutoSize
+    $taskEvents | ForEach-Object {
+        [PSCustomObject]@{
+            Event = $_.name
+            GameTick = $_.game_tick
+            IdAndChineseName = Format-TaskEventDetails $_
+        }
+    } | Format-Table -Wrap -AutoSize
     exit
 }
 
