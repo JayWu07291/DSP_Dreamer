@@ -78,6 +78,24 @@
 
 打開 `first-frame-native.png` 與 `first-frame-flipped.png`。記下方向正確的版本，並確認紅、綠、藍色沒有互換。
 
+匯出適合人工檢查的事件畫面：
+
+```powershell
+.\prototypes\issue-4-recorder\probe.ps1 export-event-frames
+```
+
+命令會選取每次科技樹開啟後 0.5 秒、科技樹關閉後的第一幀，以及可用的 episode 結束前與新 episode 開始後畫面，輸出 PNG 和 `event-frames.json` 索引。用這些畫面確認完整世界視野、科技樹、游標、方向與色彩，並確認錄製模組狀態面板沒有入鏡。指定舊 run 時可加上 `-RunDirectory '<run 路徑>'`；`show-latest`、`export-frame` 與下方的驗證命令也接受相同參數。
+
+建立逐幀 transition 並驗證時間對齊：
+
+```powershell
+.\prototypes\issue-4-recorder\probe.ps1 verify-alignment
+```
+
+每一列 `alignment-manifest.ndjson` 都是一個相鄰 frame pair。區間採半開定義 `[observation.requested_ticks, next_observation.requested_ticks)`：區間內 DSP 實際讀到的 `input_sample` 是 `action_input_samples`，注入回讀是 `observed_injected_actions`，任務事件是 `next_state_events`，episode 邊界是 `episode_events`。`alignment-summary.json` 會檢查 capture 時間嚴格遞增、raw frame offset 有效，以及 task/action event 都有後續 observation；`alignment_verdict` 只在這些條件全部成立時通過。
+
+若同一次錄製包含 `episode_end`、之後的 `episode_begin`，而且重新進入世界後仍能收到 task event，`world_reset_verdict` 會是 `pass`；沒有進行世界重載時是 `not_tested`。這兩個工具的完整 episode 與輸入對齊需要 probe 0.1.9 或更新版本，舊 run 會回報需要重錄，而不會猜測缺少的單調時間。
+
 ## 判定門檻
 
 下列條件全部成立時，`metrics_verdict` 才是 `pass`：

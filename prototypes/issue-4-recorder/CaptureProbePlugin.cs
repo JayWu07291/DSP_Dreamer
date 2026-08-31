@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.8";
+        public const string PluginVersion = "0.1.9";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -415,6 +415,7 @@ namespace DSPDreamer.CaptureProbe
             }
 
             WriteEvent("input_sample", Fields(
+                "ticks", clock.ElapsedTicks,
                 "unity_frame", Time.frameCount,
                 "game_tick", SafeGameTick(),
                 "down", string.Join(",", down.ToArray()),
@@ -770,13 +771,13 @@ namespace DSPDreamer.CaptureProbe
         {
             if (!recording) return;
             BindTaskEvents();
-            WriteEvent("episode_begin", Fields("unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
+            WriteEvent("episode_begin", Fields("ticks", clock.ElapsedTicks, "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
         }
 
         internal void OnGameEnd()
         {
             if (!recording) return;
-            WriteEvent("episode_end", Fields("unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
+            WriteEvent("episode_end", Fields("ticks", clock.ElapsedTicks, "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
             UnbindTaskEvents();
         }
 
