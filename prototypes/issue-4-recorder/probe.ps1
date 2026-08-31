@@ -50,6 +50,10 @@ if ($Command -eq 'export-frame') {
     exit
 }
 
+if ($Command -eq 'deploy' -and $null -ne (Get-Process -Name DSPGAME -ErrorAction SilentlyContinue)) {
+    throw 'DSP is running. Close DSP before deploying the probe DLL.'
+}
+
 dotnet build $project --configuration $configuration -p:DSPRoot=$DspRoot
 
 if ($Command -eq 'deploy') {
