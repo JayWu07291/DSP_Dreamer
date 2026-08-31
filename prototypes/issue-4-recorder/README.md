@@ -12,7 +12,7 @@
 2. 下一個 `VFInput.OnUpdate` postfix 記錄 DSP 實際讀到的鍵鼠狀態。若該樣本看到注入內容，它會記錄相同 `action_id`。
 3. 同一 rendered frame 的 `WaitForEndOfFrame` 建立 RGB 擷取要求，固定保存要求當下的 `unity_frame`、`game_tick` 與待對齊的 `action_id`。
 4. GPU callback 只補上 `completed_ticks`。它不得改寫要求當下的 frame、tick 或 action 身分。
-5. 物品進入背包、面板開關、科技樹、研究佇列、手作、手採、建造與登陸艙拆除事件保存發生當下的 `unity_frame` 與 `game_tick`。錄製開始時另存一份已開啟面板快照。資料載入器日後可把 `action_id` 對到同 rendered frame 結束時的 RGB 與 task label，形成 `observation_t, action_t, next_state_t`。
+5. 物品進入背包、指定面板開關、研究佇列、手作、手採、建造與登陸艙拆除事件保存發生當下的 `unity_frame` 與 `game_tick`。錄製開始時另存一份已開啟面板快照。資料載入器日後可把 `action_id` 對到同 rendered frame 結束時的 RGB 與 task label，形成 `observation_t, action_t, next_state_t`。
 
 這個原型故意同時保存要求時間與完成時間。GPU callback 的完成順序不是資料時間順序。
 
@@ -49,21 +49,22 @@
 
 這個命令也會列出錄製開始時的面板快照，以及 `task_event` 的總數與內容，包括物品取得、面板開關、科技樹開啟、研究排隊、手作排隊與完成、科技完成、手採產出、建造、一般拆除與登陸艙拆除。摘要把科技、配方、物品、建築、礦脈與植被 ID 和當次遊戲語言的名稱放在同一欄，方便人工核對。名稱也會寫入 `events.ndjson`，不必在離線檢查時載入 LDB。行星 ID 與名稱不記錄。
 
-`item_acquired` 是背包狀態事件，`manual_mining_yield` 與 `craft_completed` 是來源事件。原始 NDJSON 保留兩層語意；`show-latest` 會用 `game_tick + item_id + count` 合併人工摘要中的重疊列，並顯示合併數量。
+`item_acquired` 是沒有其他來源事件的背包狀態事件。錄製器會延後一個 game tick 寫入；若同 tick、item ID 與數量已有 `manual_mining_yield` 或 `craft_completed`，就不把 `item_acquired` 寫進 NDJSON。`summary.json` 的 `suppressed_item_acquisition_duplicates` 記錄寫入前刪除的數量。`show-latest` 仍會合併舊版 run 的重疊列，新版 run 的合併數應為零。
+
+面板事件只追蹤 `UITechTree`、`UIReplicatorWindow`、`UIInventoryWindow` 與 `UIMechaWindow`。Unity instance ID 只在單次 run 內有效，所以白名單使用型別名稱，不固定 `#419754` 這類數值。
 
 事件名稱與成功判定如下：
 
 | `name` | 記錄時機 |
 | --- | --- |
 | `landing_capsule_dismantled` | `protoId 9999` 的登陸艙植被確實被移除 |
-| `tech_tree_opened` | 科技樹完成 `_OnOpen` |
 | `tech_enqueued` | `EnqueueTech` 後該科技的排隊數增加 |
 | `craft_enqueued` | `MechaForge.AddTask` 回傳成功的工作 |
 | `craft_completed` | 手作工作進入交付階段 |
 | `tech_unlocked` | 遊戲送出科技解鎖事件 |
 | `manual_mining_yield` | `PlayerAction_Mine` 登記實際產出 |
 | `factory_build` | 工廠送出完成建造事件 |
-| `item_acquired` | 物品實際進入玩家背包，保存 item ID、數量與增產點數 |
+| `item_acquired` | 沒有採礦或手作來源事件的物品實際進入玩家背包，保存 item ID、數量與增產點數 |
 | `panel_opened` | 面板的 `active` 狀態從 false 變成 true，保存型別與 run 內 instance ID |
 | `panel_closed` | 面板的 `active` 狀態從 true 變成 false，保存型別與 run 內 instance ID |
 
@@ -85,7 +86,7 @@
 - 總掉幀率低於 1%。總掉幀分成排程錯過、沒有空閒 GPU slot、GPU readback 錯誤與 writer backpressure。
 - 有效寫入率至少是設定 Hz 的 95%。
 - GPU readback 與 writer backpressure 都是零。
-- 上表十一種必要 task event 都至少記錄一次；`summary.json` 的 `missing_task_event_kinds` 必須是空字串。
+- 上表十種必要 task event 都至少記錄一次；`summary.json` 的 `missing_task_event_kinds` 必須是空字串。
 - 至少做過三次注入，而且每個注入都在 100 ms 內由 `VFInput.OnUpdate` 觀察到。
 
 數值門檻通過後，整體 `verdict` 仍是 `metrics_pass_visual_pending`。正式結論需要人工確認 frame 包含完整世界視野、科技樹 UI 與游標，不包含錄製模組狀態面板，且上下方向與 RGBA channel 正確。先跑 10 Hz。人工確認通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。

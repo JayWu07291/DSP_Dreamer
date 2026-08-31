@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.7";
+        public const string PluginVersion = "0.1.8";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -30,7 +30,6 @@ namespace DSPDreamer.CaptureProbe
         private static readonly string[] RequiredTaskEventKinds =
         {
             "landing_capsule_dismantled",
-            "tech_tree_opened",
             "tech_enqueued",
             "craft_enqueued",
             "craft_completed",
@@ -41,24 +40,12 @@ namespace DSPDreamer.CaptureProbe
             "panel_opened",
             "panel_closed"
         };
-        private static readonly HashSet<string> MajorPanelTypeNames = new HashSet<string>(StringComparer.Ordinal)
+        private static readonly HashSet<string> TrackedPanelTypeNames = new HashSet<string>(StringComparer.Ordinal)
         {
-            "UIBlueprintBrowser",
-            "UICredits",
-            "UIDashboard",
-            "UIDysonEditor",
-            "UIEscMenu",
-            "UIGalaxySelect",
-            "UIGameMenu",
-            "UIGlobemap",
-            "UIMainMenu",
-            "UIMechaEditor",
-            "UIMechaLab",
-            "UIMilkyWay",
-            "UISandboxMenu",
-            "UIStarmap",
+            "UIInventoryWindow",
+            "UIMechaWindow",
+            "UIReplicatorWindow",
             "UITechTree",
-            "UIZScreen"
         };
         internal static CaptureProbePlugin Current;
 
@@ -66,6 +53,8 @@ namespace DSPDreamer.CaptureProbe
         private readonly Stopwatch clock = new Stopwatch();
         private readonly Dictionary<KeyCode, bool> keyState = new Dictionary<KeyCode, bool>();
         private readonly Queue<PendingAction> pendingActions = new Queue<PendingAction>();
+        private readonly List<PendingAcquisition> pendingAcquisitions = new List<PendingAcquisition>();
+        private readonly HashSet<string> semanticAcquisitionKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> taskEventKinds = new HashSet<string>(StringComparer.Ordinal);
         private ConfigEntry<int> captureHz;
         private ConfigEntry<int> captureWidth;
@@ -102,6 +91,7 @@ namespace DSPDreamer.CaptureProbe
         private long actionLatencyTicksTotal;
         private long actionLatencyTicksMax;
         private long taskEventCount;
+        private long suppressedAcquisitionDuplicates;
         private int pendingDismantleObjectId;
         private int pendingDismantleProtoId;
         private string pendingDismantleProtoName;
@@ -133,6 +123,8 @@ namespace DSPDreamer.CaptureProbe
 
         private void Update()
         {
+            if (recording) FlushPendingAcquisitions(SafeGameTick());
+
             bool control = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             if (control && shift && Input.GetKeyDown(KeyCode.F11))
@@ -473,6 +465,7 @@ namespace DSPDreamer.CaptureProbe
         private void StopProbe(string reason)
         {
             if (!recording) return;
+            FlushPendingAcquisitions(long.MaxValue);
             recording = false;
             stopping = true;
             ReleaseInjectedW(reason);
@@ -529,6 +522,7 @@ namespace DSPDreamer.CaptureProbe
                 "task_events", taskEventCount,
                 "task_event_kinds", string.Join(",", SortedTaskEventKinds()),
                 "missing_task_event_kinds", string.Join(",", missingTaskEventKinds),
+                "suppressed_item_acquisition_duplicates", suppressedAcquisitionDuplicates,
                 "injected_actions", injectedActions,
                 "observed_actions", observedActions,
                 "average_action_latency_ms", averageActionLatencyMs,
@@ -592,8 +586,15 @@ namespace DSPDreamer.CaptureProbe
 
         private void OnPackageAddItem(int itemId, int count, int inc)
         {
-            if (count <= 0) return;
-            WriteTaskEvent("item_acquired", Fields("item_id", itemId, "item_name", ItemName(itemId), "item_count", count, "item_inc", inc, "destination", "player_package"));
+            if (!recording || count <= 0) return;
+            long gameTick = SafeGameTick();
+            string key = AcquisitionKey(gameTick, itemId, count);
+            if (semanticAcquisitionKeys.Contains(key))
+            {
+                suppressedAcquisitionDuplicates++;
+                return;
+            }
+            pendingAcquisitions.Add(new PendingAcquisition(itemId, count, inc, gameTick, Time.frameCount, clock.ElapsedTicks));
         }
 
         private void OnFactoryBuild(PlanetFactory factory, int entityId, int prebuildId)
@@ -619,11 +620,6 @@ namespace DSPDreamer.CaptureProbe
             pendingDismantleProtoName = string.Empty;
         }
 
-        internal void RecordTechTreeOpened()
-        {
-            WriteTaskEvent("tech_tree_opened", Fields());
-        }
-
         internal void RecordTechEnqueued(int techId, int queuedCount)
         {
             WriteTaskEvent("tech_enqueued", Fields("tech_id", techId, "tech_name", TechName(techId), "queued_count", queuedCount));
@@ -642,7 +638,11 @@ namespace DSPDreamer.CaptureProbe
 
         internal void RecordCraftCompleted(ForgeTask task)
         {
-            if (task == null) return;
+            if (!recording || task == null) return;
+            for (int i = 0; i < task.productIds.Length && i < task.productCounts.Length; i++)
+            {
+                MarkSemanticAcquisition(task.productIds[i], task.productCounts[i]);
+            }
             WriteTaskEvent("craft_completed", Fields(
                 "recipe_id", task.recipeId,
                 "recipe_name", RecipeName(task.recipeId),
@@ -653,6 +653,8 @@ namespace DSPDreamer.CaptureProbe
 
         internal void RecordManualMiningYield(PlayerAction_Mine action, int itemId, int itemCount, PlanetFactory factory)
         {
+            if (!recording) return;
+            MarkSemanticAcquisition(itemId, itemCount);
             WriteTaskEvent("manual_mining_yield", Fields(
                 "item_id", itemId,
                 "item_name", ItemName(itemId),
@@ -702,11 +704,7 @@ namespace DSPDreamer.CaptureProbe
         private static bool IsPanel(ManualBehaviour behaviour)
         {
             if (behaviour == null) return false;
-            string typeName = behaviour.GetType().Name;
-            if (!typeName.StartsWith("UI", StringComparison.Ordinal)) return false;
-            return typeName.EndsWith("Window", StringComparison.Ordinal)
-                || typeName.EndsWith("Panel", StringComparison.Ordinal)
-                || MajorPanelTypeNames.Contains(typeName);
+            return TrackedPanelTypeNames.Contains(behaviour.GetType().Name);
         }
 
         private static string PanelKey(ManualBehaviour panel)
@@ -717,13 +715,55 @@ namespace DSPDreamer.CaptureProbe
         private void WriteTaskEvent(string name, IDictionary<string, object> fields)
         {
             if (!recording) return;
+            WriteTaskEventAt(name, fields, Time.frameCount, SafeGameTick(), clock.IsRunning ? clock.ElapsedTicks : 0);
+        }
+
+        private void WriteTaskEventAt(string name, IDictionary<string, object> fields, int unityFrame, long gameTick, long ticks)
+        {
             taskEventCount++;
             taskEventKinds.Add(name);
             fields["name"] = name;
-            fields["unity_frame"] = Time.frameCount;
-            fields["game_tick"] = SafeGameTick();
-            fields["ticks"] = clock.IsRunning ? clock.ElapsedTicks : 0;
+            fields["unity_frame"] = unityFrame;
+            fields["game_tick"] = gameTick;
+            fields["ticks"] = ticks;
             WriteEvent("task_event", fields);
+        }
+
+        private void MarkSemanticAcquisition(int itemId, int count)
+        {
+            long gameTick = SafeGameTick();
+            string key = AcquisitionKey(gameTick, itemId, count);
+            semanticAcquisitionKeys.Add(key);
+            suppressedAcquisitionDuplicates += pendingAcquisitions.RemoveAll(pending => pending.GameTick == gameTick && pending.ItemId == itemId && pending.Count == count);
+        }
+
+        private void FlushPendingAcquisitions(long currentGameTick)
+        {
+            for (int i = 0; i < pendingAcquisitions.Count;)
+            {
+                PendingAcquisition pending = pendingAcquisitions[i];
+                if (currentGameTick != long.MaxValue && pending.GameTick >= currentGameTick)
+                {
+                    i++;
+                    continue;
+                }
+                pendingAcquisitions.RemoveAt(i);
+                if (semanticAcquisitionKeys.Contains(AcquisitionKey(pending.GameTick, pending.ItemId, pending.Count))) continue;
+                WriteTaskEventAt("item_acquired", Fields(
+                    "item_id", pending.ItemId,
+                    "item_name", ItemName(pending.ItemId),
+                    "item_count", pending.Count,
+                    "item_inc", pending.Inc,
+                    "destination", "player_package"),
+                    pending.UnityFrame,
+                    pending.GameTick,
+                    pending.Ticks);
+            }
+        }
+
+        private static string AcquisitionKey(long gameTick, int itemId, int count)
+        {
+            return gameTick.ToString(Invariant) + "|" + itemId.ToString(Invariant) + "|" + count.ToString(Invariant);
         }
 
         internal void OnGameBegin()
@@ -771,6 +811,7 @@ namespace DSPDreamer.CaptureProbe
             readbackErrors = writerDrops = writerBytes = maxWriterQueue = 0;
             injectedActions = observedActions = actionLatencyTicksTotal = actionLatencyTicksMax = 0;
             taskEventCount = 0;
+            suppressedAcquisitionDuplicates = 0;
             taskEventKinds.Clear();
             inputSamples = 0;
             outstandingReadbacks = 0;
@@ -778,6 +819,8 @@ namespace DSPDreamer.CaptureProbe
             lastObservedActionId = 0;
             lastObservedActionFrame = -1;
             pendingActions.Clear();
+            pendingAcquisitions.Clear();
+            semanticAcquisitionKeys.Clear();
             keyState.Clear();
             pendingDismantleObjectId = pendingDismantleProtoId = 0;
             pendingDismantleProtoName = string.Empty;
@@ -997,6 +1040,25 @@ namespace DSPDreamer.CaptureProbe
             public long Id { get; private set; }
             public long RequestedTicks { get; private set; }
         }
+
+        private sealed class PendingAcquisition
+        {
+            public PendingAcquisition(int itemId, int count, int inc, long gameTick, int unityFrame, long ticks)
+            {
+                ItemId = itemId;
+                Count = count;
+                Inc = inc;
+                GameTick = gameTick;
+                UnityFrame = unityFrame;
+                Ticks = ticks;
+            }
+            public int ItemId { get; private set; }
+            public int Count { get; private set; }
+            public int Inc { get; private set; }
+            public long GameTick { get; private set; }
+            public int UnityFrame { get; private set; }
+            public long Ticks { get; private set; }
+        }
     }
 
     [HarmonyPatch(typeof(VFInput), nameof(VFInput.OnUpdate))]
@@ -1023,15 +1085,6 @@ namespace DSPDreamer.CaptureProbe
         private static void Prefix()
         {
             if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.OnGameEnd();
-        }
-    }
-
-    [HarmonyPatch(typeof(UITechTree), "_OnOpen")]
-    internal static class UITechTreeOnOpenPatch
-    {
-        private static void Postfix()
-        {
-            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordTechTreeOpened();
         }
     }
 
