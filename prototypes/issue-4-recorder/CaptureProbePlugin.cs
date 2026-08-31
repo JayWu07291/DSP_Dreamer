@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.6";
+        public const string PluginVersion = "0.1.7";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -660,9 +660,7 @@ namespace DSPDreamer.CaptureProbe
                 "mining_type", action == null ? "unknown" : action.miningType.ToString(),
                 "mining_id", action == null ? 0 : action.miningId,
                 "mining_proto_id", action == null ? 0 : action.miningProtoId,
-                "mining_proto_name", MiningProtoName(action),
-                "planet_id", factory == null || factory.planet == null ? 0 : factory.planet.id,
-                "planet_name", factory == null || factory.planet == null ? string.Empty : factory.planet.displayName));
+                "mining_proto_name", MiningProtoName(action)));
         }
 
         internal void RecordLandingCapsuleDismantled(int vegeId)
@@ -1111,18 +1109,34 @@ namespace DSPDreamer.CaptureProbe
     [HarmonyPatch(typeof(ManualBehaviour), nameof(ManualBehaviour._Open))]
     internal static class ManualBehaviourOpenPatch
     {
-        private static void Postfix(ManualBehaviour __instance)
+        private static void Prefix(ManualBehaviour __instance, out bool __state)
         {
-            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordPanelOpened(__instance);
+            __state = __instance.active;
+        }
+
+        private static void Postfix(ManualBehaviour __instance, bool __state)
+        {
+            if (!__state && __instance.active && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordPanelOpened(__instance);
+            }
         }
     }
 
     [HarmonyPatch(typeof(ManualBehaviour), nameof(ManualBehaviour._Close))]
     internal static class ManualBehaviourClosePatch
     {
-        private static void Postfix(ManualBehaviour __instance)
+        private static void Prefix(ManualBehaviour __instance, out bool __state)
         {
-            if (CaptureProbePlugin.Current != null) CaptureProbePlugin.Current.RecordPanelClosed(__instance);
+            __state = __instance.active;
+        }
+
+        private static void Postfix(ManualBehaviour __instance, bool __state)
+        {
+            if (__state && !__instance.active && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordPanelClosed(__instance);
+            }
         }
     }
 }

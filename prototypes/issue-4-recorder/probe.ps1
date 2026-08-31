@@ -18,7 +18,6 @@ function Format-TaskEventDetails($Event) {
     if ($null -ne $Event.product_ids) { $parts.Add("產物 $($Event.product_ids) $($Event.product_names) ×$($Event.product_counts)") }
     if ($null -ne $Event.item_id) { $parts.Add("物品 $($Event.item_id) $($Event.item_name) ×$($Event.item_count)") }
     if ($null -ne $Event.mining_proto_id) { $parts.Add("採集物 $($Event.mining_proto_id) $($Event.mining_proto_name)") }
-    if ($null -ne $Event.planet_id) { $parts.Add("行星 $($Event.planet_id) $($Event.planet_name)") }
     if ($null -ne $Event.entity_id) { $parts.Add("實體ID $($Event.entity_id)") }
     if ($null -ne $Event.prebuild_id -and $Event.prebuild_id -ne 0) { $parts.Add("預建物ID $($Event.prebuild_id)") }
     if ($null -ne $Event.object_id) { $parts.Add("拆除物ID $($Event.object_id)") }
@@ -42,7 +41,28 @@ if ($Command -eq 'show-latest') {
     } | Select-Object -First 1
     Write-Host "Initial open panels: $($panelSnapshot.open_panels)"
     Write-Host "Task events: $($taskEvents.Count)"
-    $taskEvents | ForEach-Object {
+    $sourceAcquisitionKeys = [Collections.Generic.HashSet[string]]::new()
+    foreach ($event in $taskEvents) {
+        if ($event.name -eq 'manual_mining_yield') {
+            $sourceAcquisitionKeys.Add("$($event.game_tick)|$($event.item_id)|$($event.item_count)") | Out-Null
+        }
+        if ($event.name -eq 'craft_completed') {
+            $productIds = @([string]$event.product_ids -split ',')
+            $productCounts = @([string]$event.product_counts -split ',')
+            for ($i = 0; $i -lt [Math]::Min($productIds.Count, $productCounts.Count); $i++) {
+                $sourceAcquisitionKeys.Add("$($event.game_tick)|$($productIds[$i])|$($productCounts[$i])") | Out-Null
+            }
+        }
+    }
+    $collapsedItemEvents = 0
+    $displayEvents = @($taskEvents | Where-Object {
+        if ($_.name -ne 'item_acquired') { return $true }
+        $isOverlap = $sourceAcquisitionKeys.Contains("$($_.game_tick)|$($_.item_id)|$($_.item_count)")
+        if ($isOverlap) { $collapsedItemEvents++ }
+        return -not $isOverlap
+    })
+    Write-Host "Collapsed overlapping item_acquired rows: $collapsedItemEvents"
+    $displayEvents | ForEach-Object {
         [PSCustomObject]@{
             Event = $_.name
             GameTick = $_.game_tick

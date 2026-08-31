@@ -47,7 +47,9 @@
 .\prototypes\issue-4-recorder\probe.ps1 show-latest
 ```
 
-這個命令也會列出錄製開始時的面板快照，以及 `task_event` 的總數與內容，包括物品取得、面板開關、科技樹開啟、研究排隊、手作排隊與完成、科技完成、手採產出、建造、一般拆除與登陸艙拆除。摘要把科技、配方、物品、建築、礦脈、植被與行星 ID 和當次遊戲語言的名稱放在同一欄，方便人工核對。名稱也會寫入 `events.ndjson`，不必在離線檢查時載入 LDB。
+這個命令也會列出錄製開始時的面板快照，以及 `task_event` 的總數與內容，包括物品取得、面板開關、科技樹開啟、研究排隊、手作排隊與完成、科技完成、手採產出、建造、一般拆除與登陸艙拆除。摘要把科技、配方、物品、建築、礦脈與植被 ID 和當次遊戲語言的名稱放在同一欄，方便人工核對。名稱也會寫入 `events.ndjson`，不必在離線檢查時載入 LDB。行星 ID 與名稱不記錄。
+
+`item_acquired` 是背包狀態事件，`manual_mining_yield` 與 `craft_completed` 是來源事件。原始 NDJSON 保留兩層語意；`show-latest` 會用 `game_tick + item_id + count` 合併人工摘要中的重疊列，並顯示合併數量。
 
 事件名稱與成功判定如下：
 
@@ -62,8 +64,8 @@
 | `manual_mining_yield` | `PlayerAction_Mine` 登記實際產出 |
 | `factory_build` | 工廠送出完成建造事件 |
 | `item_acquired` | 物品實際進入玩家背包，保存 item ID、數量與增產點數 |
-| `panel_opened` | 一個頂層視窗、面板或主要畫面完成開啟，保存型別與 run 內 instance ID |
-| `panel_closed` | 一個頂層視窗、面板或主要畫面完成關閉，保存型別與 run 內 instance ID |
+| `panel_opened` | 面板的 `active` 狀態從 false 變成 true，保存型別與 run 內 instance ID |
+| `panel_closed` | 面板的 `active` 狀態從 true 變成 false，保存型別與 run 內 instance ID |
 
 `panel_state_snapshot` 不是 task event。它在每次錄製開始時列出當下所有已開啟面板，之後可依 `panel_opened` 與 `panel_closed` 重建任一時間點的 UI 狀態。
 
