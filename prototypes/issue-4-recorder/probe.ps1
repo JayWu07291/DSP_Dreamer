@@ -54,6 +54,17 @@ if ($Command -eq 'deploy' -and $null -ne (Get-Process -Name DSPGAME -ErrorAction
     throw 'DSP is running. Close DSP before deploying the probe DLL.'
 }
 
+$pluginSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'CaptureProbePlugin.cs') -Raw
+if ($pluginSource -notmatch 'PluginVersion\s*=\s*"([^"]+)"') {
+    throw 'PluginVersion constant was not found.'
+}
+$pluginVersion = $Matches[1]
+[Reflection.Assembly]::LoadFrom((Join-Path $DspRoot 'BepInEx\core\BepInEx.dll')) | Out-Null
+$pluginMetadata = New-Object BepInEx.BepInPlugin('probe.validation', 'probe validation', $pluginVersion)
+if ($null -eq $pluginMetadata.Version) {
+    throw "BepInEx 5 rejects plugin version '$pluginVersion'. Use a numeric System.Version value such as 0.1.0."
+}
+
 dotnet build $project --configuration $configuration -p:DSPRoot=$DspRoot
 
 if ($Command -eq 'deploy') {

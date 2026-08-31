@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.0-prototype";
+        public const string PluginVersion = "0.1.0";
 
         private const int SlotCount = 12;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
