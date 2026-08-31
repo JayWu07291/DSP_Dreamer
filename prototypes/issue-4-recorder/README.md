@@ -24,7 +24,7 @@
 .\prototypes\issue-4-recorder\probe.ps1 deploy
 ```
 
-接著啟動 DSP。先在顯示設定選擇視窗化 1280×720、60 FPS，再載入基準場景。1280×720 是 DSP 原生支援的 16:9 解析度，原型會把它下採樣成模型輸入使用的 640×360。來源畫面若不是 16:9，原型會拒絕開始，避免拉伸影像。
+接著啟動 DSP。先在顯示設定選擇視窗化 1280×720、60 FPS，再載入基準場景。1280×720 是 DSP 原生支援的 16:9 解析度。原型先把完整畫面擷取到原生尺寸 RenderTexture，再用 GPU bilinear scaling 下採樣成模型輸入使用的 640×360。來源畫面若不是 16:9，原型會拒絕開始，避免拉伸影像。
 
 畫面左上角會顯示狀態。
 
@@ -55,7 +55,7 @@
 
 ## 判定門檻
 
-一次結果只有在下列條件全部成立時才是 `pass`：
+下列條件全部成立時，`metrics_verdict` 才是 `pass`：
 
 - 至少錄製 60 秒。
 - 總掉幀率低於 1%。總掉幀分成排程錯過、沒有空閒 GPU slot、GPU readback 錯誤與 writer backpressure。
@@ -63,4 +63,4 @@
 - GPU readback 與 writer backpressure 都是零。
 - 至少做過三次注入，而且每個注入都在 100 ms 內由 `VFInput.OnUpdate` 觀察到。
 
-正式結論仍需人工確認原始 frame 包含世界、科技樹 UI、游標與 overlay，且上下方向與 RGBA channel 正確。先跑 10 Hz。通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。
+數值門檻通過後，整體 `verdict` 仍是 `metrics_pass_visual_pending`。正式結論需要人工確認 frame 包含完整世界視野、科技樹 UI、游標與 overlay，且上下方向與 RGBA channel 正確。先跑 10 Hz。人工確認通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。

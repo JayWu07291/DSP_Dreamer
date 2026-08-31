@@ -22,7 +22,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.0";
+        public const string PluginVersion = "0.1.2";
 
         private const int SlotCount = 12;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
@@ -182,8 +182,11 @@ namespace DSPDreamer.CaptureProbe
                 {
                     Index = i,
                     Buffer = new byte[byteCount],
+                    SourceTarget = new RenderTexture(sourceWidth, sourceHeight, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB),
                     Target = new RenderTexture(captureWidth.Value, captureHeight.Value, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
                 };
+                slots[i].SourceTarget.filterMode = FilterMode.Bilinear;
+                slots[i].SourceTarget.Create();
                 slots[i].Target.Create();
             }
 
@@ -204,6 +207,7 @@ namespace DSPDreamer.CaptureProbe
                 "source_width", sourceWidth,
                 "source_height", sourceHeight,
                 "source_display_mode", sourceDisplayMode,
+                "capture_strategy", "full_frame_then_bilinear_gpu_scale",
                 "unity_frame", Time.frameCount,
                 "game_tick", SafeGameTick()));
             recording = true;
@@ -247,7 +251,8 @@ namespace DSPDreamer.CaptureProbe
 
             try
             {
-                ScreenCapture.CaptureScreenshotIntoRenderTexture(slot.Target);
+                ScreenCapture.CaptureScreenshotIntoRenderTexture(slot.SourceTarget);
+                Graphics.Blit(slot.SourceTarget, slot.Target);
                 AsyncGPUReadback.Request(slot.Target, 0, TextureFormat.RGBA32, request => CompleteReadback(request, slot, captureId, requestedTicks, unityFrame, gameTick, actionId));
             }
             catch (Exception exception)
@@ -444,19 +449,20 @@ namespace DSPDreamer.CaptureProbe
             double effectiveHz = elapsed <= 0 ? 0 : writtenFrames / elapsed;
             double measuredRenderedFps = elapsed <= 0 ? 0 : inputSamples / elapsed;
             double averageActionLatencyMs = observedActions == 0 ? 0 : TicksToMilliseconds(actionLatencyTicksTotal / observedActions);
-            string verdict = elapsed >= Math.Min(durationSeconds.Value, 60)
+            bool metricsPassed = elapsed >= Math.Min(durationSeconds.Value, 60)
                 && dropRate < 0.01
                 && effectiveHz >= captureHz.Value * 0.95
                 && readbackErrors == 0
                 && writerDrops == 0
                 && injectedActions >= 3
                 && observedActions == injectedActions
-                && TicksToMilliseconds(actionLatencyTicksMax) <= 100.0
-                ? "pass"
-                : "inconclusive_or_fail";
+                && TicksToMilliseconds(actionLatencyTicksMax) <= 100.0;
+            string metricsVerdict = metricsPassed ? "pass" : "inconclusive_or_fail";
+            string verdict = metricsPassed ? "metrics_pass_visual_pending" : "inconclusive_or_fail";
 
             string summary = JsonObject(Fields(
                 "verdict", verdict,
+                "metrics_verdict", metricsVerdict,
                 "elapsed_seconds", elapsed,
                 "configured_hz", captureHz.Value,
                 "width", captureWidth.Value,
@@ -464,6 +470,7 @@ namespace DSPDreamer.CaptureProbe
                 "source_width", sourceWidth,
                 "source_height", sourceHeight,
                 "source_display_mode", sourceDisplayMode,
+                "capture_strategy", "full_frame_then_bilinear_gpu_scale",
                 "measured_rendered_fps", measuredRenderedFps,
                 "effective_hz", effectiveHz,
                 "expected_frames", expectedFrames,
@@ -480,12 +487,14 @@ namespace DSPDreamer.CaptureProbe
                 "observed_actions", observedActions,
                 "average_action_latency_ms", averageActionLatencyMs,
                 "max_action_latency_ms", TicksToMilliseconds(actionLatencyTicksMax)));
-            WriteEvent("session_summary", Fields("verdict", verdict, "drop_rate", dropRate, "effective_hz", effectiveHz));
+            WriteEvent("session_summary", Fields("verdict", verdict, "metrics_verdict", metricsVerdict, "drop_rate", dropRate, "effective_hz", effectiveHz));
             File.WriteAllText(Path.Combine(runDirectory, "summary.json"), summary + Environment.NewLine, new UTF8Encoding(false));
             eventWriter.Dispose();
             frameWriter.Dispose();
             for (int i = 0; i < slots.Length; i++)
             {
+                slots[i].SourceTarget.Release();
+                Destroy(slots[i].SourceTarget);
                 slots[i].Target.Release();
                 Destroy(slots[i].Target);
             }
@@ -717,6 +726,7 @@ namespace DSPDreamer.CaptureProbe
             public int Index;
             public int Busy;
             public byte[] Buffer;
+            public RenderTexture SourceTarget;
             public RenderTexture Target;
         }
 
