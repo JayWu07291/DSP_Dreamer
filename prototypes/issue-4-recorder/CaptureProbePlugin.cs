@@ -23,10 +23,18 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.10";
+        public const string PluginVersion = "0.1.11";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
+        private const int IronOreItemId = 1001;
+        private const int CopperOreItemId = 1002;
+        private const int IronIngotItemId = 1101;
+        private const int MagnetItemId = 1102;
+        private const int CopperIngotItemId = 1104;
+        private const int MagneticCoilItemId = 1201;
+        private const int CircuitBoardItemId = 1301;
+        private const int ElectromagneticMatrixItemId = 6001;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
         private static readonly string[] RequiredTaskEventKinds =
         {
@@ -110,11 +118,18 @@ namespace DSPDreamer.CaptureProbe
         private int sourceWidth;
         private int sourceHeight;
         private string sourceDisplayMode;
+        private int electromagnetismTechId;
+        private int automaticMetallurgyTechId;
+        private int basicLogisticsTechId;
+        private int basicManufacturingTechId;
+        private int electromagneticMatrixTechId;
         private int outstandingReadbacks;
         private long releaseWAtTicks;
         private bool injectedWHeld;
         private string lastMessage = "Ctrl+F8 開始 10 Hz 擷取";
         private GUIStyle overlayStyle;
+
+        internal bool IsRecording { get { return recording; } }
 
         private void Awake()
         {
@@ -253,6 +268,8 @@ namespace DSPDreamer.CaptureProbe
                 "game_tick", SafeGameTick()));
             recording = true;
             RecordPanelSnapshot();
+            ResolveMicrotaskCatalog();
+            RecordMicrotaskStateSnapshot("session_start");
             lastMessage = "擷取中：" + runDirectory;
         }
 
@@ -611,6 +628,7 @@ namespace DSPDreamer.CaptureProbe
         {
             if (!recording) return;
             FlushPendingAcquisitions(long.MaxValue);
+            RecordMicrotaskStateSnapshot("session_stop");
             recording = false;
             stopping = true;
             ReleaseInjectedW(reason);
@@ -814,6 +832,227 @@ namespace DSPDreamer.CaptureProbe
                 "mining_proto_name", MiningProtoName(action)));
         }
 
+        internal void RecordMinerProduction(PlanetFactory factory, MinerComponent miner, float power, int itemId, int itemCount)
+        {
+            if (!recording || itemCount <= 0 || (itemId != IronOreItemId && itemId != CopperOreItemId)) return;
+            int protoId = factory != null && miner.entityId > 0 && miner.entityId < factory.entityPool.Length
+                ? factory.entityPool[miner.entityId].protoId
+                : 0;
+            WriteTaskEvent("miner_produced", Fields(
+                "factory_index", factory == null ? -1 : factory.index,
+                "entity_id", miner.entityId,
+                "miner_id", miner.id,
+                "proto_id", protoId,
+                "proto_name", ItemName(protoId),
+                "item_id", itemId,
+                "item_name", ItemName(itemId),
+                "item_count", itemCount,
+                "power", power,
+                "powered", power >= 0.1f,
+                "vein_count", miner.veinCount));
+        }
+
+        internal void RecordMachineBatch(string machineKind, int entityId, int componentId, int recipeId, ERecipeType recipeType, RecipeExecuteData recipe, float power, int normalCycles, int extraCycles)
+        {
+            if (!recording || recipe == null || normalCycles <= 0 || !ContainsTrackedProduct(recipe.products)) return;
+            PlanetFactory factory = GameMain.localPlanet == null ? null : GameMain.localPlanet.factory;
+            int protoId = factory != null && entityId > 0 && entityId < factory.entityPool.Length
+                ? factory.entityPool[entityId].protoId
+                : 0;
+            WriteTaskEvent("machine_batch_completed", Fields(
+                "machine_kind", machineKind,
+                "factory_index", factory == null ? -1 : factory.index,
+                "entity_id", entityId,
+                "component_id", componentId,
+                "proto_id", protoId,
+                "proto_name", ItemName(protoId),
+                "recipe_id", recipeId,
+                "recipe_name", RecipeName(recipeId),
+                "recipe_type", recipeType.ToString(),
+                "product_ids", JoinInts(recipe.products),
+                "product_names", JoinItemNames(recipe.products),
+                "product_counts", JoinInts(recipe.productCounts),
+                "normal_cycles", normalCycles,
+                "extra_cycles", extraCycles,
+                "power", power,
+                "powered", power >= 0.1f));
+        }
+
+        internal void RecordSorterDelivery(PlanetFactory factory, SorterDeliveryState state, int deliveredCount)
+        {
+            if (!recording || factory == null || state == null || deliveredCount <= 0) return;
+            if (state.TargetEntityId <= 0 || state.TargetEntityId >= factory.entityPool.Length) return;
+            EntityData target = factory.entityPool[state.TargetEntityId];
+            string targetKind;
+            int componentId;
+            int recipeId;
+            ERecipeType recipeType;
+            RecipeExecuteData recipe;
+            if (target.assemblerId > 0 && target.assemblerId < factory.factorySystem.assemblerPool.Length)
+            {
+                AssemblerComponent assembler = factory.factorySystem.assemblerPool[target.assemblerId];
+                targetKind = "assembler";
+                componentId = assembler.id;
+                recipeId = assembler.recipeId;
+                recipeType = assembler.recipeType;
+                recipe = assembler.recipeExecuteData;
+            }
+            else if (target.labId > 0 && target.labId < factory.factorySystem.labPool.Length)
+            {
+                LabComponent lab = factory.factorySystem.labPool[target.labId];
+                targetKind = "lab";
+                componentId = lab.id;
+                recipeId = lab.recipeId;
+                recipeType = ERecipeType.Research;
+                recipe = lab.recipeExecuteData;
+                if (lab.researchMode) return;
+            }
+            else
+            {
+                return;
+            }
+
+            if (recipeId <= 0 || recipe == null || !ContainsTrackedProduct(recipe.products)) return;
+            WriteTaskEvent("sorter_delivered", Fields(
+                "factory_index", factory.index,
+                "inserter_id", state.InserterId,
+                "inserter_entity_id", state.InserterEntityId,
+                "source_entity_id", state.SourceEntityId,
+                "target_entity_id", state.TargetEntityId,
+                "target_kind", targetKind,
+                "target_component_id", componentId,
+                "target_proto_id", target.protoId,
+                "target_proto_name", ItemName(target.protoId),
+                "target_recipe_id", recipeId,
+                "target_recipe_name", RecipeName(recipeId),
+                "target_recipe_type", recipeType.ToString(),
+                "target_product_ids", JoinInts(recipe.products),
+                "target_product_names", JoinItemNames(recipe.products),
+                "item_id", state.ItemId,
+                "item_name", ItemName(state.ItemId),
+                "item_count", deliveredCount,
+                "power", state.Power,
+                "powered", state.Power >= 0.1f));
+        }
+
+        private static bool ContainsTrackedProduct(int[] products)
+        {
+            if (products == null) return false;
+            for (int i = 0; i < products.Length; i++)
+            {
+                int itemId = products[i];
+                if (itemId == IronIngotItemId || itemId == MagnetItemId || itemId == CopperIngotItemId
+                    || itemId == MagneticCoilItemId || itemId == CircuitBoardItemId || itemId == ElectromagneticMatrixItemId)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void ResolveMicrotaskCatalog()
+        {
+            electromagnetismTechId = FindTechByRewards(2301, 1, 2203, 1);
+            automaticMetallurgyTechId = FindTechByRewards(2302, 3);
+            basicLogisticsTechId = FindTechByRewards(2001, 20, 2011, 5);
+            basicManufacturingTechId = FindTechByRewards(2303, 1);
+            electromagneticMatrixTechId = FindTechByRewards(2901, 1);
+            WriteEvent("microtask_catalog", Fields(
+                "tech_electromagnetism_id", electromagnetismTechId,
+                "tech_electromagnetism_name", TechName(electromagnetismTechId),
+                "tech_automatic_metallurgy_id", automaticMetallurgyTechId,
+                "tech_automatic_metallurgy_name", TechName(automaticMetallurgyTechId),
+                "tech_basic_logistics_id", basicLogisticsTechId,
+                "tech_basic_logistics_name", TechName(basicLogisticsTechId),
+                "tech_basic_manufacturing_id", basicManufacturingTechId,
+                "tech_basic_manufacturing_name", TechName(basicManufacturingTechId),
+                "tech_electromagnetic_matrix_id", electromagneticMatrixTechId,
+                "tech_electromagnetic_matrix_name", TechName(electromagneticMatrixTechId),
+                "iron_ore_item_id", IronOreItemId,
+                "iron_ore_item_name", ItemName(IronOreItemId),
+                "copper_ore_item_id", CopperOreItemId,
+                "copper_ore_item_name", ItemName(CopperOreItemId),
+                "iron_ingot_item_id", IronIngotItemId,
+                "iron_ingot_item_name", ItemName(IronIngotItemId),
+                "magnet_item_id", MagnetItemId,
+                "magnet_item_name", ItemName(MagnetItemId),
+                "copper_ingot_item_id", CopperIngotItemId,
+                "copper_ingot_item_name", ItemName(CopperIngotItemId),
+                "magnetic_coil_item_id", MagneticCoilItemId,
+                "magnetic_coil_item_name", ItemName(MagneticCoilItemId),
+                "circuit_board_item_id", CircuitBoardItemId,
+                "circuit_board_item_name", ItemName(CircuitBoardItemId),
+                "electromagnetic_matrix_item_id", ElectromagneticMatrixItemId,
+                "electromagnetic_matrix_item_name", ItemName(ElectromagneticMatrixItemId)));
+        }
+
+        private void RecordMicrotaskStateSnapshot(string reason)
+        {
+            WriteEvent("microtask_state_snapshot", Fields(
+                "reason", reason,
+                "capsule_count", CountLandingCapsules(),
+                "tech_electromagnetism_unlocked", TechUnlocked(electromagnetismTechId),
+                "tech_automatic_metallurgy_unlocked", TechUnlocked(automaticMetallurgyTechId),
+                "tech_basic_logistics_unlocked", TechUnlocked(basicLogisticsTechId),
+                "tech_basic_manufacturing_unlocked", TechUnlocked(basicManufacturingTechId),
+                "tech_electromagnetic_matrix_unlocked", TechUnlocked(electromagneticMatrixTechId),
+                "unity_frame", Time.frameCount,
+                "game_tick", SafeGameTick(),
+                "ticks", clock.IsRunning ? clock.ElapsedTicks : 0));
+        }
+
+        private static int FindTechByRewards(params int[] itemCountPairs)
+        {
+            if (itemCountPairs == null || itemCountPairs.Length == 0 || itemCountPairs.Length % 2 != 0 || LDB.techs == null) return 0;
+            TechProto[] techs = LDB.techs.dataArray;
+            if (techs == null) return 0;
+            for (int i = 0; i < techs.Length; i++)
+            {
+                TechProto tech = techs[i];
+                if (tech == null || tech.AddItems == null || tech.AddItemCounts == null) continue;
+                bool matched = true;
+                for (int pair = 0; pair < itemCountPairs.Length; pair += 2)
+                {
+                    int expectedItem = itemCountPairs[pair];
+                    int expectedCount = itemCountPairs[pair + 1];
+                    bool rewardFound = false;
+                    for (int reward = 0; reward < tech.AddItems.Length && reward < tech.AddItemCounts.Length; reward++)
+                    {
+                        if (tech.AddItems[reward] == expectedItem && tech.AddItemCounts[reward] == expectedCount)
+                        {
+                            rewardFound = true;
+                            break;
+                        }
+                    }
+                    if (!rewardFound)
+                    {
+                        matched = false;
+                        break;
+                    }
+                }
+                if (matched) return tech.ID;
+            }
+            return 0;
+        }
+
+        private static bool TechUnlocked(int techId)
+        {
+            return techId > 0 && GameMain.history != null && GameMain.history.TechUnlocked(techId);
+        }
+
+        private static int CountLandingCapsules()
+        {
+            PlanetFactory factory = GameMain.localPlanet == null ? null : GameMain.localPlanet.factory;
+            if (factory == null || factory.vegePool == null) return -1;
+            int count = 0;
+            int limit = Math.Min(factory.vegeCursor, factory.vegePool.Length);
+            for (int i = 1; i < limit; i++)
+            {
+                if (factory.vegePool[i].id == i && factory.vegePool[i].protoId == SpaceCapsuleProtoId) count++;
+            }
+            return count;
+        }
+
         internal void RecordLandingCapsuleDismantled(int vegeId)
         {
             WriteTaskEvent("landing_capsule_dismantled", Fields("vege_id", vegeId, "proto_id", SpaceCapsuleProtoId, "proto_name", VegeName(SpaceCapsuleProtoId)));
@@ -922,11 +1161,14 @@ namespace DSPDreamer.CaptureProbe
             unreadableCursorTextureIds.Clear();
             BindTaskEvents();
             WriteEvent("episode_begin", Fields("ticks", clock.ElapsedTicks, "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
+            ResolveMicrotaskCatalog();
+            RecordMicrotaskStateSnapshot("episode_begin");
         }
 
         internal void OnGameEnd()
         {
             if (!recording) return;
+            RecordMicrotaskStateSnapshot("episode_end");
             WriteEvent("episode_end", Fields("ticks", clock.ElapsedTicks, "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
             UnbindTaskEvents();
         }
@@ -978,6 +1220,8 @@ namespace DSPDreamer.CaptureProbe
             keyState.Clear();
             pendingDismantleObjectId = pendingDismantleProtoId = 0;
             pendingDismantleProtoName = string.Empty;
+            electromagnetismTechId = automaticMetallurgyTechId = basicLogisticsTechId = 0;
+            basicManufacturingTechId = electromagneticMatrixTechId = 0;
             recording = stopping = writerFinished = false;
         }
 
@@ -1247,6 +1491,60 @@ namespace DSPDreamer.CaptureProbe
         }
     }
 
+    internal sealed class MinerProductionState
+    {
+        public int IronBefore;
+        public int CopperBefore;
+    }
+
+    internal sealed class MachineCycleState
+    {
+        public int RecipeId;
+        public int CycleCount;
+        public int ExtraCycleCount;
+    }
+
+    internal sealed class SorterDeliveryState
+    {
+        public int InserterId;
+        public int InserterEntityId;
+        public int SourceEntityId;
+        public int TargetEntityId;
+        public int ItemId;
+        public int ItemCount;
+        public float Power;
+
+        public static SorterDeliveryState Capture(InserterComponent component, float power)
+        {
+            if (CaptureProbePlugin.Current == null || !CaptureProbePlugin.Current.IsRecording
+                || power < 0.1f || component.stage != EInserterStage.Inserting
+                || component.itemId <= 0 || component.itemCount <= 0 || component.insertTarget <= 0)
+            {
+                return null;
+            }
+            return new SorterDeliveryState
+            {
+                InserterId = component.id,
+                InserterEntityId = component.entityId,
+                SourceEntityId = component.pickTarget,
+                TargetEntityId = component.insertTarget,
+                ItemId = component.itemId,
+                ItemCount = component.itemCount,
+                Power = power,
+            };
+        }
+
+        public void Complete(PlanetFactory factory, InserterComponent component)
+        {
+            int remaining = component.itemId == ItemId ? component.itemCount : 0;
+            int delivered = ItemCount - remaining;
+            if (delivered > 0 && CaptureProbePlugin.Current != null)
+            {
+                CaptureProbePlugin.Current.RecordSorterDelivery(factory, this, delivered);
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(VFInput), nameof(VFInput.OnUpdate))]
     internal static class VFInputOnUpdatePatch
     {
@@ -1322,6 +1620,128 @@ namespace DSPDreamer.CaptureProbe
             {
                 CaptureProbePlugin.Current.RecordManualMiningYield(__instance, itemId, itemCount, factory);
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(MinerComponent), nameof(MinerComponent.InternalUpdate))]
+    internal static class MinerComponentInternalUpdatePatch
+    {
+        private static void Prefix(int[] productRegister, out MinerProductionState __state)
+        {
+            __state = null;
+            if (CaptureProbePlugin.Current == null || !CaptureProbePlugin.Current.IsRecording || productRegister == null
+                || productRegister.Length <= 1002)
+            {
+                return;
+            }
+            __state = new MinerProductionState
+            {
+                IronBefore = productRegister[1001],
+                CopperBefore = productRegister[1002],
+            };
+        }
+
+        private static void Postfix(ref MinerComponent __instance, PlanetFactory factory, float power, int[] productRegister, MinerProductionState __state)
+        {
+            if (__state == null || productRegister == null || productRegister.Length <= 1002 || CaptureProbePlugin.Current == null) return;
+            int iron = productRegister[1001] - __state.IronBefore;
+            int copper = productRegister[1002] - __state.CopperBefore;
+            if (iron > 0) CaptureProbePlugin.Current.RecordMinerProduction(factory, __instance, power, 1001, iron);
+            if (copper > 0) CaptureProbePlugin.Current.RecordMinerProduction(factory, __instance, power, 1002, copper);
+        }
+    }
+
+    [HarmonyPatch(typeof(AssemblerComponent), nameof(AssemblerComponent.InternalUpdate))]
+    internal static class AssemblerComponentInternalUpdatePatch
+    {
+        private static void Prefix(ref AssemblerComponent __instance, out MachineCycleState __state)
+        {
+            __state = CaptureProbePlugin.Current == null || !CaptureProbePlugin.Current.IsRecording || __instance.recipeId <= 0
+                ? null
+                : new MachineCycleState
+                {
+                    RecipeId = __instance.recipeId,
+                    CycleCount = __instance.cycleCount,
+                    ExtraCycleCount = __instance.extraCycleCount,
+                };
+        }
+
+        private static void Postfix(ref AssemblerComponent __instance, float power, MachineCycleState __state)
+        {
+            if (__state == null || __instance.recipeId != __state.RecipeId || CaptureProbePlugin.Current == null) return;
+            int normalCycles = __instance.cycleCount - __state.CycleCount;
+            if (normalCycles <= 0) return;
+            CaptureProbePlugin.Current.RecordMachineBatch(
+                "assembler",
+                __instance.entityId,
+                __instance.id,
+                __instance.recipeId,
+                __instance.recipeType,
+                __instance.recipeExecuteData,
+                power,
+                normalCycles,
+                __instance.extraCycleCount - __state.ExtraCycleCount);
+        }
+    }
+
+    [HarmonyPatch(typeof(LabComponent), nameof(LabComponent.InternalUpdateAssemble))]
+    internal static class LabComponentInternalUpdateAssemblePatch
+    {
+        private static void Prefix(ref LabComponent __instance, out MachineCycleState __state)
+        {
+            __state = CaptureProbePlugin.Current == null || !CaptureProbePlugin.Current.IsRecording || __instance.recipeId <= 0
+                ? null
+                : new MachineCycleState
+                {
+                    RecipeId = __instance.recipeId,
+                    CycleCount = __instance.cycleCount,
+                    ExtraCycleCount = __instance.extraCycleCount,
+                };
+        }
+
+        private static void Postfix(ref LabComponent __instance, float power, MachineCycleState __state)
+        {
+            if (__state == null || __instance.recipeId != __state.RecipeId || CaptureProbePlugin.Current == null) return;
+            int normalCycles = __instance.cycleCount - __state.CycleCount;
+            if (normalCycles <= 0) return;
+            CaptureProbePlugin.Current.RecordMachineBatch(
+                "lab",
+                __instance.entityId,
+                __instance.id,
+                __instance.recipeId,
+                ERecipeType.Research,
+                __instance.recipeExecuteData,
+                power,
+                normalCycles,
+                __instance.extraCycleCount - __state.ExtraCycleCount);
+        }
+    }
+
+    [HarmonyPatch(typeof(InserterComponent), nameof(InserterComponent.InternalUpdate))]
+    internal static class InserterComponentInternalUpdatePatch
+    {
+        private static void Prefix(ref InserterComponent __instance, float power, out SorterDeliveryState __state)
+        {
+            __state = SorterDeliveryState.Capture(__instance, power);
+        }
+
+        private static void Postfix(ref InserterComponent __instance, PlanetFactory factory, SorterDeliveryState __state)
+        {
+            if (__state != null) __state.Complete(factory, __instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(InserterComponent), nameof(InserterComponent.InternalUpdateNoAnim))]
+    internal static class InserterComponentInternalUpdateNoAnimPatch
+    {
+        private static void Prefix(ref InserterComponent __instance, float power, out SorterDeliveryState __state)
+        {
+            __state = SorterDeliveryState.Capture(__instance, power);
+        }
+
+        private static void Postfix(ref InserterComponent __instance, PlanetFactory factory, SorterDeliveryState __state)
+        {
+            if (__state != null) __state.Complete(factory, __instance);
         }
     }
 

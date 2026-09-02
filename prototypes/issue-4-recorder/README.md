@@ -98,6 +98,29 @@ Probe 0.1.10 會在擷取要求當下保存游標位置、顯示狀態與 DSP cu
 
 若同一次錄製包含 `episode_end`、之後的 `episode_begin`，而且重新進入世界後仍能收到 task event，`world_reset_verdict` 會是 `pass`；沒有進行世界重載時是 `not_tested`。這兩個工具的完整 episode 與輸入對齊需要 probe 0.1.9 或更新版本，舊 run 會回報需要重錄，而不會猜測缺少的單調時間。
 
+## 十六項微任務判定原型
+
+Probe 0.1.11 用實體、配方與事件順序驗證從新遊戲到第一個電磁矩陣的十六項微任務。科技與登陸艙有高階事件；工廠生產沒有統一的微任務事件，但可直接讀取 component 的批次完成與分揀器交付。這些內部狀態只用於標註、reward、提示切換與評估，不是 policy observation。
+
+| 微任務 | 首選判定 | 沒收到即時事件時的替代判定 |
+| --- | --- | --- |
+| 回收登陸艙 | `RemoveVegeWithComponents` 移除 `protoId 9999` | `vegePool` 中登陸艙數量由一變零；物品獎勵只能當診斷證據 |
+| 五項科技完成 | `GameHistoryData.onTechUnlocked` 命中目標 TechProto | 比較前後 `GameHistoryData.TechUnlocked(id)` |
+| 自動採集鐵礦、銅礦 | 已供電 `MinerComponent.InternalUpdate` 增加對應礦物產量 | 對應採礦機的礦脈減少且 `productRegister` 增加；單看背包物品不足以判定自動採集 |
+| 熔爐生產磁鐵、鐵塊、銅塊 | 固定配方 `AssemblerComponent.cycleCount` 增加 | 輪詢同一 entity 與 recipe 的 `cycleCount` 或 `produced[]`；全域產量只能當較弱證據 |
+| 建立自動熔煉 | 三個不同熔爐各有 `sorter_delivered`，之後各自完成指定配方批次 | 檢查三個 entity 的固定配方、輸入分揀器連線、`served[]` 與 `cycleCount`，但靜態連線無法證明曾交付物品 |
+| 自動生產磁線圈、電路板 | 不同製造台收到所有指定原料的分揀器交付，之後完成固定配方批次 | 輪詢同一 entity 與 recipe 的 `served[]`、`cycleCount`；單看產物無法排除手動供料 |
+| 自動供應矩陣研究站 | 同一研究站選定電磁矩陣配方，且分揀器分別送入磁線圈與電路板 | 比較 `LabComponent.recipeId` 與 `served[]`；只看分揀器連線不算完成 |
+| 生產第一個電磁矩陣 | 上述研究站的 `LabComponent.cycleCount` 增加，產物為 item 6001 | 輪詢同一 entity 與 recipe 的 `cycleCount` 或 `produced[]` |
+
+實機驗證建議從尚未拆除登陸艙的新遊戲開始。這次只驗證事件與狀態，可以先把設定檔的 `CaptureHz` 設為 1，並把 `DurationSeconds` 調到足以完成整段流程，降低 `frames.rgba` 的空間占用。錄製期間依序完成十六項微任務，第一個電磁矩陣出現後停止，再執行：
+
+```powershell
+.\prototypes\issue-4-recorder\probe.ps1 verify-microtasks -RunDirectory '<run 路徑>'
+```
+
+命令會輸出 `microtask-verdicts.json`。只有十六項都找到符合 entity、recipe、供電、分揀器供料與先後順序的證據時，總判定才是 `pass`。`metrics_verdict` 仍屬於先前的擷取效能 smoke test；1 Hz 微任務 run 不用拿它判定本輪結果。
+
 ## 判定門檻
 
 下列條件全部成立時，`metrics_verdict` 才是 `pass`：
@@ -111,9 +134,9 @@ Probe 0.1.10 會在擷取要求當下保存游標位置、顯示狀態與 DSP cu
 
 數值門檻通過後，整體 `verdict` 仍是 `metrics_pass_visual_pending`。正式結論需要人工確認 frame 包含完整世界視野、科技樹 UI 與游標，不包含錄製模組狀態面板，且上下方向與 RGBA channel 正確。先跑 10 Hz。人工確認通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。
 
-## 原型結論
+## 已驗證的第一階段結論
 
-原型已於 2026-09-01 完成驗證。這個分支保留實作、驗證工具與量測方法，作為 issue #4 的原始證據；它不會直接合併為正式錄製器，也不定義正式訓練資料格式。
+同步擷取、對齊、游標與 10/20/30 Hz 壓力測試已於 2026-09-01 完成。2026-09-02 重新開啟原型，補驗從回收登陸艙到第一個電磁矩陣的十六項微任務判定。這個分支保留實作、驗證工具與量測方法，作為「製作同步 DSP 錄製與閉迴路控制原型」的原始證據；它不會直接合併為正式錄製器，也不定義正式訓練資料格式。
 
 | 頻率 | 錄製時間 | 寫入幀數 | 有效頻率 | 掉幀率 | 對齊 | 用途 |
 | --- | ---: | ---: | ---: | ---: | --- | --- |

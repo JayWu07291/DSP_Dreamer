@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('build', 'deploy', 'show-latest', 'export-frame', 'export-event-frames', 'verify-alignment')]
+    [ValidateSet('build', 'deploy', 'show-latest', 'export-frame', 'export-event-frames', 'verify-alignment', 'verify-microtasks')]
     [string]$Command = 'deploy',
     [string]$DspRoot = 'E:\Steam\steamapps\common\Dyson Sphere Program',
     [string]$RunDirectory
@@ -226,6 +226,237 @@ if ($Command -eq 'export-event-frames') {
     $indexPath = Join-Path $run.FullName 'event-frames.json'
     ConvertTo-Json -InputObject @($index) -Depth 4 | Set-Content -LiteralPath $indexPath -Encoding UTF8
     Write-Host $indexPath
+    exit
+}
+
+if ($Command -eq 'verify-microtasks') {
+    $run = Get-SelectedRun
+    $events = @(Get-Content -LiteralPath (Join-Path $run.FullName 'events.ndjson') | ForEach-Object { $_ | ConvertFrom-Json })
+    $catalog = $events | Where-Object type -eq 'microtask_catalog' | Select-Object -First 1
+    if ($null -eq $catalog) { throw 'microtask_catalog is missing. Record a new run with probe 0.1.11 or later.' }
+    $snapshots = @($events | Where-Object type -eq 'microtask_state_snapshot' | Sort-Object { [long]$_.ticks })
+    $tasks = @($events | Where-Object type -eq 'task_event' | Sort-Object { [long]$_.ticks })
+    $startSnapshot = $snapshots | Select-Object -First 1
+    $endSnapshot = $snapshots | Select-Object -Last 1
+    $results = [Collections.Generic.List[object]]::new()
+
+    function Test-IdList($Value, [int]$Expected) {
+        if ($null -eq $Value) { return $false }
+        return @(([string]$Value -split ',') | Where-Object { [int]$_ -eq $Expected }).Count -gt 0
+    }
+
+    function Get-SnapshotValue($Snapshot, [string]$Property) {
+        if ($null -eq $Snapshot) { return $null }
+        $entry = $Snapshot.PSObject.Properties[$Property]
+        if ($null -eq $entry) { return $null }
+        return $entry.Value
+    }
+
+    function Add-Result([int]$Task, [string]$Name, [string]$Verdict, [string]$Signal, [string]$Evidence, [string]$Fallback) {
+        $results.Add([ordered]@{
+            task = $Task
+            name = $Name
+            verdict = $Verdict
+            signal = $Signal
+            evidence = $Evidence
+            fallback = $Fallback
+        })
+    }
+
+    function Add-TechResult([int]$Task, [string]$Name, [string]$CatalogProperty, [string]$SnapshotProperty) {
+        $techId = [int]$catalog.PSObject.Properties[$CatalogProperty].Value
+        if ($techId -le 0) {
+            Add-Result $Task $Name 'catalog_unresolved' 'none' 'The target tech could not be resolved from its unlock rewards.' 'Resolve the TechProto ID, then read GameHistoryData.TechUnlocked(id).'
+            return
+        }
+        $unlock = $tasks | Where-Object { $_.name -eq 'tech_unlocked' -and [int]$_.tech_id -eq $techId } | Select-Object -First 1
+        if ($null -ne $unlock) {
+            Add-Result $Task $Name 'pass_direct_event' 'GameHistoryData.onTechUnlocked' "tech $techId $($unlock.tech_name), tick $($unlock.game_tick)" 'Poll GameHistoryData.TechUnlocked(id).'
+            return
+        }
+        $startValue = Get-SnapshotValue $startSnapshot $SnapshotProperty
+        $endValue = Get-SnapshotValue $endSnapshot $SnapshotProperty
+        if ($startValue -eq $false -and $endValue -eq $true) {
+            Add-Result $Task $Name 'pass_state_fallback' 'GameHistoryData.TechUnlocked' "false -> true for tech $techId" 'No weaker fallback is needed.'
+        } elseif ($startValue -eq $true) {
+            Add-Result $Task $Name 'already_complete_at_start' 'GameHistoryData.TechUnlocked' "tech $techId was already unlocked" 'Start from a baseline where the tech is locked.'
+        } else {
+            Add-Result $Task $Name 'not_observed' 'GameHistoryData.TechUnlocked' "tech $techId was not observed unlocked" 'Use onTechUnlocked or poll TechUnlocked(id) after the action.'
+        }
+    }
+
+    function Find-Batch([int]$ProductId, [string]$MachineKind) {
+        return $tasks | Where-Object {
+            $_.name -eq 'machine_batch_completed' -and
+            ($MachineKind -eq '' -or $_.machine_kind -eq $MachineKind) -and
+            $_.powered -eq $true -and
+            (Test-IdList $_.product_ids $ProductId)
+        } | Select-Object -First 1
+    }
+
+    function Find-AutomatedBatch([int]$ProductId, [int[]]$RequiredItems, [string]$MachineKind, [int[]]$ExcludedEntities) {
+        $candidates = @($tasks | Where-Object {
+            $_.name -eq 'machine_batch_completed' -and
+            $_.machine_kind -eq $MachineKind -and
+            $_.powered -eq $true -and
+            (Test-IdList $_.product_ids $ProductId)
+        })
+        foreach ($batch in $candidates) {
+            if ($ExcludedEntities -contains [int]$batch.entity_id) { continue }
+            $deliveries = @($tasks | Where-Object {
+                $_.name -eq 'sorter_delivered' -and
+                [int]$_.target_entity_id -eq [int]$batch.entity_id -and
+                [int]$_.target_recipe_id -eq [int]$batch.recipe_id -and
+                [long]$_.ticks -le [long]$batch.ticks
+            })
+            $allFound = $true
+            foreach ($required in $RequiredItems) {
+                if (@($deliveries | Where-Object { [int]$_.item_id -eq $required }).Count -eq 0) {
+                    $allFound = $false
+                    break
+                }
+            }
+            if ($allFound) {
+                return [pscustomobject]@{ Batch = $batch; Deliveries = $deliveries }
+            }
+        }
+        return $null
+    }
+
+    $capsuleEvent = $tasks | Where-Object name -eq 'landing_capsule_dismantled' | Select-Object -First 1
+    if ($null -ne $capsuleEvent) {
+        Add-Result 1 '回收登陸艙' 'pass_direct_event' 'PlanetFactory.RemoveVegeWithComponents' "vegetation $($capsuleEvent.vege_id), tick $($capsuleEvent.game_tick)" 'Confirm the capsule count changes from one to zero.'
+    } else {
+        $startCapsules = Get-SnapshotValue $startSnapshot 'capsule_count'
+        $endCapsules = Get-SnapshotValue $endSnapshot 'capsule_count'
+        if ([int]$startCapsules -gt 0 -and [int]$endCapsules -eq 0) {
+            Add-Result 1 '回收登陸艙' 'pass_state_fallback' 'factory.vegePool' "$startCapsules -> $endCapsules capsules" 'The item reward is weaker evidence and should only be diagnostic.'
+        } elseif ([int]$startCapsules -eq 0) {
+            Add-Result 1 '回收登陸艙' 'already_complete_at_start' 'factory.vegePool' 'No landing capsule existed at the first snapshot.' 'Start from the controlled new-game baseline.'
+        } else {
+            Add-Result 1 '回收登陸艙' 'not_observed' 'factory.vegePool' "capsules $startCapsules -> $endCapsules" 'Confirm the capsule count changes from one to zero.'
+        }
+    }
+
+    Add-TechResult 2 '完成電磁學' 'tech_electromagnetism_id' 'tech_electromagnetism_unlocked'
+
+    foreach ($miningTask in @(
+        [pscustomobject]@{ Task = 3; Name = '自動採集鐵礦'; Item = 1001 },
+        [pscustomobject]@{ Task = 4; Name = '自動採集銅礦'; Item = 1002 }
+    )) {
+        $mining = $tasks | Where-Object { $_.name -eq 'miner_produced' -and [int]$_.item_id -eq $miningTask.Item -and $_.powered -eq $true } | Select-Object -First 1
+        if ($null -ne $mining) {
+            Add-Result $miningTask.Task $miningTask.Name 'pass_component_event' 'MinerComponent.InternalUpdate' "entity $($mining.entity_id), $($mining.item_name) x$($mining.item_count), power $($mining.power)" 'Poll productRegister delta while a matching powered MinerComponent is active.'
+        } else {
+            Add-Result $miningTask.Task $miningTask.Name 'not_observed' 'MinerComponent.InternalUpdate' "item $($miningTask.Item) production was not observed" 'A vein amount decrease plus a powered matching miner is weaker but usable.'
+        }
+    }
+
+    Add-TechResult 5 '完成自動化冶金' 'tech_automatic_metallurgy_id' 'tech_automatic_metallurgy_unlocked'
+
+    foreach ($productionTask in @(
+        [pscustomobject]@{ Task = 6; Name = '用熔爐生產磁鐵'; Product = 1102 },
+        [pscustomobject]@{ Task = 7; Name = '用熔爐生產鐵塊'; Product = 1101 },
+        [pscustomobject]@{ Task = 8; Name = '用熔爐生產銅塊'; Product = 1104 }
+    )) {
+        $batch = Find-Batch $productionTask.Product 'assembler'
+        if ($null -ne $batch -and $batch.recipe_type -eq 'Smelt') {
+            Add-Result $productionTask.Task $productionTask.Name 'pass_component_event' 'AssemblerComponent.cycleCount' "entity $($batch.entity_id), recipe $($batch.recipe_id) $($batch.recipe_name), tick $($batch.game_tick)" 'Poll cycleCount for the same entity and recipe; productRegister is less specific.'
+        } else {
+            Add-Result $productionTask.Task $productionTask.Name 'not_observed' 'AssemblerComponent.cycleCount' "smelting product $($productionTask.Product) was not observed" 'Poll cycleCount for the same entity and recipe.'
+        }
+    }
+
+    Add-TechResult 9 '完成基礎物流系統' 'tech_basic_logistics_id' 'tech_basic_logistics_unlocked'
+
+    $autoMagnet = Find-AutomatedBatch 1102 @(1001) 'assembler' @()
+    $autoIron = Find-AutomatedBatch 1101 @(1001) 'assembler' @()
+    $autoCopper = Find-AutomatedBatch 1104 @(1002) 'assembler' @()
+    $smelterEntities = @()
+    foreach ($candidate in @($autoMagnet, $autoIron, $autoCopper)) {
+        if ($null -ne $candidate) { $smelterEntities += [int]$candidate.Batch.entity_id }
+    }
+    if ($null -ne $autoMagnet -and $null -ne $autoIron -and $null -ne $autoCopper -and @($smelterEntities | Select-Object -Unique).Count -eq 3) {
+        Add-Result 10 '建立自動熔煉' 'pass_correlated_events' 'sorter_delivered + machine_batch_completed' "smelter entities $($smelterEntities -join ',')" 'Require three distinct fixed-recipe smelters with matching input-served and cycle-count transitions.'
+    } else {
+        Add-Result 10 '建立自動熔煉' 'not_observed' 'sorter_delivered + machine_batch_completed' "qualified smelter entities $($smelterEntities -join ',')" 'A snapshot of connected sorters, served inputs and increased cycleCount is usable but may miss historical delivery.'
+    }
+
+    Add-TechResult 11 '完成基礎製造' 'tech_basic_manufacturing_id' 'tech_basic_manufacturing_unlocked'
+
+    $autoCoil = Find-AutomatedBatch 1201 @(1102, 1104) 'assembler' @()
+    if ($null -ne $autoCoil) {
+        Add-Result 12 '自動生產磁線圈' 'pass_correlated_events' 'sorter_delivered + machine_batch_completed' "assembler entity $($autoCoil.Batch.entity_id), recipe $($autoCoil.Batch.recipe_id)" 'Check served inputs and cycleCount on a fixed-recipe assembler with connected input sorters.'
+    } else {
+        Add-Result 12 '自動生產磁線圈' 'not_observed' 'sorter_delivered + machine_batch_completed' 'No qualified assembler completed the recipe.' 'Check served inputs and cycleCount on a fixed-recipe assembler.'
+    }
+
+    $excludedAssembler = if ($null -eq $autoCoil) { @() } else { @([int]$autoCoil.Batch.entity_id) }
+    $autoBoard = Find-AutomatedBatch 1301 @(1101, 1104) 'assembler' $excludedAssembler
+    if ($null -ne $autoBoard) {
+        Add-Result 13 '自動生產電路板' 'pass_correlated_events' 'sorter_delivered + machine_batch_completed' "assembler entity $($autoBoard.Batch.entity_id), recipe $($autoBoard.Batch.recipe_id)" 'Check served inputs and cycleCount on another fixed-recipe assembler.'
+    } else {
+        Add-Result 13 '自動生產電路板' 'not_observed' 'sorter_delivered + machine_batch_completed' 'No distinct qualified assembler completed the recipe.' 'Check served inputs and cycleCount on another fixed-recipe assembler.'
+    }
+
+    Add-TechResult 14 '完成電磁矩陣科技' 'tech_electromagnetic_matrix_id' 'tech_electromagnetic_matrix_unlocked'
+
+    $labSupply = $null
+    $labDeliveries = @($tasks | Where-Object {
+        $_.name -eq 'sorter_delivered' -and $_.target_kind -eq 'lab' -and
+        $_.powered -eq $true -and (Test-IdList $_.target_product_ids 6001)
+    })
+    foreach ($delivery in $labDeliveries) {
+        $sameLab = @($labDeliveries | Where-Object {
+            [int]$_.target_entity_id -eq [int]$delivery.target_entity_id -and
+            [int]$_.target_recipe_id -eq [int]$delivery.target_recipe_id
+        })
+        if (@($sameLab | Where-Object { [int]$_.item_id -eq 1201 }).Count -gt 0 -and
+            @($sameLab | Where-Object { [int]$_.item_id -eq 1301 }).Count -gt 0) {
+            $labSupply = [pscustomobject]@{
+                EntityId = [int]$delivery.target_entity_id
+                RecipeId = [int]$delivery.target_recipe_id
+                LastTicks = [long](($sameLab | Sort-Object { [long]$_.ticks } | Select-Object -Last 1).ticks)
+            }
+            break
+        }
+    }
+    if ($null -ne $labSupply) {
+        Add-Result 15 '自動供應矩陣研究站' 'pass_correlated_events' 'LabComponent.recipeId + sorter_delivered' "lab entity $($labSupply.EntityId), recipe $($labSupply.RecipeId)" 'Poll the selected recipe and served[] deltas; a static connection alone cannot prove delivery.'
+    } else {
+        Add-Result 15 '自動供應矩陣研究站' 'not_observed' 'LabComponent.recipeId + sorter_delivered' 'No lab received both required items through sorters.' 'Poll the selected recipe and served[] deltas.'
+    }
+
+    $matrixBatch = $null
+    if ($null -ne $labSupply) {
+        $matrixBatch = $tasks | Where-Object {
+            $_.name -eq 'machine_batch_completed' -and $_.machine_kind -eq 'lab' -and
+            [int]$_.entity_id -eq $labSupply.EntityId -and [int]$_.recipe_id -eq $labSupply.RecipeId -and
+            [long]$_.ticks -ge $labSupply.LastTicks -and $_.powered -eq $true -and
+            (Test-IdList $_.product_ids 6001)
+        } | Select-Object -First 1
+    }
+    if ($null -ne $matrixBatch) {
+        Add-Result 16 '生產第一個電磁矩陣' 'pass_correlated_events' 'LabComponent.cycleCount' "lab entity $($matrixBatch.entity_id), recipe $($matrixBatch.recipe_id), tick $($matrixBatch.game_tick)" 'Poll cycleCount or produced[] for the same matrix-mode lab and recipe.'
+    } else {
+        Add-Result 16 '生產第一個電磁矩陣' 'not_observed' 'LabComponent.cycleCount' 'No supplied lab completed an electromagnetic matrix batch.' 'Poll cycleCount or produced[] for the same matrix-mode lab and recipe.'
+    }
+
+    $passed = @($results | Where-Object { $_.verdict -like 'pass_*' }).Count
+    $overall = if ($passed -eq 16) { 'pass' } else { 'incomplete_or_fail' }
+    $report = [ordered]@{
+        verdict = $overall
+        passed = $passed
+        total = 16
+        run = $run.FullName
+        results = @($results)
+    }
+    $reportPath = Join-Path $run.FullName 'microtask-verdicts.json'
+    $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+    $results | ForEach-Object { [pscustomobject]$_ } | Format-Table task, name, verdict, signal -AutoSize
+    Write-Host "$passed / 16 microtasks passed"
+    Write-Host $reportPath
+    if ($overall -ne 'pass') { throw "Microtask verification is incomplete. See $reportPath" }
     exit
 }
 
