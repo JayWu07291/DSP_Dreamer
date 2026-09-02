@@ -416,12 +416,13 @@ if ($Command -eq 'verify-microtasks') {
             [int]$_.target_entity_id -eq [int]$delivery.target_entity_id -and
             [int]$_.target_recipe_id -eq [int]$delivery.target_recipe_id
         })
-        if (@($sameLab | Where-Object { [int]$_.item_id -eq 1202 }).Count -gt 0 -and
-            @($sameLab | Where-Object { [int]$_.item_id -eq 1301 }).Count -gt 0) {
+        $firstCoil = $sameLab | Where-Object { [int]$_.item_id -eq 1202 } | Sort-Object { [long]$_.ticks } | Select-Object -First 1
+        $firstBoard = $sameLab | Where-Object { [int]$_.item_id -eq 1301 } | Sort-Object { [long]$_.ticks } | Select-Object -First 1
+        if ($null -ne $firstCoil -and $null -ne $firstBoard) {
             $labSupply = [pscustomobject]@{
                 EntityId = [int]$delivery.target_entity_id
                 RecipeId = [int]$delivery.target_recipe_id
-                LastTicks = [long](($sameLab | Sort-Object { [long]$_.ticks } | Select-Object -Last 1).ticks)
+                ReadyTicks = [Math]::Max([long]$firstCoil.ticks, [long]$firstBoard.ticks)
             }
             break
         }
@@ -437,7 +438,7 @@ if ($Command -eq 'verify-microtasks') {
         $matrixBatch = $tasks | Where-Object {
             $_.name -eq 'machine_batch_completed' -and $_.machine_kind -eq 'lab' -and
             [int]$_.entity_id -eq $labSupply.EntityId -and [int]$_.recipe_id -eq $labSupply.RecipeId -and
-            [long]$_.ticks -ge $labSupply.LastTicks -and $_.powered -eq $true -and
+            [long]$_.ticks -ge $labSupply.ReadyTicks -and $_.powered -eq $true -and
             (Test-IdList $_.product_ids 6001)
         } | Select-Object -First 1
     }

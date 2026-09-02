@@ -113,7 +113,7 @@ Probe 0.1.13 用實體、配方與事件順序驗證從新遊戲到第一個電�
 | 建立自動熔煉 | 三個不同熔爐各有 `sorter_delivered`，之後各自完成指定配方批次 | 檢查三個 entity 的固定配方、輸入分揀器連線、`served[]` 與 `cycleCount`，但靜態連線無法證明曾交付物品 |
 | 自動生產磁線圈、電路板 | 不同製造台收到所有指定原料的分揀器交付，之後完成固定配方批次 | 輪詢同一 entity 與 recipe 的 `served[]`、`cycleCount`；單看產物無法排除手動供料 |
 | 自動供應矩陣研究站 | 同一研究站選定電磁矩陣配方，且分揀器分別送入磁線圈與電路板 | 比較 `LabComponent.recipeId` 與 `served[]`；只看分揀器連線不算完成 |
-| 生產第一個電磁矩陣 | 上述研究站的 `LabComponent.cycleCount` 增加，產物為 item 6001 | 輪詢同一 entity 與 recipe 的 `cycleCount` 或 `produced[]` |
+| 生產第一個電磁矩陣 | 上述研究站首次收到兩種原料後，`LabComponent.cycleCount` 增加且產物為 item 6001 | 輪詢同一 entity 與 recipe 的 `cycleCount` 或 `produced[]`；後續補料不得把完成門檻向後移 |
 
 實機驗證建議從尚未拆除登陸艙的新遊戲開始。這次只驗證事件與狀態，可以先把設定檔的 `CaptureHz` 設為 1，並把 `DurationSeconds` 調到足以完成整段流程，降低 `frames.rgba` 的空間占用。錄製期間依序完成十六項微任務，第一個電磁矩陣出現後停止，再執行：
 
@@ -150,8 +150,10 @@ Probe 0.1.13 用實體、配方與事件順序驗證從新遊戲到第一個電�
 
 - 完整畫面會以正確方向與色彩下採樣，不會裁切；錄製狀態面板不會進入資料。
 - DSP 黃色游標會合成到影像中，位置與記錄座標一致；20 Hz 與 30 Hz 測試均未使用 fallback 游標。
-- 十種必要 task event、物品取得去重、四個指定面板的狀態轉移，以及世界重載後重新綁定均已通過。
+- 十一種必要 task event、物品取得去重、固定面板與三類機器面板的狀態轉移，以及世界重載後重新綁定均已通過。
 - `export-event-frames` 與 `verify-alignment` 可重建事件畫面及逐幀 transition；action-to-observation 延遲低於 100 ms。
 - 20 Hz 與 30 Hz 都通過掉幀率、有效寫入率、GPU readback 與 writer backpressure 門檻。20 Hz 測試的整體 `metrics_verdict` 只因該次沒有執行 `factory_build` 而顯示 fail，效能門檻本身通過。
+- 2026-09-02 的 `20260902T145501Z` run 通過全部十六項微任務。磁線圈製造台 entity 26 先收到磁鐵與銅塊，再完成 7 批 recipe 6；研究站 entity 44 在兩種材料首次到齊後完成 item 6001。
+- 同一 run 的 miner、smelter、assembler 面板開關數量各自平衡；20 次建造模式轉換沒有斷鏈。6 次建築拆除對應 6 個不同 object ID，每次只有一筆 `factory_dismantled`，沒有舊版的 before/after 重複事件。
 
 因此，原型證實目前 DSP 版本與目標電腦可同步取得 RGB、輸入、遊戲 tick、任務事件與 next-state label，也可進行閉迴路輸入注入。正式實作若沿用這些結果，應重新定義穩定的資料契約與維護邊界，不應直接依賴本原型的 NDJSON schema。
