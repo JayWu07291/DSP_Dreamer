@@ -386,9 +386,12 @@ if ($Command -eq 'verify-microtasks') {
 
     Add-TechResult 11 '完成基礎製造' 'tech_basic_manufacturing_id' 'tech_basic_manufacturing_unlocked'
 
+    $recordedCoilItemId = if ($null -eq $catalog.PSObject.Properties['magnetic_coil_item_id']) { 0 } else { [int]$catalog.magnetic_coil_item_id }
     $autoCoil = Find-AutomatedBatch 1202 @(1102, 1104) 'assembler' @()
     if ($null -ne $autoCoil) {
         Add-Result 12 '自動生產磁線圈' 'pass_correlated_events' 'sorter_delivered + machine_batch_completed' "assembler entity $($autoCoil.Batch.entity_id), recipe $($autoCoil.Batch.recipe_id)" 'Check served inputs and cycleCount on a fixed-recipe assembler with connected input sorters.'
+    } elseif ($recordedCoilItemId -ne 1202) {
+        Add-Result 12 '自動生產磁線圈' 'capture_filter_invalid' 'microtask_catalog' "This run recorded magnetic_coil_item_id $recordedCoilItemId, so probe 0.1.11 filtered out item 1202 machine events." 'Record this task again with probe 0.1.12 or later; absence of events in this run is not evidence that automation did not occur.'
     } else {
         Add-Result 12 '自動生產磁線圈' 'not_observed' 'sorter_delivered + machine_batch_completed' 'No qualified assembler completed the recipe.' 'Check served inputs and cycleCount on a fixed-recipe assembler.'
     }

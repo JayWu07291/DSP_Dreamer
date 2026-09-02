@@ -23,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.12";
+        public const string PluginVersion = "0.1.13";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -45,6 +45,7 @@ namespace DSPDreamer.CaptureProbe
             "tech_unlocked",
             "manual_mining_yield",
             "factory_build",
+            "factory_dismantled",
             "item_acquired",
             "panel_opened",
             "panel_closed"
@@ -782,14 +783,20 @@ namespace DSPDreamer.CaptureProbe
             pendingDismantleObjectId = objectId;
             pendingDismantleProtoId = FactoryObjectProtoId(factory, objectId);
             pendingDismantleProtoName = ItemName(pendingDismantleProtoId);
-            WriteTaskEvent("before_dismantle", Fields("object_id", objectId, "proto_id", pendingDismantleProtoId, "proto_name", pendingDismantleProtoName));
         }
 
         private void OnAfterDismantle(PlanetFactory factory, int objectId)
         {
-            int protoId = objectId == pendingDismantleObjectId ? pendingDismantleProtoId : 0;
-            string protoName = objectId == pendingDismantleObjectId ? pendingDismantleProtoName : string.Empty;
-            WriteTaskEvent("after_dismantle", Fields("object_id", objectId, "proto_id", protoId, "proto_name", protoName));
+            if (objectId == pendingDismantleObjectId)
+            {
+                WriteTaskEvent("factory_dismantled", Fields(
+                    "factory_index", factory == null ? -1 : factory.index,
+                    "object_id", objectId,
+                    "entity_id", objectId > 0 ? objectId : 0,
+                    "prebuild_id", objectId < 0 ? -objectId : 0,
+                    "proto_id", pendingDismantleProtoId,
+                    "proto_name", pendingDismantleProtoName));
+            }
             pendingDismantleObjectId = pendingDismantleProtoId = 0;
             pendingDismantleProtoName = string.Empty;
         }

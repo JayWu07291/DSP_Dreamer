@@ -30,7 +30,7 @@
 
 - `Ctrl+F8` 開始或停止擷取。預設 10 分鐘後自動停止。
 - 錄製期間至少按三次 `Ctrl+F9`。每次會送出 100 ms 的 W 與 16 px 相對滑鼠移動，用來量 action-to-observation latency。
-- 依序拆除登陸艙、開啟再關閉科技樹、加入研究佇列、手作並完成一項物品、完成一項科技、手動採礦，再放置至少一棟建築。這是事件涵蓋率 smoke test。
+- 依序拆除登陸艙、開啟再關閉科技樹、加入研究佇列、手作並完成一項物品、完成一項科技、手動採礦、放置一棟建築，再拆除一棟可犧牲的建築。這是事件涵蓋率 smoke test。
 - `Ctrl+Shift+F11` 是緊急停止。它會先送出 W key-up。原型不使用 `F12`，因為 Steam 會攔截它做截圖。
 
 錄製開始後，狀態面板會消失，避免污染 RGB 資料。停止擷取後，面板會重新出現並顯示結果。
@@ -64,6 +64,7 @@
 | `tech_unlocked` | 遊戲送出科技解鎖事件 |
 | `manual_mining_yield` | `PlayerAction_Mine` 登記實際產出 |
 | `factory_build` | 工廠送出完成建造事件 |
+| `factory_dismantled` | 工廠確認建築或預建物已拆除後寫入一筆事件；拆除前 callback 只暫存原型資料，不另外寫事件 |
 | `item_acquired` | 沒有採礦或手作來源事件的物品實際進入玩家背包，保存 item ID、數量與增產點數 |
 | `panel_opened` | 面板的 `active` 狀態從 false 變成 true，保存型別與 run 內 instance ID |
 | `panel_closed` | 面板的 `active` 狀態從 true 變成 false，保存型別與 run 內 instance ID |
@@ -101,7 +102,7 @@ Probe 0.1.10 會在擷取要求當下保存游標位置、顯示狀態與 DSP cu
 
 ## 十六項微任務判定原型
 
-Probe 0.1.12 用實體、配方與事件順序驗證從新遊戲到第一個電磁矩陣的十六項微任務。科技與登陸艙有高階事件；工廠生產沒有統一的微任務事件，但可直接讀取 component 的批次完成與分揀器交付。磁線圈的物品 ID 是 `1202`。這些內部狀態只用於標註、reward、提示切換與評估，不是 policy observation。
+Probe 0.1.13 用實體、配方與事件順序驗證從新遊戲到第一個電磁矩陣的十六項微任務。科技與登陸艙有高階事件；工廠生產沒有統一的微任務事件，但可直接讀取 component 的批次完成與分揀器交付。磁線圈的物品 ID 是 `1202`。Probe 0.1.11 曾把它誤寫成 `1201`，所以該版本的 run 無法判定第 12 項，驗證器會回報 `capture_filter_invalid`，不再把缺少事件解讀成玩家沒有完成。這些內部狀態只用於標註、reward、提示切換與評估，不是 policy observation。
 
 | 微任務 | 首選判定 | 沒收到即時事件時的替代判定 |
 | --- | --- | --- |
@@ -130,7 +131,7 @@ Probe 0.1.12 用實體、配方與事件順序驗證從新遊戲到第一個電�
 - 總掉幀率低於 1%。總掉幀分成排程錯過、沒有空閒 GPU slot、GPU readback 錯誤與 writer backpressure。
 - 有效寫入率至少是設定 Hz 的 95%。
 - GPU readback 與 writer backpressure 都是零。
-- 上表十種必要 task event 都至少記錄一次；`summary.json` 的 `missing_task_event_kinds` 必須是空字串。
+- 上表十一種必要 task event 都至少記錄一次；`summary.json` 的 `missing_task_event_kinds` 必須是空字串。
 - 至少做過三次注入，而且每個注入都在 100 ms 內由 `VFInput.OnUpdate` 觀察到。
 
 數值門檻通過後，整體 `verdict` 仍是 `metrics_pass_visual_pending`。正式結論需要人工確認 frame 包含完整世界視野、科技樹 UI 與游標，不包含錄製模組狀態面板，且上下方向與 RGBA channel 正確。先跑 10 Hz。人工確認通過後，把 `BepInEx/config/tw.jaywu.dspdreamer.capture-probe.cfg` 的 `CaptureHz` 改成 20，再跑一次壓力測試。
