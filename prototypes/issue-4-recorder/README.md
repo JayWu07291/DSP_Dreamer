@@ -12,7 +12,7 @@
 2. 下一個 `VFInput.OnUpdate` postfix 記錄 DSP 實際讀到的鍵鼠狀態。若該樣本看到注入內容，它會記錄相同 `action_id`。
 3. 同一 rendered frame 的 `WaitForEndOfFrame` 建立 RGB 擷取要求，固定保存要求當下的 `unity_frame`、`game_tick` 與待對齊的 `action_id`。
 4. GPU callback 只補上 `completed_ticks`。它不得改寫要求當下的 frame、tick 或 action 身分。
-5. 物品進入背包、指定面板開關、研究佇列、手作、手採、建造與登陸艙拆除事件保存發生當下的 `unity_frame` 與 `game_tick`。錄製開始時另存一份已開啟面板快照。資料載入器日後可把 `action_id` 對到同 rendered frame 結束時的 RGB 與 task label，形成 `observation_t, action_t, next_state_t`。
+5. 物品進入背包、指定面板開關、建造／拆除模式切換、研究佇列、手作、手採、建造與登陸艙拆除事件保存發生當下的 `unity_frame` 與 `game_tick`。錄製開始時另存面板與建造模式快照。資料載入器日後可把 `action_id` 對到同 rendered frame 結束時的 RGB 與 task label，形成 `observation_t, action_t, next_state_t`。
 
 這個原型故意同時保存要求時間與完成時間。GPU callback 的完成順序不是資料時間順序。
 
@@ -51,7 +51,7 @@
 
 `item_acquired` 是沒有其他來源事件的背包狀態事件。錄製器會延後一個 game tick 寫入；若同 tick、item ID 與數量已有 `manual_mining_yield` 或 `craft_completed`，就不把 `item_acquired` 寫進 NDJSON。`summary.json` 的 `suppressed_item_acquisition_duplicates` 記錄寫入前刪除的數量。`show-latest` 仍會合併舊版 run 的重疊列，新版 run 的合併數應為零。
 
-面板事件只追蹤 `UITechTree`、`UIReplicatorWindow`、`UIInventoryWindow` 與 `UIMechaWindow`。Unity instance ID 只在單次 run 內有效，所以白名單使用型別名稱，不固定 `#419754` 這類數值。
+面板事件追蹤 `UITechTree`、`UIReplicatorWindow`、`UIInventoryWindow`、`UIMechaWindow`、採礦機面板，以及實體可辨識為熔爐或製造台的 `UIAssemblerWindow`。後兩類事件會保存機器類型、entity、component、建築原型、配方及當次遊戲語言名稱；不追蹤同樣使用 `UIAssemblerWindow` 的化工廠等其他設施。Unity instance ID 只在單次 run 內有效，所以固定面板白名單使用型別名稱，不固定 `#419754` 這類數值。
 
 事件名稱與成功判定如下：
 
@@ -67,8 +67,9 @@
 | `item_acquired` | 沒有採礦或手作來源事件的物品實際進入玩家背包，保存 item ID、數量與增產點數 |
 | `panel_opened` | 面板的 `active` 狀態從 false 變成 true，保存型別與 run 內 instance ID |
 | `panel_closed` | 面板的 `active` 狀態從 true 變成 false，保存型別與 run 內 instance ID |
+| `build_mode_changed` | 玩家控制器在 `none`、`construction`、`dismantle` 或其他建造模式間切換；只在狀態改變時寫入 |
 
-`panel_state_snapshot` 不是 task event。它在每次錄製開始時列出當下所有已開啟面板，之後可依 `panel_opened` 與 `panel_closed` 重建任一時間點的 UI 狀態。
+`panel_state_snapshot` 與 `build_mode_state_snapshot` 不是 task event。前者列出錄製開始時已開啟的目標面板，後者保存當時的建造模式；之後可依 `panel_opened`、`panel_closed` 與 `build_mode_changed` 重建任一時間點的 UI 與操作模式。
 
 把最近一次結果的第一幀轉成上下方向不同的兩張 PNG：
 
@@ -100,7 +101,7 @@ Probe 0.1.10 會在擷取要求當下保存游標位置、顯示狀態與 DSP cu
 
 ## 十六項微任務判定原型
 
-Probe 0.1.11 用實體、配方與事件順序驗證從新遊戲到第一個電磁矩陣的十六項微任務。科技與登陸艙有高階事件；工廠生產沒有統一的微任務事件，但可直接讀取 component 的批次完成與分揀器交付。這些內部狀態只用於標註、reward、提示切換與評估，不是 policy observation。
+Probe 0.1.12 用實體、配方與事件順序驗證從新遊戲到第一個電磁矩陣的十六項微任務。科技與登陸艙有高階事件；工廠生產沒有統一的微任務事件，但可直接讀取 component 的批次完成與分揀器交付。磁線圈的物品 ID 是 `1202`。這些內部狀態只用於標註、reward、提示切換與評估，不是 policy observation。
 
 | 微任務 | 首選判定 | 沒收到即時事件時的替代判定 |
 | --- | --- | --- |

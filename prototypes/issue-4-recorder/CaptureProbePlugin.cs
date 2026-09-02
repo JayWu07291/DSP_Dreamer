@@ -23,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.11";
+        public const string PluginVersion = "0.1.12";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -32,7 +32,7 @@ namespace DSPDreamer.CaptureProbe
         private const int IronIngotItemId = 1101;
         private const int MagnetItemId = 1102;
         private const int CopperIngotItemId = 1104;
-        private const int MagneticCoilItemId = 1201;
+        private const int MagneticCoilItemId = 1202;
         private const int CircuitBoardItemId = 1301;
         private const int ElectromagneticMatrixItemId = 6001;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
@@ -68,6 +68,7 @@ namespace DSPDreamer.CaptureProbe
         private readonly List<PendingAcquisition> pendingAcquisitions = new List<PendingAcquisition>();
         private readonly HashSet<string> semanticAcquisitionKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> taskEventKinds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<int, Dictionary<string, object>> openPanelFields = new Dictionary<int, Dictionary<string, object>>();
         private readonly Dictionary<int, CursorGlyph> cursorGlyphCache = new Dictionary<int, CursorGlyph>();
         private readonly HashSet<int> unreadableCursorTextureIds = new HashSet<int>();
         private ConfigEntry<int> captureHz;
@@ -126,6 +127,7 @@ namespace DSPDreamer.CaptureProbe
         private int outstandingReadbacks;
         private long releaseWAtTicks;
         private bool injectedWHeld;
+        private string lastBuildMode;
         private string lastMessage = "Ctrl+F8 開始 10 Hz 擷取";
         private GUIStyle overlayStyle;
 
@@ -147,7 +149,11 @@ namespace DSPDreamer.CaptureProbe
 
         private void Update()
         {
-            if (recording) FlushPendingAcquisitions(SafeGameTick());
+            if (recording)
+            {
+                FlushPendingAcquisitions(SafeGameTick());
+                RecordBuildModeTransition();
+            }
 
             bool control = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
@@ -268,6 +274,7 @@ namespace DSPDreamer.CaptureProbe
                 "game_tick", SafeGameTick()));
             recording = true;
             RecordPanelSnapshot();
+            RecordBuildModeSnapshot();
             ResolveMicrotaskCatalog();
             RecordMicrotaskStateSnapshot("session_start");
             lastMessage = "擷取中：" + runDirectory;
@@ -1060,14 +1067,20 @@ namespace DSPDreamer.CaptureProbe
 
         internal void RecordPanelOpened(ManualBehaviour panel)
         {
-            if (!IsPanel(panel)) return;
-            WriteTaskEvent("panel_opened", Fields("panel", panel.GetType().Name, "panel_instance_id", panel.GetInstanceID()));
+            Dictionary<string, object> fields;
+            if (!TryGetPanelFields(panel, out fields)) return;
+            openPanelFields[panel.GetInstanceID()] = fields;
+            WriteTaskEvent("panel_opened", new Dictionary<string, object>(fields));
         }
 
         internal void RecordPanelClosed(ManualBehaviour panel)
         {
-            if (!IsPanel(panel)) return;
-            WriteTaskEvent("panel_closed", Fields("panel", panel.GetType().Name, "panel_instance_id", panel.GetInstanceID()));
+            if (panel == null) return;
+            int instanceId = panel.GetInstanceID();
+            Dictionary<string, object> fields;
+            if (!openPanelFields.TryGetValue(instanceId, out fields) && !TryGetPanelFields(panel, out fields)) return;
+            WriteTaskEvent("panel_closed", new Dictionary<string, object>(fields));
+            openPanelFields.Remove(instanceId);
         }
 
         private void RecordPanelSnapshot()
@@ -1077,7 +1090,12 @@ namespace DSPDreamer.CaptureProbe
             for (int i = 0; i < behaviours.Length; i++)
             {
                 ManualBehaviour behaviour = behaviours[i];
-                if (IsPanel(behaviour) && behaviour.active) openPanels.Add(PanelKey(behaviour));
+                Dictionary<string, object> fields;
+                if (behaviour.active && TryGetPanelFields(behaviour, out fields))
+                {
+                    openPanels.Add(PanelKey(behaviour));
+                    openPanelFields[behaviour.GetInstanceID()] = fields;
+                }
             }
             string[] names = new string[openPanels.Count];
             openPanels.CopyTo(names);
@@ -1089,10 +1107,69 @@ namespace DSPDreamer.CaptureProbe
                 "ticks", clock.ElapsedTicks));
         }
 
-        private static bool IsPanel(ManualBehaviour behaviour)
+        private static bool TryGetPanelFields(ManualBehaviour panel, out Dictionary<string, object> fields)
         {
-            if (behaviour == null) return false;
-            return TrackedPanelTypeNames.Contains(behaviour.GetType().Name);
+            fields = null;
+            if (panel == null) return false;
+            string panelType = panel.GetType().Name;
+            if (TrackedPanelTypeNames.Contains(panelType))
+            {
+                fields = Fields("panel", panelType, "panel_instance_id", panel.GetInstanceID());
+                return true;
+            }
+
+            UIMinerWindow minerWindow = panel as UIMinerWindow;
+            if (minerWindow != null)
+            {
+                PlanetFactory factory = minerWindow.factory;
+                int minerId = minerWindow.minerId;
+                if (factory == null || factory.factorySystem == null || minerId <= 0 || minerId >= factory.factorySystem.minerPool.Length) return false;
+                MinerComponent miner = factory.factorySystem.minerPool[minerId];
+                if (miner.id != minerId || miner.entityId <= 0 || miner.entityId >= factory.entityPool.Length) return false;
+                int protoId = factory.entityPool[miner.entityId].protoId;
+                fields = Fields(
+                    "panel", panelType,
+                    "panel_instance_id", panel.GetInstanceID(),
+                    "machine_kind", "miner",
+                    "factory_index", factory.index,
+                    "entity_id", miner.entityId,
+                    "component_id", minerId,
+                    "proto_id", protoId,
+                    "proto_name", ItemName(protoId));
+                return true;
+            }
+
+            UIAssemblerWindow assemblerWindow = panel as UIAssemblerWindow;
+            if (assemblerWindow == null) return false;
+            PlanetFactory assemblerFactory = assemblerWindow.factory;
+            int assemblerId = assemblerWindow.assemblerId;
+            if (assemblerFactory == null || assemblerFactory.factorySystem == null || assemblerId <= 0 || assemblerId >= assemblerFactory.factorySystem.assemblerPool.Length) return false;
+            AssemblerComponent assembler = assemblerFactory.factorySystem.assemblerPool[assemblerId];
+            if (assembler.id != assemblerId || assembler.entityId <= 0 || assembler.entityId >= assemblerFactory.entityPool.Length) return false;
+            int assemblerProtoId = assemblerFactory.entityPool[assembler.entityId].protoId;
+            ERecipeType recipeType = assembler.recipeType;
+            ItemProto assemblerProto = LDB.items.Select(assemblerProtoId);
+            if (recipeType == ERecipeType.None && assemblerProto != null && assemblerProto.prefabDesc != null)
+            {
+                recipeType = assemblerProto.prefabDesc.assemblerRecipeType;
+            }
+            string machineKind;
+            if (recipeType == ERecipeType.Smelt) machineKind = "smelter";
+            else if (recipeType == ERecipeType.Assemble) machineKind = "assembler";
+            else return false;
+            fields = Fields(
+                "panel", panelType,
+                "panel_instance_id", panel.GetInstanceID(),
+                "machine_kind", machineKind,
+                "factory_index", assemblerFactory.index,
+                "entity_id", assembler.entityId,
+                "component_id", assemblerId,
+                "proto_id", assemblerProtoId,
+                "proto_name", ItemName(assemblerProtoId),
+                "recipe_id", assembler.recipeId,
+                "recipe_name", RecipeName(assembler.recipeId),
+                "recipe_type", recipeType.ToString());
+            return true;
         }
 
         private static string PanelKey(ManualBehaviour panel)
@@ -1165,6 +1242,38 @@ namespace DSPDreamer.CaptureProbe
             RecordMicrotaskStateSnapshot("episode_begin");
         }
 
+        private void RecordBuildModeSnapshot()
+        {
+            lastBuildMode = CurrentBuildMode();
+            WriteEvent("build_mode_state_snapshot", Fields(
+                "mode", lastBuildMode,
+                "unity_frame", Time.frameCount,
+                "game_tick", SafeGameTick(),
+                "ticks", clock.IsRunning ? clock.ElapsedTicks : 0));
+        }
+
+        private void RecordBuildModeTransition()
+        {
+            string currentMode = CurrentBuildMode();
+            if (lastBuildMode == null)
+            {
+                lastBuildMode = currentMode;
+                return;
+            }
+            if (currentMode == lastBuildMode) return;
+            WriteTaskEvent("build_mode_changed", Fields("previous_mode", lastBuildMode, "mode", currentMode));
+            lastBuildMode = currentMode;
+        }
+
+        private static string CurrentBuildMode()
+        {
+            Player player = GameMain.mainPlayer;
+            if (player == null || player.controller == null || player.controller.cmd.type != ECommand.Build) return "none";
+            if (player.controller.cmd.mode == -1) return "dismantle";
+            if (player.controller.cmd.mode >= 0) return "construction";
+            return "other_build";
+        }
+
         internal void OnGameEnd()
         {
             if (!recording) return;
@@ -1207,6 +1316,7 @@ namespace DSPDreamer.CaptureProbe
             suppressedAcquisitionDuplicates = 0;
             cursorVisibleFrames = cursorCompositedFrames = cursorFallbackFrames = 0;
             taskEventKinds.Clear();
+            openPanelFields.Clear();
             cursorGlyphCache.Clear();
             unreadableCursorTextureIds.Clear();
             inputSamples = 0;
@@ -1222,6 +1332,7 @@ namespace DSPDreamer.CaptureProbe
             pendingDismantleProtoName = string.Empty;
             electromagnetismTechId = automaticMetallurgyTechId = basicLogisticsTechId = 0;
             basicManufacturingTechId = electromagneticMatrixTechId = 0;
+            lastBuildMode = null;
             recording = stopping = writerFinished = false;
         }
 

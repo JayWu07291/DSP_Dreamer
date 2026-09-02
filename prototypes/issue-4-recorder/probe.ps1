@@ -83,6 +83,8 @@ function Format-TaskEventDetails($Event) {
     if ($null -ne $Event.vege_id) { $parts.Add("植被實例ID $($Event.vege_id)") }
     if ($null -ne $Event.proto_id) { $parts.Add("原型 $($Event.proto_id) $($Event.proto_name)") }
     if ($null -ne $Event.panel_instance_id) { $parts.Add("面板 $($Event.panel)#$($Event.panel_instance_id)") }
+    if ($null -ne $Event.machine_kind) { $parts.Add("機器類型 $($Event.machine_kind)") }
+    if ($null -ne $Event.previous_mode) { $parts.Add("模式 $($Event.previous_mode) → $($Event.mode)") }
     return $parts -join '; '
 }
 
@@ -384,7 +386,7 @@ if ($Command -eq 'verify-microtasks') {
 
     Add-TechResult 11 '完成基礎製造' 'tech_basic_manufacturing_id' 'tech_basic_manufacturing_unlocked'
 
-    $autoCoil = Find-AutomatedBatch 1201 @(1102, 1104) 'assembler' @()
+    $autoCoil = Find-AutomatedBatch 1202 @(1102, 1104) 'assembler' @()
     if ($null -ne $autoCoil) {
         Add-Result 12 '自動生產磁線圈' 'pass_correlated_events' 'sorter_delivered + machine_batch_completed' "assembler entity $($autoCoil.Batch.entity_id), recipe $($autoCoil.Batch.recipe_id)" 'Check served inputs and cycleCount on a fixed-recipe assembler with connected input sorters.'
     } else {
@@ -411,7 +413,7 @@ if ($Command -eq 'verify-microtasks') {
             [int]$_.target_entity_id -eq [int]$delivery.target_entity_id -and
             [int]$_.target_recipe_id -eq [int]$delivery.target_recipe_id
         })
-        if (@($sameLab | Where-Object { [int]$_.item_id -eq 1201 }).Count -gt 0 -and
+        if (@($sameLab | Where-Object { [int]$_.item_id -eq 1202 }).Count -gt 0 -and
             @($sameLab | Where-Object { [int]$_.item_id -eq 1301 }).Count -gt 0) {
             $labSupply = [pscustomobject]@{
                 EntityId = [int]$delivery.target_entity_id
