@@ -14,13 +14,13 @@ From the repository root:
 
 The first run creates `tmp/issue-6-venv` and installs NumPy plus the official PyTorch 2.9.0 CUDA 12.8 wheel. Later runs reuse it. To isolate one stage, pass `-Stage world_model`, `-Stage agent_finetune`, or `-Stage imagination`.
 
-The script prints the full configuration, loss, trainable parameter count, elapsed time, and peak allocated and reserved CUDA memory. It also writes `measured_rtx5070.json` beside this file.
+The script prints the full configuration, loss, trainable parameter count, elapsed time, and peak allocated and reserved CUDA memory. Those peaks belong to this PyTorch process. A separate `nvidia-smi` monitor samples whole-device usage every 100 ms, including other software, and records the peak for each stage. The script writes `measured_rtx5070.json` beside this file.
 
 ## Question under test
 
 The prototype keeps these design commitments:
 
-- A causal tokenizer zero-pads each 640×360 RGB observation to 640×384 without shrinking the UI. Spatial cross-attention produces 64 latent tokens, then causal temporal attention mixes history. The bottleneck is 32 channels per latent token.
+- A causal tokenizer keeps each 640×360 RGB observation at its native 16:9 shape. It uses 20×20 patches, which form an exact 32×18 grid without resizing or padding. Spatial cross-attention produces 64 latent tokens, then causal temporal attention mixes history. The bottleneck is 32 channels per latent token.
 - Interactive dynamics predicts clean latent representations from corrupted representations, task-blind low-level actions, signal level, and shortcut step size. It has four space-time blocks and a time-attention layer after the fourth spatial layer.
 - A task-conditioned agent token reads world tokens through one-way cross-attention. The world tokens never read the task token. Policy and reward heads use MTP distance 8. Agent fine-tuning gives half of each microbatch to uniform dynamics training and half to task-relevant policy and reward training.
 - The policy represents 17 binary keyboard and mouse-button controls, one 121-class joint mouse movement, and a three-class wheel action.

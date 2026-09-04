@@ -7,9 +7,9 @@ class PrototypeConfig:
 
     observation_height: int = 360
     observation_width: int = 640
-    model_height: int = 384
+    model_height: int = 360
     model_width: int = 640
-    patch_size: int = 16
+    patch_size: int = 20
 
     model_dim: int = 512
     latent_tokens: int = 64

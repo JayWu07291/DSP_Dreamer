@@ -11,6 +11,8 @@ import argparse
 import copy
 import json
 import math
+import subprocess
+import threading
 import time
 from contextlib import nullcontext
 from dataclasses import asdict
@@ -23,6 +25,52 @@ import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
 from config import PrototypeConfig
+
+
+def nvidia_smi_memory() -> dict[str, float]:
+    output = subprocess.check_output(
+        [
+            "nvidia-smi",
+            "--query-gpu=memory.total,memory.used,memory.free",
+            "--format=csv,noheader,nounits",
+        ],
+        text=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    total_mib, used_mib, free_mib = [float(value.strip()) for value in output.splitlines()[0].split(",")]
+    return {
+        "total_gib": round(total_mib / 1024, 3),
+        "used_gib": round(used_mib / 1024, 3),
+        "free_gib": round(free_mib / 1024, 3),
+    }
+
+
+class NvidiaSmiMonitor:
+    """Samples whole-device VRAM, including other processes, every 100 ms."""
+
+    def __init__(self) -> None:
+        self.stop_event = threading.Event()
+        self.samples: list[dict[str, float]] = []
+        self.thread = threading.Thread(target=self._sample_until_stopped, daemon=True)
+
+    def _sample_until_stopped(self) -> None:
+        while not self.stop_event.is_set():
+            self.samples.append(nvidia_smi_memory())
+            self.stop_event.wait(0.1)
+
+    def start(self) -> None:
+        self.samples.append(nvidia_smi_memory())
+        self.thread.start()
+
+    def stop(self) -> dict[str, float]:
+        self.stop_event.set()
+        self.thread.join()
+        self.samples.append(nvidia_smi_memory())
+        return {
+            "used_before_gib": self.samples[0]["used_gib"],
+            "peak_used_gib": max(sample["used_gib"] for sample in self.samples),
+            "sample_count": len(self.samples),
+        }
 
 
 def causal_mask(length: int, device: torch.device) -> torch.Tensor:
@@ -73,13 +121,8 @@ class CausalTokenizer(nn.Module):
         batch, steps, channels, height, width = frames.shape
         resized = F.interpolate(
             frames.reshape(batch * steps, channels, height, width),
-            size=(self.cfg.observation_height, self.cfg.observation_width),
+            size=(self.cfg.model_height, self.cfg.model_width),
             mode="area",
-        )
-        vertical_padding = self.cfg.model_height - self.cfg.observation_height
-        resized = F.pad(
-            resized,
-            (0, 0, vertical_padding // 2, vertical_padding - vertical_padding // 2),
         )
         return resized.reshape(
             batch, steps, channels, self.cfg.model_height, self.cfg.model_width
@@ -615,6 +658,9 @@ def measure_stage(
     device: torch.device,
 ) -> dict[str, float | int | str]:
     torch.manual_seed(7)
+    device_monitor = NvidiaSmiMonitor() if device.type == "cuda" else None
+    if device_monitor:
+        device_monitor.start()
     model = DreamerPrototype(cfg).to(device)
     model.train()
     if device.type == "cuda":
@@ -640,6 +686,7 @@ def measure_stage(
         reserved = torch.cuda.max_memory_reserved(device) / 1024**3
     else:
         allocated = reserved = 0.0
+    whole_device = device_monitor.stop() if device_monitor else None
     elapsed = time.perf_counter() - started
     result = {
         "stage": name,
@@ -647,6 +694,7 @@ def measure_stage(
         "seconds": round(elapsed, 3),
         "peak_allocated_gib": round(allocated, 3),
         "peak_reserved_gib": round(reserved, 3),
+        "whole_device_vram": whole_device,
         "trainable_parameters": trainable_parameters(model),
     }
     del loss, optimizer, model
@@ -663,6 +711,17 @@ def main() -> None:
     args = parser.parse_args()
     cfg = PrototypeConfig()
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
+    if device.type == "cuda":
+        free_bytes, total_bytes = torch.cuda.mem_get_info(device)
+        cuda_memory_before = {
+            "total_gib": round(total_bytes / 1024**3, 3),
+            "used_gib": round((total_bytes - free_bytes) / 1024**3, 3),
+            "free_gib": round(free_bytes / 1024**3, 3),
+        }
+        nvidia_smi_memory_before = nvidia_smi_memory()
+    else:
+        cuda_memory_before = None
+        nvidia_smi_memory_before = None
     selected = STAGES if args.stage == "all" else {args.stage: STAGES[args.stage]}
     results = [measure_stage(name, function, cfg, device) for name, function in selected.items()]
     report = {
@@ -670,6 +729,8 @@ def main() -> None:
         "device": str(device),
         "gpu": torch.cuda.get_device_name(0) if device.type == "cuda" else None,
         "torch": torch.__version__,
+        "cuda_memory_before": cuda_memory_before,
+        "nvidia_smi_memory_before": nvidia_smi_memory_before,
         "config": asdict(cfg),
         "results": results,
     }
