@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PROTOTYPE — DSP 任務圖與獎勵排程</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101418; color: #e8eef2; }
+    body { margin: 0; }
+    header { padding: 18px 24px; border-bottom: 1px solid #33404a; background: #151b20; }
+    h1 { margin: 0 0 6px; font-size: 20px; }
+    header p { margin: 0; color: #aebbc5; }
+    main { display: grid; grid-template-columns: minmax(360px, 1.1fr) minmax(340px, .9fr); gap: 16px; padding: 16px; }
+    section { border: 1px solid #33404a; border-radius: 10px; background: #151b20; padding: 14px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    h3 { margin: 14px 0 8px; font-size: 14px; color: #c9d6df; }
+    button { border: 1px solid #536574; border-radius: 7px; background: #202b33; color: #eef5f8; padding: 8px 10px; cursor: pointer; }
+    button:hover { background: #2a3944; }
+    button:disabled { opacity: .38; cursor: not-allowed; }
+    .toolbar, .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .toolbar { margin-bottom: 12px; }
+    .active { border-color: #65c7f0; box-shadow: 0 0 0 1px #65c7f0 inset; }
+    .card { border: 1px solid #3b4954; border-radius: 8px; padding: 10px; margin: 8px 0; }
+    .card strong { display: block; margin-bottom: 4px; }
+    .status { font-size: 12px; color: #aebbc5; }
+    .frontier { border-color: #b693ff; }
+    .done { border-color: #59c98c; background: #17271f; }
+    .pending { opacity: .62; }
+    .prompt { border: 1px solid #65c7f0; background: #132733; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .prompt code { color: #8edcff; }
+    .legend { font-size: 12px; color: #aebbc5; margin-bottom: 10px; }
+    .events button { margin: 3px; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0d1115; border-radius: 8px; padding: 10px; max-height: 330px; overflow: auto; font-size: 12px; }
+    .walkthrough { display: none; }
+    .walkthrough.show { display: block; }
+    .walkthrough ol { padding-left: 22px; }
+    .walkthrough li { margin: 7px 0; }
+    .warning { color: #ffc879; }
+    @media (max-width: 850px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PROTOTYPE — DSP 任務圖與獎勵排程</h1>
+    <p>問題：背景研究、合成與拆除同時進行時，16 個微任務與 7 個背景里程碑應如何推進？所有狀態只存在記憶體。</p>
+  </header>
+  <main>
+    <div>
+      <section>
+        <h2>排程模式</h2>
+        <div class="toolbar">
+          <button id="graphMode" class="active">任務圖排程</button>
+          <button id="linearMode">完成事件線性排程</button>
+          <button id="reset">重設</button>
+        </div>
+        <div id="prompt" class="prompt"></div>
+        <div class="legend">紫框是目前可做的節點，綠框是已完成。圖的依賴邊只控制排程解鎖，遊戲事件判定器仍會阻止不可能提前發生的事件。中文名稱只供人閱讀，模型只收 active task 的 one-hot／embedding。</div>
+        <div id="nodes"></div>
+      </section>
+
+      <section style="margin-top:16px">
+        <h2>自由操作</h2>
+        <div class="events" id="events"></div>
+        <h3>等待狀態</h3>
+        <div class="events"><button id="advanceWait">推進一個等待決策步</button></div>
+        <h3>背景進度</h3>
+        <div class="events" id="backgroundEvents"></div>
+      </section>
+    </div>
+
+    <div>
+      <section>
+        <h2>引導案例</h2>
+        <div class="tabs">
+          <button data-tab="opening" class="active">並行開局</button>
+          <button data-tab="logistics">物流解鎖前後</button>
+          <button data-tab="reward">非目前任務完成</button>
+        </div>
+        <div id="opening" class="walkthrough show">
+          <ol>
+            <li>按「開始拆除登陸艙」。任務圖模式立即推進，不等待拆除動畫。</li>
+            <li>拆除進行時只能先按「排入五項科技」。完成後顯示 <code>wait_for_progress</code>，早期製作、燃料和採銅仍被鎖住。</li>
+            <li>觸發背景事件「登陸艙拆除完成」。取得初始物資後，早期製作、燃料和採銅才進入 frontier。</li>
+            <li>按「排入早期手工製作」、「補充機甲燃料」與「取得前期銅礦」，再觸發「電磁學完成」。</li>
+          </ol>
+        </div>
+        <div id="logistics" class="walkthrough">
+          <ol>
+            <li>在基礎物流完成前，放置三台熔爐並手動送料。</li>
+            <li>觸發「基礎物流完成」，自動熔煉節點才進入 frontier。</li>
+            <li>連接採礦機、傳送帶、分揀器與熔爐後，再進入製造支線。</li>
+          </ol>
+        </div>
+        <div id="reward" class="walkthrough">
+          <ol>
+            <li>讓目前 prompt 停在一個行動節點。</li>
+            <li>觸發另一個背景完成事件。</li>
+            <li>觀察右側紀錄：里程碑一定鎖定；是否同時發 task reward，正是需要決定的地方。</li>
+          </ol>
+          <p class="warning">原型採已確認方案：同一狀態快照成立的事件同時鎖定，且後續狀態逆轉不撤銷。只有 active task 對應的分量成為當下 scalar policy reward。新解鎖任務不會搶佔未完成的 active task。</p>
+        </div>
+      </section>
+
+      <section style="margin-top:16px">
+        <h2>完整狀態</h2>
+        <pre id="state"></pre>
+        <h2>事件與 reward 紀錄</h2>
+        <pre id="log"></pre>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const nodeDefs = [
+      { id:'start_dismantle', label:'開始拆除登陸艙', type:'action', deps:[] },
+      { id:'queue_research', label:'排入五項科技', detail:'佇列前五項依序為電磁學、自動化冶金、基礎物流系統、基礎製造、電磁矩陣', type:'action', deps:['start_dismantle'] },
+      { id:'queue_crafting', label:'排入早期手工製作', detail:'製作佇列已排入 10 個磁線圈與 10 個電路板，不等待成品完成', type:'action', deps:['lander_done'] },
+      { id:'fuel_mecha', label:'補充機甲燃料', detail:'至少一個由登陸艙取得的液氫燃料棒進入機甲燃燒室，不等待能量增加', type:'action', deps:['lander_done'] },
+      { id:'mine_copper', label:'取得前期銅礦', detail:'玩家親自採礦使背包累計增加至少 4 個銅礦', type:'action', deps:['lander_done'] },
+      { id:'supply_metallurgy', label:'供應自動化冶金研究材料', detail:'對應科技的全部材料需求都已送入研究暫存', type:'action', deps:['electromagnetism_done'] },
+      { id:'place_iron_miner', label:'建立鐵礦自動採集', detail:'採礦機覆蓋鐵礦脈，位於有效供電範圍，並至少產出 1 個鐵礦', type:'action', deps:['electromagnetism_done'] },
+      { id:'place_copper_miner', label:'建立銅礦自動採集', detail:'採礦機覆蓋銅礦脈，位於有效供電範圍，並至少產出 1 個銅礦', type:'action', deps:['electromagnetism_done'] },
+      { id:'manual_smelting', label:'建立三種人工送料熔煉', detail:'三台無自動輸入的熔爐分別固定為鐵塊、磁鐵、銅塊配方，並各產出至少 1 個成品', type:'action', deps:['metallurgy_done','place_iron_miner','mine_copper'] },
+      { id:'supply_logistics', label:'供應基礎物流研究材料', detail:'對應科技的全部材料需求都已送入研究暫存', type:'action', deps:['metallurgy_done'] },
+      { id:'connect_smelters', label:'建立三種自動熔煉', detail:'鐵塊、磁鐵、銅塊支線都從已供電採礦機取料，經傳送帶與分揀器送入固定配方熔爐，並各產出至少 1 個成品', type:'action', deps:['manual_smelting','logistics_done','place_iron_miner','place_copper_miner'] },
+      { id:'supply_manufacturing', label:'供應基礎製造研究材料', detail:'對應科技的全部材料需求都已送入研究暫存', type:'action', deps:['logistics_done'] },
+      { id:'setup_coil_line', label:'建立磁線圈製造支線', detail:'固定磁線圈配方的製造台經分揀器取得自動熔煉產出的磁鐵與銅塊，並至少完成 1 批；不追蹤製造台來源', type:'action', deps:['connect_smelters','manufacturing_done'] },
+      { id:'setup_board_line', label:'建立電路板製造支線', detail:'固定電路板配方的製造台經分揀器取得自動熔煉產出的鐵塊與銅塊，並至少完成 1 批；不追蹤製造台來源', type:'action', deps:['connect_smelters','manufacturing_done'] },
+      { id:'supply_matrix_tech', label:'供應電磁矩陣研究材料', detail:'對應科技的全部材料需求都已送入研究暫存', type:'action', deps:['manufacturing_done'] },
+      { id:'setup_lab', label:'連接矩陣研究站', detail:'研究站設為電磁矩陣配方，且磁線圈與電路板都曾從各自製造台經分揀器送入', type:'action', deps:['setup_coil_line','setup_board_line','matrix_tech_done'] },
+      { id:'matrix_done', label:'矩陣研究站產出電磁矩陣', detail:'矩陣研究站首次實際產出電磁矩陣', type:'milestone', deps:['setup_lab'] },
+      { id:'lander_done', label:'登陸艙拆除完成', type:'milestone', deps:['start_dismantle'] },
+      { id:'electromagnetism_done', label:'電磁學完成', type:'milestone', deps:['queue_research','lander_done'] },
+      { id:'metallurgy_done', label:'自動化冶金完成', type:'milestone', deps:['supply_metallurgy'] },
+      { id:'logistics_done', label:'基礎物流完成', type:'milestone', deps:['supply_logistics'] },
+      { id:'manufacturing_done', label:'基礎製造完成', type:'milestone', deps:['supply_manufacturing'] },
+      { id:'matrix_tech_done', label:'電磁矩陣科技完成', type:'milestone', deps:['supply_matrix_tech'] }
+    ];
+
+    const actionPriority = [
+      'start_dismantle','queue_research','queue_crafting','fuel_mecha','mine_copper',
+      'supply_metallurgy','place_iron_miner','place_copper_miner','supply_logistics',
+      'manual_smelting','supply_manufacturing','connect_smelters','supply_matrix_tech',
+      'setup_coil_line','setup_board_line','setup_lab'
+    ];
+    const taskIds = [...actionPriority, 'wait_for_progress'];
+    const taskIndex = Object.fromEntries(taskIds.map((id, index) => [id, index]));
+
+    const linearOrder = [
+      'start_dismantle','queue_research','lander_done','queue_crafting','fuel_mecha','mine_copper','electromagnetism_done','place_iron_miner',
+      'supply_metallurgy','metallurgy_done','manual_smelting','supply_logistics','logistics_done',
+      'place_copper_miner','connect_smelters','supply_manufacturing','manufacturing_done',
+      'setup_coil_line','setup_board_line','supply_matrix_tech','matrix_tech_done','setup_lab','matrix_done'
+    ];
+
+    let mode = 'graph';
+    let state;
+
+    function freshState() {
+      return { completed:{}, activeTask:null, milestones:[], taskRewards:[], eventLog:[], tick:0, waitSteps:0 };
+    }
+
+    function def(id) { return nodeDefs.find(n => n.id === id); }
+    function depsMet(n) { return n.deps.every(id => state.completed[id]); }
+    function frontier() {
+      const rank = id => actionPriority.indexOf(id);
+      return nodeDefs
+        .filter(n => n.type === 'action' && !state.completed[n.id] && depsMet(n))
+        .sort((a, b) => rank(a.id) - rank(b.id));
+    }
+
+    function choosePrompt() {
+      if (mode === 'linear') {
+        state.activeTask = linearOrder.find(id => !state.completed[id]) || null;
+      } else {
+        const available = frontier();
+        if (!state.activeTask || state.completed[state.activeTask] || !available.some(n => n.id === state.activeTask)) {
+        state.activeTask = available[0]?.id || (state.completed.matrix_done ? null : 'wait_for_progress');
+        }
+      }
+    }
+
+    function triggerMany(ids) {
+      const eligible = ids.map(def).filter(n => n && !state.completed[n.id] && depsMet(n));
+      if (!eligible.length) return;
+      state.tick++;
+      const activeAtEvent = state.activeTask;
+      eligible.forEach(n => {
+        state.completed[n.id] = true;
+        state.eventLog.push(`[${state.tick}] event: ${n.label}`);
+
+        if (n.type === 'milestone') {
+          state.milestones.push(n.id);
+          state.eventLog.push(`[${state.tick}] milestone latched: ${n.label}`);
+        }
+
+        state.taskRewards.push({ tick:state.tick, task:n.id, reward:1, activeAtEvent });
+        state.eventLog.push(`[${state.tick}] task-specific reward[${n.id}] = 1`);
+      });
+      const scalarReward = eligible.some(n => n.id === activeAtEvent) ? 1 : 0;
+      state.eventLog.push(`[${state.tick}] scalar reward for current prompt = ${scalarReward}`);
+
+      choosePrompt();
+      render();
+    }
+
+    function trigger(id) { triggerMany([id]); }
+
+    function advanceWait() {
+      if (state.activeTask !== 'wait_for_progress') return;
+      state.tick++;
+      state.waitSteps++;
+      state.eventLog.push(`[${state.tick}] wait_for_progress: reward = 0`);
+      render();
+    }
+
+    function activeTaskVector() {
+      if (state.activeTask === null) return null;
+      return taskIds.map(id => id === state.activeTask ? 1 : 0);
+    }
+
+    function setMode(next) {
+      mode = next;
+      state = freshState();
+      choosePrompt();
+      render();
+    }
+
+    function render() {
+      document.querySelector('#graphMode').classList.toggle('active', mode === 'graph');
+      document.querySelector('#linearMode').classList.toggle('active', mode === 'linear');
+      const active = state.activeTask && state.activeTask !== 'wait_for_progress' ? def(state.activeTask) : null;
+      document.querySelector('#prompt').innerHTML = active
+        ? `<strong>目前 task_id</strong><br><code>${active.id}</code>　索引 ${taskIndex[active.id]}　${active.label}`
+        : state.activeTask === 'wait_for_progress'
+          ? `<strong>目前 task_id</strong><br><code>wait_for_progress</code>　索引 ${taskIndex.wait_for_progress}　等待已啟動的背景進度（無 reward，不列入微任務到達率）`
+          : `<strong>目前 task_id</strong><br>episode 已完成`;
+
+      const fids = new Set(frontier().map(n => n.id));
+      document.querySelector('#nodes').innerHTML = nodeDefs.map(n => {
+        const cls = state.completed[n.id] ? 'done' : fids.has(n.id) ? 'frontier' : 'pending';
+        const status = state.completed[n.id] ? '已完成' : depsMet(n) ? (n.type === 'action' ? '可執行' : '可觸發背景事件') : `等待：${n.deps.filter(id => !state.completed[id]).map(id => def(id).label).join('、')}`;
+        const detail = n.detail ? `<br><span class="status">完成條件：${n.detail}</span>` : '';
+        return `<div class="card ${cls}"><strong>${n.type === 'action' ? '微任務' : '背景里程碑'}｜${n.label}</strong><span class="status">${status}</span>${detail}</div>`;
+      }).join('');
+
+      const actions = nodeDefs.filter(n => n.type === 'action');
+      const milestones = nodeDefs.filter(n => n.type === 'milestone');
+      const batchReady = ['setup_coil_line','setup_board_line'].every(id => !state.completed[id] && depsMet(def(id)));
+      document.querySelector('#events').innerHTML = actions.map(n => `<button ${state.completed[n.id] || !depsMet(n) ? 'disabled' : ''} onclick="trigger('${n.id}')">${n.label}</button>`).join('')
+        + `<button ${batchReady ? '' : 'disabled'} onclick="triggerMany(['setup_coil_line','setup_board_line'])">同一快照完成兩條製造支線</button>`;
+      document.querySelector('#backgroundEvents').innerHTML = milestones.map(n => `<button ${state.completed[n.id] || !depsMet(n) ? 'disabled' : ''} onclick="trigger('${n.id}')">${n.label}</button>`).join('');
+      document.querySelector('#advanceWait').disabled = state.activeTask !== 'wait_for_progress';
+
+      document.querySelector('#state').textContent = JSON.stringify({
+        mode,
+        activeTask: state.activeTask,
+        activeTaskIndex: state.activeTask === null ? null : taskIndex[state.activeTask],
+        activeTaskOneHot: activeTaskVector(),
+        frozenTaskIndex: taskIndex,
+        frontier: frontier().map(n => n.id),
+        completed: Object.keys(state.completed),
+        milestones: state.milestones,
+        taskRewards: state.taskRewards,
+        waitSteps: state.waitSteps
+      }, null, 2);
+      document.querySelector('#log').textContent = state.eventLog.length ? state.eventLog.join('\n') : '尚無事件';
+    }
+
+    document.querySelector('#graphMode').onclick = () => setMode('graph');
+    document.querySelector('#linearMode').onclick = () => setMode('linear');
+    document.querySelector('#reset').onclick = () => setMode(mode);
+    document.querySelector('#advanceWait').onclick = advanceWait;
+    document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => {
+      document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.walkthrough').forEach(p => p.classList.remove('show'));
+      button.classList.add('active');
+      document.querySelector(`#${button.dataset.tab}`).classList.add('show');
+    });
+
+    setMode('graph');
+  </script>
+</body>
+</html>
