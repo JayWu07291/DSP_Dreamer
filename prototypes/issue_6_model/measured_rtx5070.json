@@ -1,0 +1,59 @@
+{
+  "prototype": true,
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5070",
+  "torch": "2.9.0+cu128",
+  "config": {
+    "observation_height": 360,
+    "observation_width": 640,
+    "model_height": 384,
+    "model_width": 640,
+    "patch_size": 16,
+    "model_dim": 512,
+    "latent_tokens": 64,
+    "latent_dim": 32,
+    "register_tokens": 8,
+    "attention_heads": 8,
+    "tokenizer_temporal_layers": 4,
+    "dynamics_layers": 8,
+    "context_steps": 64,
+    "short_train_steps": 32,
+    "train_steps": 80,
+    "batch_size": 2,
+    "gradient_accumulation": 8,
+    "mtp_distance": 8,
+    "imagination_horizon": 15,
+    "shortcut_steps": 4,
+    "task_count": 17,
+    "keyboard_buttons": 17,
+    "mouse_classes": 121,
+    "wheel_classes": 3,
+    "twohot_bins": 255
+  },
+  "results": [
+    {
+      "stage": "world_model",
+      "loss": 0.6989129781723022,
+      "seconds": 1.379,
+      "peak_allocated_gib": 5.151,
+      "peak_reserved_gib": 6.617,
+      "trainable_parameters": 47956544
+    },
+    {
+      "stage": "agent_finetune",
+      "loss": 13.036372184753418,
+      "seconds": 0.299,
+      "peak_allocated_gib": 1.803,
+      "peak_reserved_gib": 2.346,
+      "trainable_parameters": 34919435
+    },
+    {
+      "stage": "imagination",
+      "loss": 5.292474269866943,
+      "seconds": 1.97,
+      "peak_allocated_gib": 1.496,
+      "peak_reserved_gib": 1.971,
+      "trainable_parameters": 3020011
+    }
+  ]
+}
