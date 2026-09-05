@@ -22,7 +22,7 @@
 
 ## RTX 5070 實測
 
-這次執行開始前，`nvidia-smi` 顯示整張顯卡已使用 3.194 GiB，空閒 8.470 GiB。測試當時沒有 DSP 遊戲行程，因此整卡峰值只包含當時已開啟的桌面與背景軟體。
+第一次執行沒有開啟 DSP。測試開始前，`nvidia-smi` 顯示整張顯卡已使用 3.194 GiB，空閒 8.470 GiB。
 
 | 階段 | PyTorch 已配置峰值 | PyTorch 保留峰值 | 整張顯卡取樣峰值 |
 | --- | ---: | ---: | ---: |
@@ -32,7 +32,17 @@
 
 世界模型預訓練是容量基準。整卡峰值 8.138 GiB 距離 CUDA 可用總量 11.940 GiB 尚有 3.802 GiB。這個數字來自全解析度合成批次，包含 48,202,736 個可訓練參數、BF16 中間 activation、梯度、activation checkpointing，以及執行一次 AdamW update 後配置的 optimizer states。
 
-這次沒有納入 LPIPS、真實資料 loader、CUDA compilation workspace、正式紀錄工具，也沒有同時執行 DSP 與錄製器。3.802 GiB 的餘量看起來足夠，但正式訓練前仍應在 DSP、錄製器與平常背景軟體都執行時重跑監測。若整卡峰值超過 10 GiB，先降低 microbatch 或 long batch length，不先犧牲 640×360 畫面。
+第二次執行時已開啟 `DSPGAME.exe` 與載入遊戲行程內的 Prototype 錄製器。測試開始前整卡已使用 5.633 GiB，空閒 6.031 GiB。
+
+| 階段 | PyTorch 已配置峰值 | PyTorch 保留峰值 | DSP 開啟時整卡峰值 | 峰值剩餘 |
+| --- | ---: | ---: | ---: | ---: |
+| 世界模型預訓練 | 4.161 GiB | 4.895 GiB | 10.579 GiB | 1.361 GiB |
+| Agent finetuning | 1.557 GiB | 1.652 GiB | 7.337 GiB | 4.603 GiB |
+| Imagination training | 1.300 GiB | 1.430 GiB | 7.119 GiB | 4.821 GiB |
+
+三個階段都完成，沒有發生 OOM。世界模型預訓練只剩 1.361 GiB，不符合至少保留 2 GiB 的安全線，而且測試仍未納入 LPIPS、真實資料 loader、CUDA compilation workspace 與正式紀錄工具。
+
+本專題應把工作流程分開。錄製與閉迴路評估需要 DSP；世界模型預訓練與 agent finetuning 使用離線資料，不需要同時開啟遊戲。執行這兩個訓練階段前應關閉 DSP。若確實需要在 DSP 開啟時訓練，先把 microbatch 降為 1，並在 gradient accumulation 中交替抽取 uniform 與任務相關片段，不先犧牲 640×360 畫面。
 
 ## 仍待驗證
 
