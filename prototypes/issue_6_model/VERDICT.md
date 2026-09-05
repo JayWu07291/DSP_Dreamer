@@ -1,4 +1,8 @@
-# 原型結論草案
+# 原型決議
+
+以下設定已接受為 v1 基準。錄製證據維持 20 Hz，模型視圖使用 10 Hz，資料編譯器把相鄰兩個錄製區間合成一個模型動作。每條 imagined rollout 固定一個 `task_id`，不在 rollout 途中模擬提示切換。
+
+訓練世界模型與 agent 時關閉 DSP。只有錄製與閉迴路推理需要開啟 DSP。
 
 我建議把下列設定帶入可執行規格：
 
@@ -44,8 +48,8 @@
 
 本專題應把工作流程分開。錄製與閉迴路評估需要 DSP；世界模型預訓練與 agent finetuning 使用離線資料，不需要同時開啟遊戲。執行這兩個訓練階段前應關閉 DSP。若確實需要在 DSP 開啟時訓練，先把 microbatch 降為 1，並在 gradient accumulation 中交替抽取 uniform 與任務相關片段，不先犧牲 640×360 畫面。
 
-## 仍待驗證
+## 後續票承接的工作
 
-64 個 latent tokens 是否足以重建 DSP 最小的圖示與文字，這次 synthetic smoke test 無法回答。完整訓練前應使用真實錄影片段比較 64 與 96 個 latent tokens 的 reconstruction quality。
+64 個 latent tokens 是否足以重建 DSP 最小的圖示與文字，這次 synthetic smoke test 無法回答。[定義評估協定與證據門檻](https://github.com/JayWu07291/DSP_Dreamer/issues/8)應要求使用真實錄影片段比較 64 與 96 個 latent tokens，並量測 DSP 開啟時的單步閉迴路推理延遲與 VRAM。
 
-原型讓每條 imagined rollout 固定一個 task。Dreamer 4 沒有交代 imagination 期間是否切換 task。第一版先固定 task 較容易核對 reward 語意；rollout 途中切換 task 留作後續消融實驗。
+[定義三階段訓練課程與降級門檻](https://github.com/JayWu07291/DSP_Dreamer/issues/7)承接精確學習率、short/long batch 比例、各階段訓練步數、停止條件與降級規則。rollout 途中切換 task 不屬於 v1，留作後續消融實驗。
