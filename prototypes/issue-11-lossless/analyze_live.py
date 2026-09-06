@@ -5,6 +5,7 @@ from collections import Counter
 import json
 from pathlib import Path
 import statistics
+import math
 
 from storage_probe import records, save, file_sha
 
@@ -47,11 +48,12 @@ for e in records(a.run / 'events.ndjson'):
 duration = s['elapsed_seconds']
 if not frequency:
     raise ValueError('Missing session clock frequency')
-images = sum(f.stat().st_size for f in a.run.glob('*.mkv'))
+images = ((a.run / 'frames.rgba').stat().st_size if s['storage_codec'] == 'raw'
+          else sum(f.stat().st_size for f in a.run.glob('*.mkv')))
 events_bytes = (a.run / 'events.ndjson').stat().st_size
 indices_bytes = sum(f.stat().st_size for f in a.run.glob('*.index.ndjson'))
 minutes = []
-for minute in range(30):
+for minute in range(math.ceil(samples[-1]['ticks'] / frequency / 60)):
     block = [e for e in samples if minute * 60 * frequency <= e['ticks'] < (minute + 1) * 60 * frequency]
     queues = [e['writer_queue_depth'] for e in block]
     minutes.append(dict(minute=minute, sample_count=len(block), max_queue=max(queues, default=None),
@@ -78,7 +80,8 @@ report = dict(run=str(a.run.resolve()), summary=s, frames=len(captures), image_b
     events_bytes=events_bytes, index_bytes=indices_bytes,
     image_events_indices_gib=(images+events_bytes+indices_bytes) / 2**30,
     encoder_average_cores=s['encoder_cpu_seconds'] / duration,
-    encoder_memory_measurement='unavailable: recorder reported zero',
+    encoder_memory_measurement=('not_applicable_raw' if s['storage_codec'] == 'raw' else
+        'sampled' if s['encoder_peak_working_set_bytes'] > 0 else 'unavailable'),
     game_cpu_average_cores=samples[-1]['game_cpu_seconds'] / (samples[-1]['ticks'] / frequency),
     game_rss_sampled_max=max(x['game_working_set_bytes'] for x in samples),
     game_memory_measurement='unavailable' if not any(x['game_working_set_bytes'] > 0 for x in samples) else 'sampled',
@@ -88,7 +91,8 @@ report = dict(run=str(a.run.resolve()), summary=s, frames=len(captures), image_b
     visible_cursor_not_composited=len(cursor_missing),
     cursor_uncomposited_locations=[{k:c[k] for k in ('capture_id','cursor_x','cursor_y','cursor_index','cursor_glyph_source','segment','decoded_frame_index')} for c in cursor_missing],
     source_summary_sha256=file_sha(a.run / 'summary.json'), source_events_sha256=file_sha(a.run / 'events.ndjson'),
-    raw_control_run='not_yet_run', visual_and_workload_confirmation='pending')
+    raw_control_run='this_run' if s['storage_codec'] == 'raw' else 'see_comparison_report',
+    visual_and_workload_confirmation='pending')
 save(a.out / 'analysis.json', report)
 save(a.out / 'preview-index.json', preview)
 print(json.dumps({k:v for k,v in report.items() if k not in ('summary','cursor_uncomposited_locations','gap_events','queue_by_minute','panels')}, indent=2))

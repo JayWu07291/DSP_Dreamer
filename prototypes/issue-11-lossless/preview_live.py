@@ -16,10 +16,15 @@ sheet = Image.new('RGB', (1280, ((len(rows)+1)//2)*384), 'white')
 draw = ImageDraw.Draw(sheet)
 for n, row in enumerate(rows):
     c = row['capture']
-    b = subprocess.check_output([FFMPEG, '-v', 'error', '-nostdin', '-threads', '4', '-i', str(a.run/c['segment']),
-        '-vf', f'select=eq(n\\,{c["decoded_frame_index"]})', '-frames:v', '1',
-        '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], stderr=subprocess.DEVNULL)
-    if len(b) != FRAME_BYTES or sha(b) != c['rgba_sha256']:
+    if c['storage_codec'] == 'raw':
+        with open(a.run/'frames.rgba', 'rb') as f:
+            f.seek(c['file_offset'])
+            b = f.read(FRAME_BYTES)
+    else:
+        b = subprocess.check_output([FFMPEG, '-v', 'error', '-nostdin', '-threads', '4', '-i', str(a.run/c['segment']),
+            '-vf', f'select=eq(n\\,{c["decoded_frame_index"]})', '-frames:v', '1',
+            '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], stderr=subprocess.DEVNULL)
+    if len(b) != FRAME_BYTES or ('rgba_sha256' in c and sha(b) != c['rgba_sha256']):
         raise ValueError('Preview does not match indexed RGBA')
     x, y = n % 2 * 640, n // 2 * 384
     sheet.paste(Image.frombytes('RGBA', (640,360), b).convert('RGB'), (x,y))

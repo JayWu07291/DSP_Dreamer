@@ -30,7 +30,7 @@
 
 之後關閉 DSP，使用 `prepare -Codec raw` 安排相同設定與相近操作的原始 RGBA 對照。若仍需要驗證 gzip 的實機取捨，使用 `prepare -Codec gzip1`。每次皆建立新 run。raw 30 分鐘約 30.9 GiB，僅含影像；FFV1 的容量須以新 run 實際值為準。
 
-2026-09-06 已完成第一次 FFV1 30 分鐘測試，完整性與擷取數值通過。下一步採 `prepare -Codec raw -Seconds 600`，用 10 分鐘 raw 與 FFV1 的同長度區間對照。這不是另一份 30 分鐘持續性證據。probe 0.1.14 在遊戲內的 RAM 欄位回傳零，視為缺測；0.1.15 改用 Windows `GetProcessMemoryInfo`，失敗回傳 -1。獨立 C# 測試取得有效數值，遊戲內與 FFV1 的補充 RAM 量測仍待完成。
+2026-09-06 已完成第一次 FFV1 30 分鐘測試與 raw 10 分鐘對照，完整性與擷取數值通過。probe 0.1.14 在遊戲內的 RAM 欄位回傳零，視為缺測；0.1.15 改用 Windows `GetProcessMemoryInfo`，失敗回傳 -1。raw 實機已取得有效 RAM，下一步採 `prepare -Codec ffv1 -Seconds 300` 補 FFV1 RAM。這份 5 分鐘量測不取代已完成的 30 分鐘測試，也不代表已知前次長程 RAM 峰值。
 
 ## 可重跑的離線比較
 

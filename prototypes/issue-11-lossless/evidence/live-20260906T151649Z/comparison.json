@@ -1,0 +1,49 @@
+{
+  "method": "First 600 seconds of each session, relative to session clock. Human workloads differ; this is not a controlled codec-only causal comparison.",
+  "runs": [
+    {
+      "run": "20260906T135528Z",
+      "codec": "ffv1",
+      "probe_version": "0.1.14",
+      "window_seconds": 600,
+      "written_frames": 11992,
+      "effective_hz": 19.986666666666668,
+      "scheduler_gap_count": 8,
+      "writer_queue_max": 0,
+      "sampled_queue_max": 0,
+      "write_ms": {
+        "median": 9.86345,
+        "p95": 11.8177,
+        "p99": 30.837400000000002,
+        "maximum": 92.05810000000001
+      },
+      "cpu_sampling_interval_seconds": 599.8021752,
+      "game_mean_cores": 2.1738417330101076,
+      "encoder_mean_cores": 0.5251210532789011,
+      "game_rss_max_bytes": null,
+      "encoder_memory": "unavailable_in_0.1.14"
+    },
+    {
+      "run": "20260906T151649Z",
+      "codec": "raw",
+      "probe_version": "0.1.15",
+      "window_seconds": 600,
+      "written_frames": 11998,
+      "effective_hz": 19.996666666666666,
+      "scheduler_gap_count": 2,
+      "writer_queue_max": 0,
+      "sampled_queue_max": 0,
+      "write_ms": {
+        "median": 0.3311,
+        "p95": 0.4173,
+        "p99": 0.5329,
+        "maximum": 4.5699000000000005
+      },
+      "cpu_sampling_interval_seconds": 599.9163957,
+      "game_mean_cores": 1.7647511096353257,
+      "encoder_mean_cores": 0.0,
+      "game_rss_max_bytes": 4503576576,
+      "encoder_memory": "not_applicable_raw"
+    }
+  ]
+}
