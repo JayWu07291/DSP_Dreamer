@@ -1,0 +1,8 @@
+{
+  "file": "E:\\GitHub\\DSP_Dreamer\\prototypes\\issue-11-lossless\\out\\crash-gzip1-01\\segment-000001.dwg.partial",
+  "verified_prefix_frames": 0,
+  "indexed_frames": 5,
+  "decoder_error": "Invalid DWG1 magic",
+  "state": "incomplete_not_sealed",
+  "rgba_sha256": []
+}

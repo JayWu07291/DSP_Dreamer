@@ -1,0 +1,23 @@
+{
+  "segments": [
+    {
+      "file": "segment-000000.dwg",
+      "frames": 200,
+      "encoded_bytes": 49669195,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.7760380000036093,
+        "cpu_core_seconds": 0.78125,
+        "mean_cores": 1.006716165956263,
+        "sampled_peak_rss_bytes": 27205632,
+        "frames_per_second": 257.7193384848033
+      }
+    }
+  ],
+  "frames": 200,
+  "incomplete": [
+    "segment-000001.dwg.partial"
+  ],
+  "decoded_evidence": "verified_prefix",
+  "live_20hz_30min": "not_tested"
+}

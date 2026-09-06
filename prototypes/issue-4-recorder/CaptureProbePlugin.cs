@@ -23,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.13";
+        public const string PluginVersion = "0.1.14";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -77,12 +77,18 @@ namespace DSPDreamer.CaptureProbe
         private ConfigEntry<int> captureHeight;
         private ConfigEntry<int> durationSeconds;
         private ConfigEntry<string> outputRoot;
+        private ConfigEntry<string> storageCodec;
+        private ConfigEntry<string> storageFfmpeg;
+        private ConfigEntry<int> segmentFrames;
         private Harmony harmony;
         private CaptureSlot[] slots;
         private BlockingCollection<FramePacket> writeQueue;
         private Thread writerThread;
         private StreamWriter eventWriter;
-        private FileStream frameWriter;
+        private PrototypeFrameStorage frameWriter;
+        private volatile bool storageFailed;
+        private long nextStorageSample;
+        private double gameCpuAtStart;
         private Player boundPlayer;
         private string runDirectory;
         private bool recording;
@@ -142,6 +148,9 @@ namespace DSPDreamer.CaptureProbe
             captureHeight = Config.Bind("Probe", "Height", 360, "RGB frame height.");
             durationSeconds = Config.Bind("Probe", "DurationSeconds", 600, "Automatic stop time.");
             outputRoot = Config.Bind("Probe", "OutputRoot", Path.Combine(Paths.PluginPath, "DSPDreamerCaptureProbe", "runs"), "Probe output directory.");
+            storageCodec = Config.Bind("StoragePrototype", "Codec", "raw", "Throwaway candidates: raw, ffv1, gzip1. Compressed segments require offline verification.");
+            storageFfmpeg = Config.Bind("StoragePrototype", "Ffmpeg", @"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe", "FFmpeg executable for FFV1.");
+            segmentFrames = Config.Bind("StoragePrototype", "SegmentFrames", 200, "Candidate segment size in accepted frames, not a time contract.");
             harmony = new Harmony(PluginGuid);
             harmony.PatchAll(typeof(CaptureProbePlugin).Assembly);
             StartCoroutine(CaptureLoop());
@@ -150,6 +159,19 @@ namespace DSPDreamer.CaptureProbe
 
         private void Update()
         {
+            if (recording && storageFailed) StopProbe("storage failure");
+            if (recording && clock.ElapsedTicks >= nextStorageSample)
+            {
+                nextStorageSample = clock.ElapsedTicks + Stopwatch.Frequency;
+                using (var gameProcess = Process.GetCurrentProcess())
+                    WriteEvent("storage_sample", Fields("ticks", clock.ElapsedTicks,
+                        "writer_queue_depth", writeQueue.Count, "written_frames", writtenFrames,
+                        "game_cpu_seconds", gameProcess.TotalProcessorTime.TotalSeconds - gameCpuAtStart,
+                        "game_working_set_bytes", gameProcess.WorkingSet64,
+                        "encoder_cpu_seconds", frameWriter.CurrentEncoderCpuSeconds(),
+                        "encoder_peak_working_set_bytes", frameWriter.EncoderPeakWorkingSet,
+                        "outstanding_readbacks", outstandingReadbacks));
+            }
             if (recording)
             {
                 FlushPendingAcquisitions(SafeGameTick());
@@ -207,7 +229,12 @@ namespace DSPDreamer.CaptureProbe
 
                 long due = 1L + (now - nextCaptureTicks) / capturePeriodTicks;
                 expectedFrames += due;
-                if (due > 1) schedulerDrops += due - 1;
+                if (due > 1)
+                {
+                    schedulerDrops += due - 1;
+                    WriteEvent("capture_gap", Fields("reason", "scheduler_missed", "count", due - 1,
+                        "first_due_ticks", nextCaptureTicks, "resumed_ticks", now));
+                }
                 nextCaptureTicks += due * capturePeriodTicks;
                 RequestFrame(now);
             }
@@ -231,11 +258,14 @@ namespace DSPDreamer.CaptureProbe
             }
 
             ResetCounters();
+            using (var gameProcess = Process.GetCurrentProcess()) gameCpuAtStart = gameProcess.TotalProcessorTime.TotalSeconds;
+            nextStorageSample = 0;
             Directory.CreateDirectory(outputRoot.Value);
             runDirectory = Path.Combine(outputRoot.Value, DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", Invariant));
             Directory.CreateDirectory(runDirectory);
             eventWriter = new StreamWriter(new FileStream(Path.Combine(runDirectory, "events.ndjson"), FileMode.CreateNew, FileAccess.Write, FileShare.Read), new UTF8Encoding(false));
-            frameWriter = new FileStream(Path.Combine(runDirectory, "frames.rgba"), FileMode.CreateNew, FileAccess.Write, FileShare.Read, 1024 * 1024, FileOptions.SequentialScan);
+            frameWriter = new PrototypeFrameStorage(runDirectory, storageCodec.Value, storageFfmpeg.Value,
+                segmentFrames.Value, captureWidth.Value, captureHeight.Value, JsonObject);
             writeQueue = new BlockingCollection<FramePacket>(SlotCount);
             slots = new CaptureSlot[SlotCount];
             int byteCount = checked(captureWidth.Value * captureHeight.Value * 4);
@@ -264,6 +294,10 @@ namespace DSPDreamer.CaptureProbe
             BindTaskEvents();
             WriteEvent("session_start", Fields(
                 "capture_hz", captureHz.Value,
+                "storage_codec", storageCodec.Value,
+                "segment_frames", segmentFrames.Value,
+                "stopwatch_frequency", Stopwatch.Frequency,
+                "probe_version", PluginVersion,
                 "width", captureWidth.Value,
                 "height", captureHeight.Value,
                 "duration_seconds", durationSeconds.Value,
@@ -509,16 +543,16 @@ namespace DSPDreamer.CaptureProbe
             {
                 foreach (FramePacket packet in writeQueue.GetConsumingEnumerable())
                 {
-                    long offset = frameWriter.Position;
-                    frameWriter.Write(packet.Slot.Buffer, 0, packet.Slot.Buffer.Length);
-                    writerBytes += packet.Slot.Buffer.Length;
-                    writtenFrames++;
-                    if (packet.Cursor.Visible) cursorVisibleFrames++;
-                    if (packet.Cursor.CompositedPixels > 0) cursorCompositedFrames++;
-                    if (packet.Cursor.CompositedPixels > 0 && packet.Cursor.GlyphSource == "fallback") cursorFallbackFrames++;
-                    WriteEvent("capture_written", Fields(
+                    if (storageFailed)
+                    {
+                        writerDrops++;
+                        WriteEvent("capture_drop", Fields("reason", "storage_failed", "capture_id", packet.CaptureId));
+                        Interlocked.Exchange(ref packet.Slot.Busy, 0);
+                        continue;
+                    }
+                    var fields = Fields(
                         "capture_id", packet.CaptureId,
-                        "file_offset", offset,
+                        "writer_queue_depth", writeQueue.Count,
                         "byte_count", packet.Slot.Buffer.Length,
                         "requested_ticks", packet.RequestedTicks,
                         "completed_ticks", packet.CompletedTicks,
@@ -531,17 +565,36 @@ namespace DSPDreamer.CaptureProbe
                         "cursor_x", packet.Cursor.HotspotX,
                         "cursor_y", packet.Cursor.HotspotY,
                         "cursor_index", packet.Cursor.Index,
-                        "cursor_glyph_source", packet.Cursor.GlyphSource));
-                    Interlocked.Exchange(ref packet.Slot.Busy, 0);
+                        "cursor_glyph_source", packet.Cursor.GlyphSource);
+                    try
+                    {
+                        frameWriter.Write(packet.Slot.Buffer, fields);
+                        writerBytes += packet.Slot.Buffer.Length;
+                        writtenFrames++;
+                        if (packet.Cursor.Visible) cursorVisibleFrames++;
+                        if (packet.Cursor.CompositedPixels > 0) cursorCompositedFrames++;
+                        if (packet.Cursor.CompositedPixels > 0 && packet.Cursor.GlyphSource == "fallback") cursorFallbackFrames++;
+                        WriteEvent("capture_written", fields);
+                    }
+                    catch (Exception exception)
+                    {
+                        storageFailed = true;
+                        writerDrops++;
+                        WriteEvent("capture_drop", Fields("reason", "storage_exception", "capture_id", packet.CaptureId, "error", exception.ToString()));
+                        frameWriter.Dispose();
+                    }
+                    finally { Interlocked.Exchange(ref packet.Slot.Busy, 0); }
                 }
-                frameWriter.Flush(true);
+                if (!storageFailed) frameWriter.Finish();
             }
             catch (Exception exception)
             {
+                storageFailed = true;
                 WriteEvent("writer_error", Fields("error", exception.ToString()));
             }
             finally
             {
+                frameWriter.Dispose();
                 writerFinished = true;
             }
         }
@@ -659,7 +712,8 @@ namespace DSPDreamer.CaptureProbe
                 && dropRate < 0.01
                 && effectiveHz >= captureHz.Value * 0.95
                 && readbackErrors == 0
-                && writerDrops == 0
+                  && writerDrops == 0
+                  && !storageFailed
                 && missingTaskEventKinds.Length == 0
                 && injectedActions >= 3
                 && observedActions == injectedActions
@@ -689,6 +743,14 @@ namespace DSPDreamer.CaptureProbe
                 "writer_drops", writerDrops,
                 "drop_rate", dropRate,
                 "writer_bytes", writerBytes,
+                "storage_codec", storageCodec.Value,
+                "storage_failed", storageFailed,
+                "storage_verification", storageCodec.Value == "raw" ? "legacy_raw" : "pending_offline_decode",
+                "storage_max_write_ms", frameWriter.MaxWriteMs,
+                "storage_max_finalize_ms", frameWriter.MaxFinalizeMs,
+                "encoder_cpu_seconds", frameWriter.EncoderCpuSeconds,
+                "encoder_peak_working_set_bytes", frameWriter.EncoderPeakWorkingSet,
+                "capture_buffer_bound_bytes", (long)SlotCount * captureWidth.Value * captureHeight.Value * 4,
                 "max_writer_queue", maxWriterQueue,
                 "task_events", taskEventCount,
                 "task_event_kinds", string.Join(",", SortedTaskEventKinds()),
@@ -1341,6 +1403,7 @@ namespace DSPDreamer.CaptureProbe
             basicManufacturingTechId = electromagneticMatrixTechId = 0;
             lastBuildMode = null;
             recording = stopping = writerFinished = false;
+            storageFailed = false;
         }
 
         private static long SafeGameTick()

@@ -1,0 +1,45 @@
+{
+  "clip": "20260901T024749Z-400-200",
+  "codec": "gzip1",
+  "frames": 200,
+  "encoded_bytes": 94418538,
+  "rgba_bytes": 184320000,
+  "rgba_roundtrip": "pass",
+  "encoded_sha256": "062ec58604f089e0e1db3915b0def9535783140a5d4dd5d99d7946adf45577e4",
+  "projected_image_gib_per_capture_hour_at_20hz": 31.65628172457218,
+  "encode": {
+    "wall_seconds": 3.449361899998621,
+    "cpu_core_seconds": 3.3125,
+    "mean_cores": 0.9603225454543706,
+    "sampled_peak_rss_bytes": 51359744,
+    "frames_per_second": 57.981738593471434
+  },
+  "decode_and_hash": {
+    "wall_seconds": 0.9525235000037355,
+    "cpu_core_seconds": 0.984375,
+    "mean_cores": 1.0334390700031437,
+    "sampled_peak_rss_bytes": 50483200,
+    "frames_per_second": 209.9685729530197
+  },
+  "ordinal_read_16": {
+    "wall_seconds": 0.09218189999955939,
+    "cpu_core_seconds": 0.078125,
+    "mean_cores": 0.8475091097099693,
+    "sampled_peak_rss_bytes": 50511872,
+    "frames_per_second": 173.56986566860172
+  },
+  "command": [
+    "python.gzip.compress",
+    "gzip1",
+    "mtime=0"
+  ],
+  "truncation": {
+    "bytes_retained": 70813903,
+    "verified_prefix_frames": 154,
+    "decoder_error": "Truncated gzip record",
+    "accepted_as_sealed": false,
+    "checksum_mismatch": true
+  },
+  "live_20hz_30min": "not_tested",
+  "buffer_note": "Streams frames without a raw staging file; sampled RSS includes Python buffers and codec memory. Initial four-frame buffer estimate removed because it was not a proven allocation bound."
+}

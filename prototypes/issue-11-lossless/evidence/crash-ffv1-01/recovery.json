@@ -1,0 +1,14 @@
+{
+  "file": "E:\\GitHub\\DSP_Dreamer\\prototypes\\issue-11-lossless\\out\\crash-ffv1-01\\segment-000001.mkv.partial",
+  "verified_prefix_frames": 5,
+  "indexed_frames": 5,
+  "decoder_error": null,
+  "state": "incomplete_not_sealed",
+  "rgba_sha256": [
+    "97a7b440a7b8aaafb46d0922b6aadd3085f3bc20866fbf7c5a5ea57ab9b09553",
+    "bfa4aecce5d137ac3fa3388d9699f0103d376e65d2e124bd58777abc536bd33c",
+    "72bb3fdccff1aadc35b4092a28127965c99e50e19990c750f9d4d7f4c1d10f17",
+    "0f1833a4e837e8e5586260e9e5fac6b113d2324b0f4eb5524567a81a898299f9",
+    "7fccc6d3d45876c9ba4b6e2fcc71276afcdc9dc7ad9cf3156c9c3b328e9dc9c8"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "run": "E:\\Steam\\steamapps\\common\\Dyson Sphere Program\\BepInEx\\plugins\\DSPDreamerCaptureProbe\\runs\\20260901T025133Z",
+  "files": {
+    "frames.rgba": {
+      "bytes": 1669017600,
+      "sha256": "23e401663fd8d61b3a9e0864b7144d3277f163ad75f1d9c3ffb4021e9c7e7858"
+    },
+    "events.ndjson": {
+      "bytes": 2296999,
+      "sha256": "f6acb5ea8cb107dd893341e290c9f4b1a7bcb1cd6e2fe08e3c1ad15583c15846"
+    },
+    "summary.json": {
+      "bytes": 1107,
+      "sha256": "98922f1e185a6ca23d89eb94ea92dee6b2c7b81bc09ebc7ec48059b3e910ae1d"
+    }
+  },
+  "summary": {
+    "verdict": "metrics_pass_visual_pending",
+    "metrics_verdict": "pass",
+    "elapsed_seconds": 61.9812948,
+    "configured_hz": 30,
+    "width": 640,
+    "height": 360,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "measured_rendered_fps": 58.549922387229635,
+    "effective_hz": 29.218492544302254,
+    "expected_frames": 1819,
+    "requested_frames": 1811,
+    "written_frames": 1811,
+    "scheduler_drops": 8,
+    "in_flight_drops": 0,
+    "readback_errors": 0,
+    "writer_drops": 0,
+    "drop_rate": 0.0043980208905992305,
+    "writer_bytes": 1669017600,
+    "max_writer_queue": 1,
+    "task_events": 42,
+    "task_event_kinds": "craft_completed,craft_enqueued,factory_build,item_acquired,landing_capsule_dismantled,manual_mining_yield,panel_closed,panel_opened,tech_enqueued,tech_unlocked",
+    "missing_task_event_kinds": "",
+    "suppressed_item_acquisition_duplicates": 19,
+    "cursor_visible_frames": 1811,
+    "cursor_composited_frames": 1811,
+    "cursor_fallback_frames": 0,
+    "cursor_composite_verdict": "pass",
+    "injected_actions": 4,
+    "observed_actions": 4,
+    "average_action_latency_ms": 17.0483,
+    "max_action_latency_ms": 17.383
+  }
+}

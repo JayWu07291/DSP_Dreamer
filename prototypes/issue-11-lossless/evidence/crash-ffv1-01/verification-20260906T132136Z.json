@@ -1,0 +1,23 @@
+{
+  "segments": [
+    {
+      "file": "segment-000000.mkv",
+      "frames": 200,
+      "encoded_bytes": 22501977,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.8869149000020116,
+        "cpu_core_seconds": 2.765625,
+        "mean_cores": 3.1182529462451556,
+        "sampled_peak_rss_bytes": 61652992,
+        "frames_per_second": 225.50077803354796
+      }
+    }
+  ],
+  "frames": 200,
+  "incomplete": [
+    "segment-000001.mkv.partial"
+  ],
+  "decoded_evidence": "verified_prefix",
+  "live_20hz_30min": "not_tested"
+}

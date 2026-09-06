@@ -1,0 +1,1 @@
+{"state":"closed_unverified","codec":"gzip1","file":"segment-000000.dwg","frames":200,"width":640,"height":360,"pixel_format":"rgba","capture_pixel_format":"rgba","segment_frames_limit":200,"runtime":"4.0.30319.42000","ffmpeg":"","parameters":"GZipStream CompressionLevel.Fastest per frame"}

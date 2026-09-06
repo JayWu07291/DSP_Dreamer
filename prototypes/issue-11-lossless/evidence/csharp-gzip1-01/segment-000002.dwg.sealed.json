@@ -1,0 +1,39 @@
+{
+  "state": "sealed_verified",
+  "codec": "gzip1",
+  "file": "segment-000002.dwg",
+  "frames": 5,
+  "width": 640,
+  "height": 360,
+  "pixel_format": "rgba",
+  "capture_pixel_format": "rgba",
+  "segment_frames_limit": 200,
+  "runtime": "4.0.30319.42000",
+  "ffmpeg": "",
+  "parameters": "GZipStream CompressionLevel.Fastest per frame",
+  "encoded_sha256": "59a6d7d07fdb448576633f08e92de9dcb3a871275a157acc5a0353c012ec9730",
+  "index_file": "segment-000002.index.ndjson",
+  "index_sha256": "232de23e9443f6c77ff447edf2579a07be6036dcf4abe2f9e188ba2e2c9583c1",
+  "rgba_sha256": [
+    "12cc5ef0d56bdbfe0274a963e69dea69bf8466450b10817a1857650af1f4cfe7",
+    "cc25ccba1c18bc4e1c2e8041e408977fc500ea5ac6bbcaa34589c686056f36c0",
+    "bfb00b0f73ffcf20e4fee35cd73b8389eb33c2c8ee88ae29d9aa76ad8eebe22c",
+    "656bad0b60b04cd6a4e65c3cfe97d02b5fc9cceb14add973fb3ca60c4e674a11",
+    "2ed860735eb29e24a13b554c512302022b4db16b1709d1f1662aa6b73e02b140"
+  ],
+  "capture_ids": [
+    401,
+    402,
+    403,
+    404,
+    405
+  ],
+  "ffmpeg_verifier": "ffmpeg version 6.1.1-essentials_build-www.gyan.dev Copyright (c) 2000-2023 the FFmpeg developers",
+  "verification": {
+    "wall_seconds": 0.024500899999111425,
+    "cpu_core_seconds": 0.03125,
+    "mean_cores": 1.2754633503721637,
+    "sampled_peak_rss_bytes": 28000256,
+    "frames_per_second": 204.0741360595462
+  }
+}

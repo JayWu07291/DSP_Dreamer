@@ -1,0 +1,47 @@
+{
+  "segments": [
+    {
+      "file": "segment-000000.dwg",
+      "frames": 200,
+      "encoded_bytes": 49669195,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.7171008000004804,
+        "cpu_core_seconds": 0.75,
+        "mean_cores": 1.0458780690239051,
+        "sampled_peak_rss_bytes": 27103232,
+        "frames_per_second": 278.9008184063747
+      }
+    },
+    {
+      "file": "segment-000001.dwg",
+      "frames": 200,
+      "encoded_bytes": 38254578,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.6336862000025576,
+        "cpu_core_seconds": 0.625,
+        "mean_cores": 0.9862925845591674,
+        "sampled_peak_rss_bytes": 28508160,
+        "frames_per_second": 315.61362705893356
+      }
+    },
+    {
+      "file": "segment-000002.dwg",
+      "frames": 5,
+      "encoded_bytes": 2210543,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.024500899999111425,
+        "cpu_core_seconds": 0.03125,
+        "mean_cores": 1.2754633503721637,
+        "sampled_peak_rss_bytes": 28000256,
+        "frames_per_second": 204.0741360595462
+      }
+    }
+  ],
+  "frames": 405,
+  "incomplete": [],
+  "decoded_evidence": "pass",
+  "live_20hz_30min": "not_tested"
+}

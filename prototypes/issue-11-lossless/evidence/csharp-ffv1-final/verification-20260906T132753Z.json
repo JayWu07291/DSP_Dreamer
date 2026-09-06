@@ -1,0 +1,47 @@
+{
+  "segments": [
+    {
+      "file": "segment-000000.mkv",
+      "frames": 200,
+      "encoded_bytes": 22501977,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.9061414999960107,
+        "cpu_core_seconds": 2.859375,
+        "mean_cores": 3.155550209335505,
+        "sampled_peak_rss_bytes": 60870656,
+        "frames_per_second": 220.71608021581673
+      }
+    },
+    {
+      "file": "segment-000001.mkv",
+      "frames": 200,
+      "encoded_bytes": 18270161,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.7892210999998497,
+        "cpu_core_seconds": 2.640625,
+        "mean_cores": 3.3458621418009513,
+        "sampled_peak_rss_bytes": 61984768,
+        "frames_per_second": 253.41441073995372
+      }
+    },
+    {
+      "file": "segment-000002.mkv",
+      "frames": 5,
+      "encoded_bytes": 1029636,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.11794470000313595,
+        "cpu_core_seconds": 0.15625,
+        "mean_cores": 1.3247733895278515,
+        "sampled_peak_rss_bytes": 59408384,
+        "frames_per_second": 42.39274846489125
+      }
+    }
+  ],
+  "frames": 405,
+  "incomplete": [],
+  "decoded_evidence": "pass",
+  "live_20hz_30min": "not_tested"
+}
