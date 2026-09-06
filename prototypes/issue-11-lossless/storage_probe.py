@@ -415,6 +415,8 @@ def verify_run(args):
                      segments_complete=not incomplete,
                      queue_bound=s['max_writer_queue'] <= 12)
         report.update(summary=s, gates=gates,
+                      slot_pressure_review_required=s['in_flight_drops'] > 0,
+                      pressure_note='Zero writer_drops does not exclude writer-induced capture-slot exhaustion. Review no_free_slot events alongside queue and write latency.',
                       live_20hz_30min='numeric_gates_pass_visual_and_workload_review_pending' if all(gates.values()) else 'fail_or_short_run',
                       source_events_sha256=file_sha(run / 'events.ndjson'),
                       source_summary_sha256=file_sha(run / 'summary.json'))

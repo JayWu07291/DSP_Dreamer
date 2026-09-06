@@ -27,6 +27,7 @@ internal static class StorageSmoke
         using (var writer = new PrototypeFrameStorage(output, codec, ffmpeg, 200, 640, 360, json.Serialize))
         using (var raw = File.OpenRead(Path.Combine(source, "frames.rgba")))
         {
+            writer.Prepare();
             byte[] bytes = new byte[640 * 360 * 4];
             int written = 0;
             foreach (var line in File.ReadLines(Path.Combine(source, "events.ndjson")))
@@ -62,6 +63,7 @@ internal static class StorageSmoke
             File.WriteAllText(Path.Combine(output, "smoke.json"), json.Serialize(new {
                 test = "offline_exact_csharp_writer", codec, frames, wall_seconds = sw.Elapsed.TotalSeconds,
                 writer_max_ms = writer.MaxWriteMs, finalize_max_ms = writer.MaxFinalizeMs,
+                storage_prepare_ms = writer.PreparationMs,
                 process_cpu_seconds = (Process.GetCurrentProcess().TotalProcessorTime - cpu).TotalSeconds,
                 native_working_set_bytes = nativeRss, encoder_peak_working_set_bytes = writer.EncoderPeakWorkingSet,
                 live_game = false

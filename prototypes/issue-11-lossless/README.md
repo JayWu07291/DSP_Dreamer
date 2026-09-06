@@ -14,7 +14,7 @@
 .\prototypes\issue-11-lossless\probe.ps1 prepare -Codec ffv1
 ```
 
-此命令建置 probe 0.1.15，將原 DLL 與設定備份到 `out/deployment-backup-<UTC>/`，設定 20 Hz、1800 秒、每段最多 200 幀，部署到既有 probe 位置。新資料寫入 `BepInEx/plugins/DSPDreamerCaptureProbe/runs-lossless/`，既有 `runs/` 不變。預設使用本機已安裝的 FFmpeg 6.1.1；可用 `-Ffmpeg` 指定另一個 executable，但版本變更需要重測。
+此命令建置 probe 0.1.16，將原 DLL 與設定備份到 `out/deployment-backup-<UTC>/`，設定 20 Hz、1800 秒、每段最多 200 幀，部署到既有 probe 位置。新資料寫入 `BepInEx/plugins/DSPDreamerCaptureProbe/runs-lossless/`，既有 `runs/` 不變。預設使用本機已安裝的 FFmpeg 6.1.1；可用 `-Ffmpeg` 指定另一個 executable，但版本變更需要重測。
 
 1. 開啟 DSP，使用 1280×720、60 FPS，載入可操作的場景。
 2. 按 `Ctrl+F8` 開始。錄製會在 30 分鐘後自動停止，期間 probe 狀態面板隱藏。
@@ -30,7 +30,7 @@
 
 之後關閉 DSP，使用 `prepare -Codec raw` 安排相同設定與相近操作的原始 RGBA 對照。若仍需要驗證 gzip 的實機取捨，使用 `prepare -Codec gzip1`。每次皆建立新 run。raw 30 分鐘約 30.9 GiB，僅含影像；FFV1 的容量須以新 run 實際值為準。
 
-2026-09-06 已完成第一次 FFV1 30 分鐘測試與 raw 10 分鐘對照，完整性與擷取數值通過。probe 0.1.14 在遊戲內的 RAM 欄位回傳零，視為缺測；0.1.15 改用 Windows `GetProcessMemoryInfo`，失敗回傳 -1。raw 實機已取得有效 RAM，下一步採 `prepare -Codec ffv1 -Seconds 300` 補 FFV1 RAM。這份 5 分鐘量測不取代已完成的 30 分鐘測試，也不代表已知前次長程 RAM 峰值。
+2026-09-06 已完成第一次 FFV1 30 分鐘測試、raw 10 分鐘對照及 FFV1 5 分鐘 RAM 補測。RAM 已取得有效值，但補測第一幀停頓造成 capture slots 短暫耗盡。0.1.16 把第一段初始化移到 capture 計時前，離線跨段測試通過。下一步採 `prepare -Codec ffv1 -Seconds 60`，重新啟動 DSP 後做第一次錄製，核對首次啟動是否仍有槽位壓力。這份短測不替代先前長程證據。
 
 ## 可重跑的離線比較
 

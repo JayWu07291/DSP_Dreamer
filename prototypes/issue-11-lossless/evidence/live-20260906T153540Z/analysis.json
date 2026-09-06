@@ -1,0 +1,209 @@
+{
+  "run": "E:\\Steam\\steamapps\\common\\Dyson Sphere Program\\BepInEx\\plugins\\DSPDreamerCaptureProbe\\runs-lossless\\20260906T153540Z",
+  "summary": {
+    "verdict": "inconclusive_or_fail",
+    "metrics_verdict": "inconclusive_or_fail",
+    "elapsed_seconds": 300.0358676,
+    "configured_hz": 20,
+    "width": 640,
+    "height": 360,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "measured_rendered_fps": 59.902838096547626,
+    "effective_hz": 19.95428095944086,
+    "expected_frames": 6000,
+    "requested_frames": 5987,
+    "written_frames": 5987,
+    "scheduler_drops": 2,
+    "in_flight_drops": 11,
+    "readback_errors": 0,
+    "writer_drops": 0,
+    "drop_rate": 0.0021666666666666666,
+    "writer_bytes": 5517619200,
+    "storage_codec": "ffv1",
+    "storage_failed": false,
+    "storage_verification": "pending_offline_decode",
+    "storage_max_write_ms": 1072.416,
+    "storage_max_finalize_ms": 25.4025,
+    "encoder_cpu_seconds": 157.1875,
+    "encoder_peak_working_set_bytes": 77705216,
+    "capture_buffer_bound_bytes": 11059200,
+    "max_writer_queue": 11,
+    "task_events": 1205,
+    "task_event_kinds": "build_mode_changed,craft_completed,craft_enqueued,factory_build,factory_dismantled,item_acquired,landing_capsule_dismantled,machine_batch_completed,manual_mining_yield,miner_produced,panel_closed,panel_opened,sorter_delivered,tech_enqueued,tech_unlocked",
+    "missing_task_event_kinds": "",
+    "suppressed_item_acquisition_duplicates": 98,
+    "cursor_visible_frames": 5987,
+    "cursor_composited_frames": 5987,
+    "cursor_fallback_frames": 0,
+    "cursor_composite_verdict": "pass",
+    "injected_actions": 0,
+    "observed_actions": 0,
+    "average_action_latency_ms": 0,
+    "max_action_latency_ms": 0
+  },
+  "frames": 5987,
+  "image_bytes": 1691896411,
+  "image_gib": 1.5757013214752078,
+  "image_gib_per_capture_hour": 18.90615546296355,
+  "same_frames_raw_gib": 5.138683319091797,
+  "image_bytes_saved_fraction": 0.6933647738865343,
+  "events_bytes": 11728085,
+  "index_bytes": 3516078,
+  "image_events_indices_gib": 1.5898985546082258,
+  "encoder_average_cores": 0.5238956970623201,
+  "encoder_memory_measurement": "sampled",
+  "game_cpu_average_cores": 2.1250133774413147,
+  "game_rss_sampled_max": 4505989120,
+  "game_memory_measurement": "sampled",
+  "write_ms": {
+    "median": 9.716700000000001,
+    "p95": 11.7399,
+    "p99": 31.1399,
+    "maximum": 1072.416
+  },
+  "queue_by_minute": [
+    {
+      "minute": 0,
+      "sample_count": 60,
+      "max_queue": 11,
+      "mean_queue": 0.18333333333333332
+    },
+    {
+      "minute": 1,
+      "sample_count": 59,
+      "max_queue": 0,
+      "mean_queue": 0
+    },
+    {
+      "minute": 2,
+      "sample_count": 60,
+      "max_queue": 0,
+      "mean_queue": 0
+    },
+    {
+      "minute": 3,
+      "sample_count": 60,
+      "max_queue": 0,
+      "mean_queue": 0
+    },
+    {
+      "minute": 4,
+      "sample_count": 59,
+      "max_queue": 0,
+      "mean_queue": 0
+    }
+  ],
+  "gap_events": [
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2686,
+      "game_tick": 545,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2689,
+      "game_tick": 548,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2692,
+      "game_tick": 551,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2695,
+      "game_tick": 554,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2698,
+      "game_tick": 557,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2701,
+      "game_tick": 560,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2704,
+      "game_tick": 563,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2707,
+      "game_tick": 566,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2710,
+      "game_tick": 569,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2713,
+      "game_tick": 572,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "no_free_slot",
+      "unity_frame": 2716,
+      "game_tick": 575,
+      "type": "capture_drop"
+    },
+    {
+      "reason": "scheduler_missed",
+      "count": 2,
+      "first_due_ticks": 20500230,
+      "resumed_ticks": 21741265,
+      "type": "capture_gap"
+    }
+  ],
+  "task_counts": {
+    "panel_opened": 41,
+    "tech_enqueued": 5,
+    "panel_closed": 41,
+    "manual_mining_yield": 42,
+    "landing_capsule_dismantled": 1,
+    "craft_enqueued": 19,
+    "craft_completed": 58,
+    "tech_unlocked": 4,
+    "item_acquired": 47,
+    "build_mode_changed": 26,
+    "factory_build": 41,
+    "miner_produced": 482,
+    "machine_batch_completed": 248,
+    "sorter_delivered": 159,
+    "factory_dismantled": 1
+  },
+  "panels": {
+    "UITechTree:panel_opened": 1,
+    "UITechTree:panel_closed": 1,
+    "UIReplicatorWindow:panel_opened": 17,
+    "UIInventoryWindow:panel_opened": 18,
+    "UIInventoryWindow:panel_closed": 18,
+    "UIReplicatorWindow:panel_closed": 17,
+    "UIMechaWindow:panel_opened": 1,
+    "UIMechaWindow:panel_closed": 1,
+    "UIAssemblerWindow:panel_opened": 4,
+    "UIAssemblerWindow:panel_closed": 4
+  },
+  "visible_cursor_not_composited": 0,
+  "cursor_uncomposited_locations": [],
+  "source_summary_sha256": "81fe4f6888ce932cafab29cc2ab24256a99390cd38334fb87907f3638cddaa73",
+  "source_events_sha256": "cf0f1cfcaa1a840724d9009c7bd021330ef7792ac2b2e13be6e151526ef3456f",
+  "raw_control_run": "see_comparison_report",
+  "visual_and_workload_confirmation": "pending"
+}

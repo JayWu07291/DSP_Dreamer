@@ -1,0 +1,1 @@
+{"test":"offline_exact_csharp_writer","codec":"ffv1","frames":405,"wall_seconds":1.376364,"writer_max_ms":39.1195,"finalize_max_ms":34.031800000000004,"storage_prepare_ms":12.9549,"process_cpu_seconds":0.375,"native_working_set_bytes":36589568,"encoder_peak_working_set_bytes":60002304,"live_game":false}

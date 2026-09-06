@@ -1,0 +1,456 @@
+{
+  "segments": [
+    {
+      "file": "segment-000000.mkv",
+      "frames": 200,
+      "encoded_bytes": 19842553,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.8580432999951881,
+        "cpu_core_seconds": 2.65625,
+        "mean_cores": 3.0957062423480215,
+        "sampled_peak_rss_bytes": 124637184,
+        "frames_per_second": 233.08847001208633
+      }
+    },
+    {
+      "file": "segment-000001.mkv",
+      "frames": 200,
+      "encoded_bytes": 42433956,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.3331038000033004,
+        "cpu_core_seconds": 4.15625,
+        "mean_cores": 3.117724216216104,
+        "sampled_peak_rss_bytes": 126533632,
+        "frames_per_second": 150.02582694573735
+      }
+    },
+    {
+      "file": "segment-000002.mkv",
+      "frames": 200,
+      "encoded_bytes": 49237898,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.4429971999998088,
+        "cpu_core_seconds": 4.578125,
+        "mean_cores": 3.1726499538603448,
+        "sampled_peak_rss_bytes": 125906944,
+        "frames_per_second": 138.6004075406567
+      }
+    },
+    {
+      "file": "segment-000003.mkv",
+      "frames": 200,
+      "encoded_bytes": 60191804,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.6627335000011954,
+        "cpu_core_seconds": 5.265625,
+        "mean_cores": 3.1668484456446055,
+        "sampled_peak_rss_bytes": 125988864,
+        "frames_per_second": 120.28385787611558
+      }
+    },
+    {
+      "file": "segment-000004.mkv",
+      "frames": 200,
+      "encoded_bytes": 54038777,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.539004999998724,
+        "cpu_core_seconds": 4.6875,
+        "mean_cores": 3.0457990714805256,
+        "sampled_peak_rss_bytes": 127102976,
+        "frames_per_second": 129.95409371650243
+      }
+    },
+    {
+      "file": "segment-000005.mkv",
+      "frames": 200,
+      "encoded_bytes": 49371391,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.4196385999966878,
+        "cpu_core_seconds": 4.515625,
+        "mean_cores": 3.1808271485507196,
+        "sampled_peak_rss_bytes": 127528960,
+        "frames_per_second": 140.8809256105509
+      }
+    },
+    {
+      "file": "segment-000006.mkv",
+      "frames": 200,
+      "encoded_bytes": 54199967,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5322701999975834,
+        "cpu_core_seconds": 4.96875,
+        "mean_cores": 3.242737475419046,
+        "sampled_peak_rss_bytes": 126136320,
+        "frames_per_second": 130.52528202944586
+      }
+    },
+    {
+      "file": "segment-000007.mkv",
+      "frames": 200,
+      "encoded_bytes": 54902750,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.545309900000575,
+        "cpu_core_seconds": 4.875,
+        "mean_cores": 3.15470702672531,
+        "sampled_peak_rss_bytes": 129069056,
+        "frames_per_second": 129.4238780194999
+      }
+    },
+    {
+      "file": "segment-000008.mkv",
+      "frames": 200,
+      "encoded_bytes": 56505846,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.563035300001502,
+        "cpu_core_seconds": 4.609375,
+        "mean_cores": 2.948989699717959,
+        "sampled_peak_rss_bytes": 128483328,
+        "frames_per_second": 127.95616324199959
+      }
+    },
+    {
+      "file": "segment-000009.mkv",
+      "frames": 200,
+      "encoded_bytes": 46889661,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.374954599996272,
+        "cpu_core_seconds": 4.25,
+        "mean_cores": 3.0910111504856403,
+        "sampled_peak_rss_bytes": 127508480,
+        "frames_per_second": 145.45934825814777
+      }
+    },
+    {
+      "file": "segment-000010.mkv",
+      "frames": 200,
+      "encoded_bytes": 44973701,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.3579315000024508,
+        "cpu_core_seconds": 4.21875,
+        "mean_cores": 3.106747284375085,
+        "sampled_peak_rss_bytes": 128688128,
+        "frames_per_second": 147.28283422222626
+      }
+    },
+    {
+      "file": "segment-000011.mkv",
+      "frames": 200,
+      "encoded_bytes": 61957064,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.668205099995248,
+        "cpu_core_seconds": 4.953125,
+        "mean_cores": 2.9691343108914543,
+        "sampled_peak_rss_bytes": 128069632,
+        "frames_per_second": 119.88933495082212
+      }
+    },
+    {
+      "file": "segment-000012.mkv",
+      "frames": 200,
+      "encoded_bytes": 61405191,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.6918483999979799,
+        "cpu_core_seconds": 5.171875,
+        "mean_cores": 3.0569376074157564,
+        "sampled_peak_rss_bytes": 130052096,
+        "frames_per_second": 118.2139014348087
+      }
+    },
+    {
+      "file": "segment-000013.mkv",
+      "frames": 200,
+      "encoded_bytes": 63085204,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.7802928000019165,
+        "cpu_core_seconds": 5.5,
+        "mean_cores": 3.0893794548818483,
+        "sampled_peak_rss_bytes": 128618496,
+        "frames_per_second": 112.34107108661266
+      }
+    },
+    {
+      "file": "segment-000014.mkv",
+      "frames": 200,
+      "encoded_bytes": 53295100,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5326982000042335,
+        "cpu_core_seconds": 4.765625,
+        "mean_cores": 3.109304232227086,
+        "sampled_peak_rss_bytes": 129654784,
+        "frames_per_second": 130.48883335248098
+      }
+    },
+    {
+      "file": "segment-000015.mkv",
+      "frames": 200,
+      "encoded_bytes": 58829171,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.6109895000045071,
+        "cpu_core_seconds": 4.859375,
+        "mean_cores": 3.016391478644898,
+        "sampled_peak_rss_bytes": 127598592,
+        "frames_per_second": 124.14730201496685
+      }
+    },
+    {
+      "file": "segment-000016.mkv",
+      "frames": 200,
+      "encoded_bytes": 54712445,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5433665000018664,
+        "cpu_core_seconds": 4.6875,
+        "mean_cores": 3.0371917493313036,
+        "sampled_peak_rss_bytes": 127324160,
+        "frames_per_second": 129.58684797146896
+      }
+    },
+    {
+      "file": "segment-000017.mkv",
+      "frames": 200,
+      "encoded_bytes": 48283461,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.4134279999998398,
+        "cpu_core_seconds": 4.140625,
+        "mean_cores": 2.9294912793580354,
+        "sampled_peak_rss_bytes": 130093056,
+        "frames_per_second": 141.49995613502963
+      }
+    },
+    {
+      "file": "segment-000018.mkv",
+      "frames": 200,
+      "encoded_bytes": 63069564,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.687034800001129,
+        "cpu_core_seconds": 5.109375,
+        "mean_cores": 3.028612687774183,
+        "sampled_peak_rss_bytes": 129183744,
+        "frames_per_second": 118.55120001073253
+      }
+    },
+    {
+      "file": "segment-000019.mkv",
+      "frames": 200,
+      "encoded_bytes": 67792196,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.7857307000012952,
+        "cpu_core_seconds": 5.375,
+        "mean_cores": 3.009972332332138,
+        "sampled_peak_rss_bytes": 129433600,
+        "frames_per_second": 111.99897050538188
+      }
+    },
+    {
+      "file": "segment-000020.mkv",
+      "frames": 200,
+      "encoded_bytes": 68282878,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.8016850000058184,
+        "cpu_core_seconds": 5.453125,
+        "mean_cores": 3.026680579558796,
+        "sampled_peak_rss_bytes": 129175552,
+        "frames_per_second": 111.0071960411249
+      }
+    },
+    {
+      "file": "segment-000021.mkv",
+      "frames": 200,
+      "encoded_bytes": 57169705,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5924344000013662,
+        "cpu_core_seconds": 4.78125,
+        "mean_cores": 3.002478469440184,
+        "sampled_peak_rss_bytes": 129097728,
+        "frames_per_second": 125.59387061710575
+      }
+    },
+    {
+      "file": "segment-000022.mkv",
+      "frames": 200,
+      "encoded_bytes": 53761379,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5241557999979705,
+        "cpu_core_seconds": 4.6875,
+        "mean_cores": 3.075472992988146,
+        "sampled_peak_rss_bytes": 128143360,
+        "frames_per_second": 131.2201810341609
+      }
+    },
+    {
+      "file": "segment-000023.mkv",
+      "frames": 200,
+      "encoded_bytes": 62640580,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.698095600004308,
+        "cpu_core_seconds": 5.078125,
+        "mean_cores": 2.9904823968609997,
+        "sampled_peak_rss_bytes": 129302528,
+        "frames_per_second": 117.77899901483322
+      }
+    },
+    {
+      "file": "segment-000024.mkv",
+      "frames": 200,
+      "encoded_bytes": 53765702,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5390143999975407,
+        "cpu_core_seconds": 4.65625,
+        "mean_cores": 3.025475265213529,
+        "sampled_peak_rss_bytes": 128090112,
+        "frames_per_second": 129.9532999823261
+      }
+    },
+    {
+      "file": "segment-000025.mkv",
+      "frames": 200,
+      "encoded_bytes": 60130794,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.6376565999962622,
+        "cpu_core_seconds": 4.921875,
+        "mean_cores": 3.0054377700497366,
+        "sampled_peak_rss_bytes": 127897600,
+        "frames_per_second": 122.1257252591639
+      }
+    },
+    {
+      "file": "segment-000026.mkv",
+      "frames": 200,
+      "encoded_bytes": 66252408,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.7593932000017958,
+        "cpu_core_seconds": 5.328125,
+        "mean_cores": 3.0283878555371033,
+        "sampled_peak_rss_bytes": 129892352,
+        "frames_per_second": 113.6755558676684
+      }
+    },
+    {
+      "file": "segment-000027.mkv",
+      "frames": 200,
+      "encoded_bytes": 66416051,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.7953095999982907,
+        "cpu_core_seconds": 5.59375,
+        "mean_cores": 3.1157578614882504,
+        "sampled_peak_rss_bytes": 130404352,
+        "frames_per_second": 111.40139839957989
+      }
+    },
+    {
+      "file": "segment-000028.mkv",
+      "frames": 200,
+      "encoded_bytes": 70482933,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.8850042999983998,
+        "cpu_core_seconds": 5.6875,
+        "mean_cores": 3.017234496496813,
+        "sampled_peak_rss_bytes": 129236992,
+        "frames_per_second": 106.10055372296486
+      }
+    },
+    {
+      "file": "segment-000029.mkv",
+      "frames": 187,
+      "encoded_bytes": 67976281,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.8166539000012563,
+        "cpu_core_seconds": 5.375,
+        "mean_cores": 2.9587363889160634,
+        "sampled_peak_rss_bytes": 130187264,
+        "frames_per_second": 102.93650320507979
+      }
+    }
+  ],
+  "frames": 5987,
+  "incomplete": [],
+  "decoded_evidence": "pass",
+  "live_20hz_30min": "fail_or_short_run",
+  "summary": {
+    "verdict": "inconclusive_or_fail",
+    "metrics_verdict": "inconclusive_or_fail",
+    "elapsed_seconds": 300.0358676,
+    "configured_hz": 20,
+    "width": 640,
+    "height": 360,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "measured_rendered_fps": 59.902838096547626,
+    "effective_hz": 19.95428095944086,
+    "expected_frames": 6000,
+    "requested_frames": 5987,
+    "written_frames": 5987,
+    "scheduler_drops": 2,
+    "in_flight_drops": 11,
+    "readback_errors": 0,
+    "writer_drops": 0,
+    "drop_rate": 0.0021666666666666666,
+    "writer_bytes": 5517619200,
+    "storage_codec": "ffv1",
+    "storage_failed": false,
+    "storage_verification": "pending_offline_decode",
+    "storage_max_write_ms": 1072.416,
+    "storage_max_finalize_ms": 25.4025,
+    "encoder_cpu_seconds": 157.1875,
+    "encoder_peak_working_set_bytes": 77705216,
+    "capture_buffer_bound_bytes": 11059200,
+    "max_writer_queue": 11,
+    "task_events": 1205,
+    "task_event_kinds": "build_mode_changed,craft_completed,craft_enqueued,factory_build,factory_dismantled,item_acquired,landing_capsule_dismantled,machine_batch_completed,manual_mining_yield,miner_produced,panel_closed,panel_opened,sorter_delivered,tech_enqueued,tech_unlocked",
+    "missing_task_event_kinds": "",
+    "suppressed_item_acquisition_duplicates": 98,
+    "cursor_visible_frames": 5987,
+    "cursor_composited_frames": 5987,
+    "cursor_fallback_frames": 0,
+    "cursor_composite_verdict": "pass",
+    "injected_actions": 0,
+    "observed_actions": 0,
+    "average_action_latency_ms": 0,
+    "max_action_latency_ms": 0
+  },
+  "gates": {
+    "duration": false,
+    "configured_hz": true,
+    "drop_rate": true,
+    "effective_hz": true,
+    "readback_errors": true,
+    "writer_drops": true,
+    "storage_errors": true,
+    "counts": true,
+    "segments_complete": true,
+    "queue_bound": true
+  },
+  "source_events_sha256": "cf0f1cfcaa1a840724d9009c7bd021330ef7792ac2b2e13be6e151526ef3456f",
+  "source_summary_sha256": "81fe4f6888ce932cafab29cc2ab24256a99390cd38334fb87907f3638cddaa73"
+}

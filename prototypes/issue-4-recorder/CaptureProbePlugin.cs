@@ -23,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.15";
+        public const string PluginVersion = "0.1.16";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -258,7 +258,6 @@ namespace DSPDreamer.CaptureProbe
             }
 
             ResetCounters();
-            using (var gameProcess = Process.GetCurrentProcess()) gameCpuAtStart = gameProcess.TotalProcessorTime.TotalSeconds;
             nextStorageSample = 0;
             Directory.CreateDirectory(outputRoot.Value);
             runDirectory = Path.Combine(outputRoot.Value, DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", Invariant));
@@ -283,6 +282,9 @@ namespace DSPDreamer.CaptureProbe
                 slots[i].Target.Create();
             }
 
+            // Process creation and pipe setup precede the capture clock and first scheduled request.
+            frameWriter.Prepare();
+            using (var gameProcess = Process.GetCurrentProcess()) gameCpuAtStart = gameProcess.TotalProcessorTime.TotalSeconds;
             writerFinished = false;
             writerThread = new Thread(WriterLoop) { IsBackground = true, Name = "DSPDreamer capture writer" };
             writerThread.Start();
@@ -298,6 +300,7 @@ namespace DSPDreamer.CaptureProbe
                 "segment_frames", segmentFrames.Value,
                 "stopwatch_frequency", Stopwatch.Frequency,
                 "probe_version", PluginVersion,
+                "storage_prepare_ms", frameWriter.PreparationMs,
                 "width", captureWidth.Value,
                 "height", captureHeight.Value,
                 "duration_seconds", durationSeconds.Value,
@@ -330,7 +333,9 @@ namespace DSPDreamer.CaptureProbe
             if (slot == null)
             {
                 inFlightDrops++;
-                WriteEvent("capture_drop", Fields("reason", "no_free_slot", "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
+                WriteEvent("capture_drop", Fields("reason", "no_free_slot", "requested_ticks", requestedTicks,
+                    "writer_queue_depth", writeQueue.Count, "outstanding_readbacks", outstandingReadbacks,
+                    "unity_frame", Time.frameCount, "game_tick", SafeGameTick()));
                 return;
             }
 

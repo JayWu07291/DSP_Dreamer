@@ -28,6 +28,8 @@ namespace DSPDreamer.CaptureProbe
         private bool closed;
         internal long Bytes;
         internal double MaxWriteMs, MaxFinalizeMs;
+        internal double PreparationMs, LastOpenMs;
+        private bool prepared;
         internal double EncoderCpuSeconds;
         internal long EncoderPeakWorkingSet = -1;
         [StructLayout(LayoutKind.Sequential)]
@@ -70,6 +72,7 @@ namespace DSPDreamer.CaptureProbe
 
         private void OpenSegment()
         {
+            var opening = Stopwatch.StartNew();
             string stem = "segment-" + segment.ToString("D6");
             target = Path.Combine(root, stem + (codec == "ffv1" ? ".mkv" : ".dwg"));
             partial = target + ".partial";
@@ -98,14 +101,28 @@ namespace DSPDreamer.CaptureProbe
                 stream = process.StandardInput.BaseStream;
                 // A dead encoder must not hold the writer thread and its twelve capture slots forever.
                 Process guardedProcess = process;
-                watchdog = new Timer(_ => { try { if (!guardedProcess.HasExited) guardedProcess.Kill(); } catch { } }, null, 5000, Timeout.Infinite);
+                watchdog = new Timer(_ => { try { if (!guardedProcess.HasExited) guardedProcess.Kill(); } catch { } }, null, Timeout.Infinite, Timeout.Infinite);
             }
+            LastOpenMs = opening.Elapsed.TotalMilliseconds;
+        }
+
+        internal void Prepare()
+        {
+            if (prepared) return;
+            var sw = Stopwatch.StartNew();
+            try { if (codec != "raw") OpenSegment(); }
+            catch { Dispose(); throw; }
+            PreparationMs = sw.Elapsed.TotalMilliseconds;
+            prepared = true;
         }
 
         internal void Write(byte[] rgba, IDictionary<string, object> fields)
         {
+            if (!prepared) throw new InvalidOperationException("Prepare storage before starting capture timing");
             var sw = Stopwatch.StartNew();
-            if (codec != "raw" && stream == null) OpenSegment();
+            double openMs = 0;
+            if (codec != "raw" && stream == null) { OpenSegment(); openMs = LastOpenMs; }
+            fields["storage_open_ms"] = openMs;
             if (watchdog != null) watchdog.Change(5000, Timeout.Infinite);
             if (process != null)
             {
