@@ -29,7 +29,27 @@ namespace DSPDreamer.CaptureProbe
         internal long Bytes;
         internal double MaxWriteMs, MaxFinalizeMs;
         internal double EncoderCpuSeconds;
-        internal long EncoderPeakWorkingSet;
+        internal long EncoderPeakWorkingSet = -1;
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MemoryCounters
+        {
+            public uint Size, PageFaultCount;
+            public UIntPtr PeakWorkingSetSize, WorkingSetSize, QuotaPeakPagedPoolUsage, QuotaPagedPoolUsage;
+            public UIntPtr QuotaPeakNonPagedPoolUsage, QuotaNonPagedPoolUsage, PagefileUsage, PeakPagefileUsage;
+        }
+        [DllImport("psapi.dll", SetLastError = true)]
+        private static extern bool GetProcessMemoryInfo(IntPtr process, ref MemoryCounters counters, uint size);
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        internal static long ReadWorkingSet(IntPtr handle, bool peak)
+        {
+            var counters = new MemoryCounters { Size = (uint)Marshal.SizeOf(typeof(MemoryCounters)) };
+            if (!GetProcessMemoryInfo(handle, ref counters, counters.Size)) return -1;
+            return (long)(peak ? counters.PeakWorkingSetSize : counters.WorkingSetSize).ToUInt64();
+        }
+
+        internal static long CurrentWorkingSet() { return ReadWorkingSet(GetCurrentProcess(), false); }
         [DllImport("kernel32.dll")]
         private static extern bool GetProcessTimes(IntPtr handle, out long creation, out long exit, out long kernel, out long user);
 
@@ -89,8 +109,7 @@ namespace DSPDreamer.CaptureProbe
             if (watchdog != null) watchdog.Change(5000, Timeout.Infinite);
             if (process != null)
             {
-                process.Refresh();
-                EncoderPeakWorkingSet = Math.Max(EncoderPeakWorkingSet, process.PeakWorkingSet64);
+                EncoderPeakWorkingSet = Math.Max(EncoderPeakWorkingSet, ReadWorkingSet(processHandle, true));
             }
             fields["storage_codec"] = codec;
             fields["raw_virtual_offset"] = Bytes;

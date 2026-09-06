@@ -14,7 +14,7 @@
 .\prototypes\issue-11-lossless\probe.ps1 prepare -Codec ffv1
 ```
 
-此命令建置 probe 0.1.14，將原 DLL 與設定備份到 `out/deployment-backup-<UTC>/`，設定 20 Hz、1800 秒、每段最多 200 幀，部署到既有 probe 位置。新資料寫入 `BepInEx/plugins/DSPDreamerCaptureProbe/runs-lossless/`，既有 `runs/` 不變。預設使用本機已安裝的 FFmpeg 6.1.1；可用 `-Ffmpeg` 指定另一個 executable，但版本變更需要重測。
+此命令建置 probe 0.1.15，將原 DLL 與設定備份到 `out/deployment-backup-<UTC>/`，設定 20 Hz、1800 秒、每段最多 200 幀，部署到既有 probe 位置。新資料寫入 `BepInEx/plugins/DSPDreamerCaptureProbe/runs-lossless/`，既有 `runs/` 不變。預設使用本機已安裝的 FFmpeg 6.1.1；可用 `-Ffmpeg` 指定另一個 executable，但版本變更需要重測。
 
 1. 開啟 DSP，使用 1280×720、60 FPS，載入可操作的場景。
 2. 按 `Ctrl+F8` 開始。錄製會在 30 分鐘後自動停止，期間 probe 狀態面板隱藏。
@@ -29,6 +29,8 @@
 `verify` 會完整解碼每段，對照 capture index 與原始事件，才新增 `.sealed.json`。回報 numeric gates、未完成段與驗證細節。畫面內容與操作覆蓋仍需人工確認。
 
 之後關閉 DSP，使用 `prepare -Codec raw` 安排相同設定與相近操作的原始 RGBA 對照。若仍需要驗證 gzip 的實機取捨，使用 `prepare -Codec gzip1`。每次皆建立新 run。raw 30 分鐘約 30.9 GiB，僅含影像；FFV1 的容量須以新 run 實際值為準。
+
+2026-09-06 已完成第一次 FFV1 30 分鐘測試，完整性與擷取數值通過。下一步採 `prepare -Codec raw -Seconds 600`，用 10 分鐘 raw 與 FFV1 的同長度區間對照。這不是另一份 30 分鐘持續性證據。probe 0.1.14 在遊戲內的 RAM 欄位回傳零，視為缺測；0.1.15 改用 Windows `GetProcessMemoryInfo`，失敗回傳 -1。獨立 C# 測試取得有效數值，遊戲內與 FFV1 的補充 RAM 量測仍待完成。
 
 ## 可重跑的離線比較
 

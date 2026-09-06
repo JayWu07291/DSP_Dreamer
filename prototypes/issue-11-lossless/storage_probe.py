@@ -336,7 +336,8 @@ def verify_run(args):
                     raise ValueError('Raw baseline offsets mismatch')
                 report = dict(test='raw_live_baseline', summary=s, frames=len(frames),
                               rgba_sha256=file_sha(raw), events_sha256=file_sha(run / 'events.ndjson'),
-                              live_numeric_gates=(s['elapsed_seconds'] >= 1800 and s['configured_hz'] == 20
+                              duration_30min=s['elapsed_seconds'] >= 1800,
+                              raw_comparison_10min_gates=(s['elapsed_seconds'] >= 600 and s['configured_hz'] == 20
                                   and s['drop_rate'] < .01 and s['effective_hz'] >= 19 and s['readback_errors'] == 0
                                   and s['writer_drops'] == 0 and not s['storage_failed']),
                               visual_and_workload_review='pending')

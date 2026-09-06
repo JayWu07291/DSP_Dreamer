@@ -23,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.14";
+        public const string PluginVersion = "0.1.15";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -167,7 +167,7 @@ namespace DSPDreamer.CaptureProbe
                     WriteEvent("storage_sample", Fields("ticks", clock.ElapsedTicks,
                         "writer_queue_depth", writeQueue.Count, "written_frames", writtenFrames,
                         "game_cpu_seconds", gameProcess.TotalProcessorTime.TotalSeconds - gameCpuAtStart,
-                        "game_working_set_bytes", gameProcess.WorkingSet64,
+                        "game_working_set_bytes", PrototypeFrameStorage.CurrentWorkingSet(),
                         "encoder_cpu_seconds", frameWriter.CurrentEncoderCpuSeconds(),
                         "encoder_peak_working_set_bytes", frameWriter.EncoderPeakWorkingSet,
                         "outstanding_readbacks", outstandingReadbacks));

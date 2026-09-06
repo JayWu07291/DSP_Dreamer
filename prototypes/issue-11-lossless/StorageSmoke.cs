@@ -56,10 +56,14 @@ internal static class StorageSmoke
                 return 99;
             }
             writer.Finish();
+            long nativeRss = PrototypeFrameStorage.CurrentWorkingSet();
+            if (nativeRss <= 0 || (codec == "ffv1" && writer.EncoderPeakWorkingSet <= 0))
+                throw new Exception("Native process memory measurement unavailable");
             File.WriteAllText(Path.Combine(output, "smoke.json"), json.Serialize(new {
                 test = "offline_exact_csharp_writer", codec, frames, wall_seconds = sw.Elapsed.TotalSeconds,
                 writer_max_ms = writer.MaxWriteMs, finalize_max_ms = writer.MaxFinalizeMs,
                 process_cpu_seconds = (Process.GetCurrentProcess().TotalProcessorTime - cpu).TotalSeconds,
+                native_working_set_bytes = nativeRss, encoder_peak_working_set_bytes = writer.EncoderPeakWorkingSet,
                 live_game = false
             }));
         }
