@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\plugins\DSPDreamerCaptureProbe\finalizer\auto_finalize.py", line 185, in main
+    finalize(run, args.ffmpeg, args.test_stop_cleanup_after)
+  File "E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\plugins\DSPDreamerCaptureProbe\finalizer\auto_finalize.py", line 151, in finalize
+    merger.merge(run, work)
+  File "E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\plugins\DSPDreamerCaptureProbe\finalizer\merge_prototype.py", line 120, in merge
+    subprocess.run([FFMPEG, '-hide_banner', '-nostdin', '-v', 'warning', '-n',
+  File "C:\Users\jay07\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jay07\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\subprocess.py", line 992, in __init__
+    errread, errwrite) = self._get_handles(stdin, stdout, stderr)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jay07\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\subprocess.py", line 1385, in _get_handles
+    c2pwrite = self._make_inheritable(c2pwrite)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jay07\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\subprocess.py", line 1416, in _make_inheritable
+    h = _winapi.DuplicateHandle(
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 6] 控制代碼無效。

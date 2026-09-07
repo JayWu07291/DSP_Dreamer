@@ -4,6 +4,8 @@
 
 ## 目前結果
 
+20260907T043258Z 實機已觸發自動 worker，但暴露 GUI 父程序提供無效 console handle 的問題。已修正部署的 Python 子程序啟動方式，三個 handles 皆無效的回歸測試通過，並完成本次錄製的重試與清理。見[實機修復紀錄](evidence/live-20260907T043258Z/review.md)。DLL 維持 0.1.17。
+
 0.1.17 已加入錄製後自動合併與清理。`prepare` 會部署 Python worker 並開啟 `AutoFinalize`，FFV1 停止且 writer 排空後自動啟動背景程序。先重驗來源，再合併與完整核對，最後發布 manifest，才刪除該次 run 中清單列出且 hash 一致的暫存段、索引及報告。成功後 run 根目錄只剩 `recording.mkv`、`events.ndjson`、`frames.ndjson`、`manifest.json`。合併期間不能開始下一次擷取，遊戲仍可操作；背景解码會使用 CPU 與磁碟。
 
 失敗時查看該 run 的 `.finalizing/error.txt`，來源或已驗證的最終資料會保留。可用 `probe.ps1 finalize -RunDirectory <該次run>` 重試，發布及清理中斷均可續做。此命令會在成功驗證後清理所指定 run 的暫存來源，請勿拿舊實驗原件作額外測試。重複對已完成 run 執行不會改動四個最終檔。未正常寫完 summary 或仍有來源 `.partial` 的錄製交給復原流程，不自動清理。

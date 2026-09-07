@@ -1,0 +1,91 @@
+{
+  "verification": {
+    "frames": 1199,
+    "rgba_hashes_match": true,
+    "playback_timestamps_match_20fps": true,
+    "last_pts_seconds": 59.9,
+    "seek_frame_ordinals": [
+      0,
+      199,
+      200,
+      399,
+      400,
+      599,
+      600,
+      799,
+      800,
+      999,
+      1000,
+      1198
+    ],
+    "seek_hashes_match": true,
+    "events_byte_identical": true,
+    "event_records": 6130,
+    "frame_index_roundtrip": true,
+    "remux_seconds": 0.4051332999988517
+  },
+  "source_summary": {
+    "verdict": "inconclusive_or_fail",
+    "metrics_verdict": "inconclusive_or_fail",
+    "elapsed_seconds": 60.0764741,
+    "configured_hz": 20,
+    "width": 640,
+    "height": 360,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "measured_rendered_fps": 59.79045964017386,
+    "effective_hz": 19.957895631561374,
+    "expected_frames": 1200,
+    "requested_frames": 1199,
+    "written_frames": 1199,
+    "scheduler_drops": 1,
+    "in_flight_drops": 0,
+    "readback_errors": 0,
+    "writer_drops": 0,
+    "drop_rate": 0.0008333333333333334,
+    "writer_bytes": 1104998400,
+    "storage_codec": "ffv1",
+    "storage_failed": false,
+    "storage_verification": "pending_offline_decode",
+    "storage_max_write_ms": 79.3505,
+    "storage_max_finalize_ms": 72.01270000000001,
+    "encoder_cpu_seconds": 29.328125,
+    "encoder_peak_working_set_bytes": 76410880,
+    "capture_buffer_bound_bytes": 11059200,
+    "max_writer_queue": 1,
+    "task_events": 71,
+    "task_event_kinds": "build_mode_changed,craft_completed,craft_enqueued,factory_build,item_acquired,landing_capsule_dismantled,manual_mining_yield,miner_produced,panel_closed,panel_opened,tech_enqueued,tech_unlocked",
+    "missing_task_event_kinds": "factory_dismantled",
+    "suppressed_item_acquisition_duplicates": 32,
+    "cursor_visible_frames": 1199,
+    "cursor_composited_frames": 1199,
+    "cursor_fallback_frames": 0,
+    "cursor_composite_verdict": "pass",
+    "injected_actions": 0,
+    "observed_actions": 0,
+    "average_action_latency_ms": 0,
+    "max_action_latency_ms": 0
+  },
+  "files": {
+    "recording.mkv": {
+      "bytes": 265502324,
+      "sha256": "54c7cd49b6ec1a826bc160678b7c590910c7240cb3a4dc7e512ebc90fda2be59"
+    },
+    "events.ndjson": {
+      "bytes": 2288644,
+      "sha256": "8cb96e49bbdb3ae17c1225e24857b021b6db612ee6039b8b2584295cc02403ae"
+    },
+    "frames.ndjson": {
+      "bytes": 785384,
+      "sha256": "48ce73f12d6b91a7c9522537e6dd9042c77c4bf157a6eee7a858978a288d3846"
+    }
+  },
+  "final_files": [
+    "events.ndjson",
+    "frames.ndjson",
+    "manifest.json",
+    "recording.mkv"
+  ]
+}

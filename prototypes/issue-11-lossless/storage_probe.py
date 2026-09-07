@@ -150,7 +150,8 @@ def encode(path, frames, codec, ffmpeg, metrics):
            '-framerate', '20', '-i', 'pipe:0', '-map', '0:v:0', '-an', '-fps_mode', 'passthrough',
            *ENCODE, '-f', 'matroska', str(path)]
     with open(str(path) + '.stderr', 'xb') as err:
-        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=err, creationflags=0x08000000)
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                             stderr=err, creationflags=0x08000000)
         metrics.add(p.pid)
         try:
             for b in frames:
@@ -204,7 +205,8 @@ def decode(path, codec, ffmpeg, metrics=None, start=0, count=None):
             cmd += ['-frames:v', str(count)]
         cmd += ['-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1']
         with open(str(path) + '.decode.stderr', 'ab') as err:
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=err, creationflags=0x08000000)
+            p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=err, creationflags=0x08000000)
             if metrics:
                 metrics.add(p.pid)
             try:
@@ -351,7 +353,8 @@ def verify_run(args):
     ids = []
     ticks = []
     results = []
-    ffmpeg_version = subprocess.check_output([args.ffmpeg, '-version'], text=True).splitlines()[0]
+    ffmpeg_version = subprocess.check_output([args.ffmpeg, '-version'], text=True,
+        stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=0x08000000).splitlines()[0]
     for manifest_path in manifest_paths:
         m = json.loads(manifest_path.read_text(encoding='utf-8-sig'))
         path = run / m['file']

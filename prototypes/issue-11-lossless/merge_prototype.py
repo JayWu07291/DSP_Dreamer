@@ -43,7 +43,8 @@ def decode_verify(video, frames, log):
                '-map', '0:v:0', '-vf', 'showinfo', '-fps_mode', 'passthrough',
                '-pix_fmt', 'rgba', '-f', 'rawvideo', 'pipe:1']
     with log.open('wb') as error:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=error)
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                   stderr=error, creationflags=0x08000000)
         try:
             for ordinal, frame in enumerate(frames):
                 data = process.stdout.read(FRAME_BYTES)
@@ -119,7 +120,8 @@ def merge(run, out, stop_before_publish=False):
     with (out / 'remux.stderr').open('wb') as log:
         subprocess.run([FFMPEG, '-hide_banner', '-nostdin', '-v', 'warning', '-n',
                         '-f', 'concat', '-safe', '0', '-i', str(concat), '-map', '0:v:0',
-                        '-c:v', 'copy', '-f', 'matroska', str(video)], stderr=log, check=True)
+                        '-c:v', 'copy', '-f', 'matroska', str(video)], stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=log, creationflags=0x08000000, check=True)
     remux_seconds = time.perf_counter() - merge_started
     event_output = artifact / 'events.ndjson.partial'
     shutil.copyfile(run / 'events.ndjson', event_output)
@@ -143,7 +145,8 @@ def merge(run, out, stop_before_publish=False):
         result = subprocess.run([FFMPEG, '-hide_banner', '-nostdin', '-v', 'error',
                                  '-ss', f'{ordinal / 20:.6f}', '-i', str(video),
                                  '-frames:v', '1', '-pix_fmt', 'rgba', '-f', 'rawvideo', 'pipe:1'],
-                                capture_output=True, check=True)
+                                stdin=subprocess.DEVNULL, capture_output=True,
+                                creationflags=0x08000000, check=True)
         require(len(result.stdout) == FRAME_BYTES and
                 hashlib.sha256(result.stdout).hexdigest() == frames[ordinal]['rgba_sha256'],
                 f'seek mismatch at {ordinal}')
