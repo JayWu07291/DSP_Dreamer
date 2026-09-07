@@ -1,0 +1,146 @@
+{
+  "segments": [
+    {
+      "file": "segment-000000.mkv",
+      "frames": 200,
+      "encoded_bytes": 19666516,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 0.835697299997264,
+        "cpu_core_seconds": 2.734375,
+        "mean_cores": 3.271968211467181,
+        "sampled_peak_rss_bytes": 74002432,
+        "frames_per_second": 239.32110346731378
+      }
+    },
+    {
+      "file": "segment-000001.mkv",
+      "frames": 200,
+      "encoded_bytes": 37872624,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.1921440000005532,
+        "cpu_core_seconds": 3.84375,
+        "mean_cores": 3.2242329785648516,
+        "sampled_peak_rss_bytes": 75202560,
+        "frames_per_second": 167.76496799036624
+      }
+    },
+    {
+      "file": "segment-000002.mkv",
+      "frames": 200,
+      "encoded_bytes": 54366412,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.5151734000028227,
+        "cpu_core_seconds": 4.671875,
+        "mean_cores": 3.083392963466291,
+        "sampled_peak_rss_bytes": 74522624,
+        "frames_per_second": 131.99809341929273
+      }
+    },
+    {
+      "file": "segment-000003.mkv",
+      "frames": 200,
+      "encoded_bytes": 52811889,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.4851079000000027,
+        "cpu_core_seconds": 4.5625,
+        "mean_cores": 3.0721673489178745,
+        "sampled_peak_rss_bytes": 75599872,
+        "frames_per_second": 134.67034954160545
+      }
+    },
+    {
+      "file": "segment-000004.mkv",
+      "frames": 200,
+      "encoded_bytes": 60990986,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.6411223000031896,
+        "cpu_core_seconds": 5.015625,
+        "mean_cores": 3.05621646844373,
+        "sampled_peak_rss_bytes": 75739136,
+        "frames_per_second": 121.86782179464096
+      }
+    },
+    {
+      "file": "segment-000005.mkv",
+      "frames": 198,
+      "encoded_bytes": 56984964,
+      "rgba_roundtrip": "pass",
+      "decode": {
+        "wall_seconds": 1.567487100001017,
+        "cpu_core_seconds": 4.921875,
+        "mean_cores": 3.1399779940752346,
+        "sampled_peak_rss_bytes": 74928128,
+        "frames_per_second": 126.316829018798
+      }
+    }
+  ],
+  "frames": 1198,
+  "incomplete": [],
+  "decoded_evidence": "pass",
+  "live_20hz_30min": "fail_or_short_run",
+  "summary": {
+    "verdict": "inconclusive_or_fail",
+    "metrics_verdict": "inconclusive_or_fail",
+    "elapsed_seconds": 60.0429784,
+    "configured_hz": 20,
+    "width": 640,
+    "height": 360,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "measured_rendered_fps": 59.82381446953671,
+    "effective_hz": 19.952374647690693,
+    "expected_frames": 1200,
+    "requested_frames": 1198,
+    "written_frames": 1198,
+    "scheduler_drops": 2,
+    "in_flight_drops": 0,
+    "readback_errors": 0,
+    "writer_drops": 0,
+    "drop_rate": 0.0016666666666666668,
+    "writer_bytes": 1104076800,
+    "storage_codec": "ffv1",
+    "storage_failed": false,
+    "storage_verification": "pending_offline_decode",
+    "storage_max_write_ms": 52.3102,
+    "storage_max_finalize_ms": 23.4266,
+    "encoder_cpu_seconds": 30.15625,
+    "encoder_peak_working_set_bytes": 77406208,
+    "capture_buffer_bound_bytes": 11059200,
+    "max_writer_queue": 1,
+    "task_events": 74,
+    "task_event_kinds": "build_mode_changed,craft_completed,craft_enqueued,factory_build,item_acquired,landing_capsule_dismantled,manual_mining_yield,miner_produced,panel_closed,panel_opened,tech_enqueued,tech_unlocked",
+    "missing_task_event_kinds": "factory_dismantled",
+    "suppressed_item_acquisition_duplicates": 30,
+    "cursor_visible_frames": 1198,
+    "cursor_composited_frames": 1198,
+    "cursor_fallback_frames": 0,
+    "cursor_composite_verdict": "pass",
+    "injected_actions": 0,
+    "observed_actions": 0,
+    "average_action_latency_ms": 0,
+    "max_action_latency_ms": 0
+  },
+  "gates": {
+    "duration": false,
+    "configured_hz": true,
+    "drop_rate": true,
+    "effective_hz": true,
+    "readback_errors": true,
+    "writer_drops": true,
+    "storage_errors": true,
+    "counts": true,
+    "segments_complete": true,
+    "queue_bound": true
+  },
+  "slot_pressure_review_required": false,
+  "pressure_note": "Zero writer_drops does not exclude writer-induced capture-slot exhaustion. Review no_free_slot events alongside queue and write latency.",
+  "source_events_sha256": "683603a3f2f541e6b8e87a65ae5eb03ad07eb1cf1ddaf4bd6cc98d662c7a7758",
+  "source_summary_sha256": "2d23d185781c4d477d1a44e5199dad1db28c49af3dae8a883def4d70a343aa6a"
+}

@@ -4,7 +4,7 @@
 
 ## 目前結果
 
-見 [RESULTS.md](RESULTS.md) 與 `evidence/`。FFV1 與每幀 gzip 分塊均通過離線逐幀 RGBA 核對。FFV1 值得先做實機測試。20 Hz、30 分鐘遊戲整合與使用者取捨仍未完成。
+見 [RESULTS.md](RESULTS.md) 與 `evidence/`。FFV1 與每幀 gzip 分塊均通過離線逐幀 RGBA 核對；FFV1 長程、raw 對照、RAM 與初始化修正確認已完成。[採用草案](PROPOSAL.md)等待使用者確認。正式錄製器仍需重新驗收。
 
 ## 一個命令準備實機測試
 

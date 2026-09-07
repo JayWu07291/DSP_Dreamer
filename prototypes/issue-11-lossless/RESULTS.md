@@ -1,6 +1,6 @@
 # 無損儲存離線量測，2026-09-06
 
-FFV1 是目前優先候選。[首次實機驗證](evidence/live-20260906T135528Z/review.md) 通過 20 Hz、30 分鐘完整性與擷取數值門檻，影像比同幀數 raw 少 72.1%。[Raw 對照](evidence/live-20260906T151649Z/review.md) 也通過。[RAM 補測](evidence/live-20260906T153540Z/review.md) 得到 encoder 74.1 MiB、DSP 約 4.20 GiB，但暴露第一幀停頓與槽位耗盡；初始化時序修正已通過離線測試，遊戲首次啟動尚待核對。正式格式未決議，資料契約未修改。下方保留先前離線量測與當時的待辦。
+建議採用 FFV1，待使用者確認 [決議草案](PROPOSAL.md)。[首次實機驗證](evidence/live-20260906T135528Z/review.md) 通過 20 Hz、30 分鐘完整性與擷取數值門檻，影像比同幀數 raw 少 72.1%。[Raw 對照](evidence/live-20260906T151649Z/review.md) 也通過。[RAM 補測](evidence/live-20260906T153540Z/review.md) 得到 encoder 74.1 MiB、DSP 約 4.20 GiB，並暴露首次啟動停頓；[修正後的遊戲確認](evidence/live-20260906T162147Z/review.md) 第一幀 9.89 ms，無槽位耗盡。正式格式尚未決議，資料契約未修改。下方保留先前離線量測與當時的待辦。
 
 ## 相同來源的比較
 
