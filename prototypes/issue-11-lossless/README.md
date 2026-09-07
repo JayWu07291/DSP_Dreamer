@@ -1,6 +1,6 @@
 # 無損儲存原型
 
-回答[驗證原始錄製資料的無損儲存方案](https://github.com/JayWu07291/DSP_Dreamer/issues/11)。這是決策用拋棄式原型，尚未選定正式格式。程式承接 `codex/prototype-issue-4-recorder`，存於 `codex/prototype-issue-11-lossless`。
+回答[驗證原始錄製資料的無損儲存方案](https://github.com/JayWu07291/DSP_Dreamer/issues/11)。這是決策用拋棄式原型，正式儲存方向已由使用者確認，原型不等於正式版驗收。程式承接 `codex/prototype-issue-4-recorder`，存於 `codex/prototype-issue-11-lossless`。
 
 ## 目前結果
 
@@ -16,7 +16,7 @@
 
 2026-09-07 已驗證錄製後合併為單一 MKV 與三個文件，見[合併驗證](evidence/merge-20260907/review.md)。執行 `python prototypes/issue-11-lossless/merge_prototype.py --run <已驗證的錄製目錄> --out <新的測試目錄>`，最終四檔在輸出下的 `artifact/`。工具只讀來源，不清理來源分段；`--stop-before-publish` 可測試未發布完成標記的狀態。`merge_checks.py --merged <成功測試目錄> --interrupted <中斷測試目錄> --out <新故障測試目錄>` 建立故障副本並驗證拒絕行為。
 
-見 [RESULTS.md](RESULTS.md) 與 `evidence/`。FFV1 與每幀 gzip 分塊均通過離線逐幀 RGBA 核對；FFV1 長程、raw 對照、RAM 與初始化修正確認已完成。[採用草案](PROPOSAL.md)等待使用者確認。正式錄製器仍需重新驗收。
+見 [RESULTS.md](RESULTS.md) 與 `evidence/`。FFV1 與每幀 gzip 分塊均通過離線逐幀 RGBA 核對；FFV1 長程、raw 對照、RAM 與初始化修正確認已完成。[儲存決議](PROPOSAL.md)已由使用者確認。正式錄製器仍需重新驗收。
 
 ## 一個命令準備實機測試
 
