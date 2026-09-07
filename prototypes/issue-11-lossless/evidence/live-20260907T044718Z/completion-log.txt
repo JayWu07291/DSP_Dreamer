@@ -1,0 +1,2 @@
+[Info   :DSP Dreamer capture probe] 完成：inconclusive_or_fail，掉幀率 0.08%. Output: E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\plugins\DSPDreamerCaptureProbe\runs-lossless\20260907T044718Z
+[Info   :DSP Dreamer capture probe] 合併與驗證完成，已清理暫存分段. Output: E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\plugins\DSPDreamerCaptureProbe\runs-lossless\20260907T044718Z

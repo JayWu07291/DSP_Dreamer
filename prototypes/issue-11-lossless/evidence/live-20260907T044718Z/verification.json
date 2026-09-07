@@ -1,0 +1,115 @@
+{
+  "verification": {
+    "frames": 1199,
+    "rgba_hashes_match": true,
+    "playback_timestamps_match_20fps": true,
+    "last_pts_seconds": 59.9,
+    "seek_frame_ordinals": [
+      0,
+      199,
+      200,
+      399,
+      400,
+      599,
+      600,
+      799,
+      800,
+      999,
+      1000,
+      1198
+    ],
+    "seek_hashes_match": true,
+    "events_byte_identical": true,
+    "event_records": 6122,
+    "frame_index_roundtrip": true,
+    "remux_seconds": 0.4015142999996897
+  },
+  "source_summary": {
+    "verdict": "inconclusive_or_fail",
+    "metrics_verdict": "inconclusive_or_fail",
+    "elapsed_seconds": 60.0871691,
+    "configured_hz": 20,
+    "width": 640,
+    "height": 360,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "measured_rendered_fps": 59.879672380837796,
+    "effective_hz": 19.95434329756101,
+    "expected_frames": 1200,
+    "requested_frames": 1199,
+    "written_frames": 1199,
+    "scheduler_drops": 1,
+    "in_flight_drops": 0,
+    "readback_errors": 0,
+    "writer_drops": 0,
+    "drop_rate": 0.0008333333333333334,
+    "writer_bytes": 1104998400,
+    "storage_codec": "ffv1",
+    "storage_failed": false,
+    "storage_verification": "pending_offline_decode",
+    "storage_max_write_ms": 95.6453,
+    "storage_max_finalize_ms": 87.61500000000001,
+    "encoder_cpu_seconds": 26.0625,
+    "encoder_peak_working_set_bytes": 76283904,
+    "capture_buffer_bound_bytes": 11059200,
+    "max_writer_queue": 2,
+    "task_events": 57,
+    "task_event_kinds": "craft_completed,craft_enqueued,item_acquired,landing_capsule_dismantled,manual_mining_yield,panel_closed,panel_opened,tech_enqueued,tech_unlocked",
+    "missing_task_event_kinds": "factory_build,factory_dismantled",
+    "suppressed_item_acquisition_duplicates": 37,
+    "cursor_visible_frames": 1199,
+    "cursor_composited_frames": 1199,
+    "cursor_fallback_frames": 0,
+    "cursor_composite_verdict": "pass",
+    "injected_actions": 0,
+    "observed_actions": 0,
+    "average_action_latency_ms": 0,
+    "max_action_latency_ms": 0
+  },
+  "files": {
+    "recording.mkv": {
+      "bytes": 239853558,
+      "sha256": "23495e2cffec1c1dae09387d2ca21deb0a66d349dc0dea335bc2fe80488b96ae"
+    },
+    "events.ndjson": {
+      "bytes": 2285714,
+      "sha256": "d4fa3d10beda67304c2f596a49be4fdcf069c05fc05f677c3939e7de59f5c43d"
+    },
+    "frames.ndjson": {
+      "bytes": 785259,
+      "sha256": "772bb72fcdf6451dfb2be868ff0a5cd5893c12ac816bb53cbf5b566a25c78db4"
+    }
+  },
+  "session": {
+    "capture_hz": 20,
+    "storage_codec": "ffv1",
+    "segment_frames": 200,
+    "stopwatch_frequency": 10000000,
+    "probe_version": "0.1.17",
+    "storage_prepare_ms": 11.615400000000001,
+    "width": 640,
+    "height": 360,
+    "duration_seconds": 60,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_display_mode": "FullScreenWindow",
+    "capture_strategy": "full_frame_then_bilinear_gpu_scale_then_cursor_composite",
+    "unity_frame": 3422,
+    "game_tick": 331,
+    "type": "session_start"
+  },
+  "independent_decode": {
+    "frames": 1199,
+    "rgba_hashes_match": true,
+    "playback_timestamps_match_20fps": true,
+    "last_pts_seconds": 59.9
+  },
+  "final_files": [
+    "events.ndjson",
+    "frames.ndjson",
+    "manifest.json",
+    "recording.mkv"
+  ]
+}
