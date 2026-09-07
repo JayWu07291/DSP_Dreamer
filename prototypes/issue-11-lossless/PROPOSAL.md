@@ -6,7 +6,7 @@
 
 原始影像採分段 Matroska／FFV1，原始事件仍使用 append-only NDJSON。每段最多 200 個實際擷取成功的畫面，在穩定 20 Hz 時約 10 秒；以 frame count 分段，不把有 gap 的段當成精確 10 秒。
 
-依使用者 2026-09-07 的明確要求，每次 session 完成後將影片接成一支可直接播放的 `recording.mkv`，事件整併為 `events.ndjson`，逐幀索引整併為 `frames.ndjson`，設定、摘要與驗證結果收進 `manifest.json`。最終固定四個檔案，不使用 ZIP，也不保留大量 segment 及逐段 marker。MKV 使用 FFV1，播放端須支援該 codec。錄製期間的短分段只用於中斷復原，合併並驗證成功後回收。單一 MKV、整併索引及四檔輸出已通過短錄製與 30 分鐘原型驗證，詳見 [合併驗證](evidence/merge-20260907/review.md)；自動清理與正式整合仍待實作。
+依使用者 2026-09-07 的明確要求，每次 session 完成後將影片接成一支可直接播放的 `recording.mkv`，事件整併為 `events.ndjson`，逐幀索引整併為 `frames.ndjson`，設定、摘要與驗證結果收進 `manifest.json`。最終固定四個檔案，不使用 ZIP，也不保留大量 segment 及逐段 marker。MKV 使用 FFV1，播放端須支援該 codec。錄製期間的短分段只用於中斷復原，合併並驗證成功後回收。單一 MKV、整併索引及四檔輸出已通過短錄製與 30 分鐘原型驗證，詳見 [合併驗證](evidence/merge-20260907/review.md)；自動合併與清理已接入 0.1.17 原型並通過副本測試，遊戲內觸發與正式整合仍待驗收。
 
 固定已測的 FFmpeg 6.1.1 executable，SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02f89d6c7243df819c94ad00`，參數為 `ffv1 level=3 coder=1 context=0 g=1 slicecrc=1 slices=4 threads=4 pix_fmt=bgra`。來源及核對格式固定為游標合成後的 640×360 RGBA bytes，包含 alpha；只做可逆 RGBA／BGRA 通道重排。不以 YUV 轉換、縮放、補幀或 PTS 取代原始證據。換版本或參數後重跑相同往返與效能檢查。
 
@@ -45,7 +45,7 @@ CPU 平均 encoder 約 0.5 個 core。RAM 為短測中各程序各自的峰值�
 6. 只允許 verified evidence 進入 compiler。compiler 串流解碼單一 MKV，依整併索引處理，不輸出整支 raw 中間影片。失敗或未知狀態保留，不能靜默補幀、重排或接受損壞資料。
 7. 異常停止後先重驗已關閉段，再對當前段核對可恢復的連續 prefix。恢復結果是新 artifact，保存來源與失效範圍，原始檔不覆寫。未完成合併不能替代來源；已發布的最終檔案不再追加或修改。
 
-預設直接串流壓縮，不用 raw staging。錄製停止後驗證來源、合併並核對最終檔案，不在遊戲擷取期間執行。remux 後容器 bytes 與 checksum 會改變，無損判定以解碼後逐幀 RGBA 一致為準。已用既有錄製驗證多段合併、尾段不足 200 幀、gap、超過 4 GiB、FFmpeg 全片解碼及 seek，並測試發布前受控停止與損壞副本拒絕。互動式播放器、任意階段中斷、清理中斷、多事件分片與正式 compiler 讀取仍待驗證。
+預設直接串流壓縮，不用 raw staging。錄製停止後驗證來源、合併並核對最終檔案，不在遊戲擷取期間執行。remux 後容器 bytes 與 checksum 會改變，無損判定以解碼後逐幀 RGBA 一致為準。已用既有錄製驗證多段合併、尾段不足 200 幀、gap、超過 4 GiB、FFmpeg 全片解碼及 seek，並測試發布前受控停止與損壞副本拒絕。原型另已通過受控發布／清理中斷重試、來源變更拒絕及低空間保留來源測試，見 [自動流程驗證](evidence/auto-finalize-20260907/review.md)。互動式播放器、任意階段程序終止、多事件分片與正式 compiler 讀取仍待驗證。
 
 ## 容量與編譯暫存
 

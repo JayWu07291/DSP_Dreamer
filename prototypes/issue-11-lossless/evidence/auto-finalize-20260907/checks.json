@@ -1,0 +1,21 @@
+{
+  "source_run": "E:\\Steam\\steamapps\\common\\Dyson Sphere Program\\BepInEx\\plugins\\DSPDreamerCaptureProbe\\runs-lossless\\20260906T162147Z",
+  "original_evidence_unchanged": true,
+  "merged_frames": 1198,
+  "cleanup_interrupted_after_files": 2,
+  "changed_source_blocks_all_deletion": true,
+  "cleanup_resume": "pass",
+  "idempotent_retry": "pass",
+  "publication_resume": "pass",
+  "low_space_preserves_sources": true,
+  "final_files": [
+    "events.ndjson",
+    "frames.ndjson",
+    "manifest.json",
+    "recording.mkv"
+  ],
+  "limitations": [
+    "Controlled failure injection, not power-loss durability.",
+    "Unity stop hook requires a new in-game recording."
+  ]
+}

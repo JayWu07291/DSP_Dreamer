@@ -23,7 +23,7 @@ namespace DSPDreamer.CaptureProbe
     {
         public const string PluginGuid = "tw.jaywu.dspdreamer.capture-probe";
         public const string PluginName = "DSP Dreamer capture probe";
-        public const string PluginVersion = "0.1.16";
+        public const string PluginVersion = "0.1.17";
 
         private const int SlotCount = 12;
         private const int SpaceCapsuleProtoId = 9999;
@@ -80,6 +80,9 @@ namespace DSPDreamer.CaptureProbe
         private ConfigEntry<string> storageCodec;
         private ConfigEntry<string> storageFfmpeg;
         private ConfigEntry<int> segmentFrames;
+        private ConfigEntry<bool> autoFinalize;
+        private ConfigEntry<string> finalizePython;
+        private Process finalizeProcess;
         private Harmony harmony;
         private CaptureSlot[] slots;
         private BlockingCollection<FramePacket> writeQueue;
@@ -151,6 +154,8 @@ namespace DSPDreamer.CaptureProbe
             storageCodec = Config.Bind("StoragePrototype", "Codec", "raw", "Throwaway candidates: raw, ffv1, gzip1. Compressed segments require offline verification.");
             storageFfmpeg = Config.Bind("StoragePrototype", "Ffmpeg", @"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe", "FFmpeg executable for FFV1.");
             segmentFrames = Config.Bind("StoragePrototype", "SegmentFrames", 200, "Candidate segment size in accepted frames, not a time contract.");
+            autoFinalize = Config.Bind("StoragePrototype", "AutoFinalize", false, "After FFV1 recording, merge and verify before cleaning this session's temporary segments.");
+            finalizePython = Config.Bind("StoragePrototype", "FinalizePython", @"C:\Users\jay07\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe", "Python executable for the post-recording worker.");
             harmony = new Harmony(PluginGuid);
             harmony.PatchAll(typeof(CaptureProbePlugin).Assembly);
             StartCoroutine(CaptureLoop());
@@ -159,6 +164,15 @@ namespace DSPDreamer.CaptureProbe
 
         private void Update()
         {
+            if (finalizeProcess != null && finalizeProcess.HasExited)
+            {
+                lastMessage = finalizeProcess.ExitCode == 0
+                    ? "合併與驗證完成，已清理暫存分段"
+                    : "合併或清理未完成，資料保留；請查看 .finalizing/error.txt";
+                Logger.LogInfo(lastMessage + ". Output: " + runDirectory);
+                finalizeProcess.Dispose();
+                finalizeProcess = null;
+            }
             if (recording && storageFailed) StopProbe("storage failure");
             if (recording && clock.ElapsedTicks >= nextStorageSample)
             {
@@ -187,7 +201,9 @@ namespace DSPDreamer.CaptureProbe
 
             if (control && Input.GetKeyDown(KeyCode.F8))
             {
-                if (recording || stopping) StopProbe("manual stop"); else StartProbe();
+                if (recording || stopping) StopProbe("manual stop");
+                else if (finalizeProcess != null) lastMessage = "正在合併與驗證，完成後可開始下一次錄製";
+                else StartProbe();
             }
 
             if (control && Input.GetKeyDown(KeyCode.F9))
@@ -782,6 +798,38 @@ namespace DSPDreamer.CaptureProbe
             }
             lastMessage = "完成：" + verdict + "，掉幀率 " + (dropRate * 100.0).ToString("F2", Invariant) + "%";
             Logger.LogInfo(lastMessage + ". Output: " + runDirectory);
+            if (autoFinalize.Value && storageCodec.Value == "ffv1" && !storageFailed && writtenFrames > 0)
+            {
+                try
+                {
+                    string script = Path.Combine(Path.GetDirectoryName(typeof(CaptureProbePlugin).Assembly.Location), "finalizer", "auto_finalize.py");
+                    if (!File.Exists(script) || !File.Exists(finalizePython.Value))
+                        throw new FileNotFoundException("Finalizer script or Python executable missing");
+                    finalizeProcess = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = finalizePython.Value,
+                        Arguments = QuoteProcessArgument(script) + " --run " + QuoteProcessArgument(runDirectory)
+                            + " --ffmpeg " + QuoteProcessArgument(storageFfmpeg.Value),
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = Path.GetDirectoryName(script)
+                    });
+                    lastMessage = "錄製完成，正在合併與驗證，成功後清理暫存分段";
+                    Logger.LogInfo(lastMessage);
+                }
+                catch (Exception ex)
+                {
+                    lastMessage = "無法啟動合併，來源資料已保留";
+                    Logger.LogError(lastMessage + ": " + ex);
+                }
+            }
+        }
+
+        private static string QuoteProcessArgument(string value)
+        {
+            // All arguments are file/directory paths. Quotes cannot occur in Windows paths.
+            if (value.IndexOf('"') >= 0) throw new ArgumentException("Quote in path");
+            return "\"" + value.TrimEnd('\\') + "\"";
         }
 
         private void Abort(string reason)

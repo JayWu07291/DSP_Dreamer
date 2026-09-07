@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('prepare', 'verify', 'benchmark')][string]$Command = 'prepare',
+    [ValidateSet('prepare', 'verify', 'benchmark', 'finalize')][string]$Command = 'prepare',
     [ValidateSet('ffv1', 'gzip1', 'raw')][string]$Codec = 'ffv1',
     [int]$Seconds = 1800,
     [string]$DspRoot = 'E:\Steam\steamapps\common\Dyson Sphere Program',
@@ -17,18 +17,23 @@ if ($Command -eq 'benchmark') {
     if ($LASTEXITCODE -ne 0) { throw 'Benchmark failed' }
     exit
 }
-if ($Command -eq 'verify') {
+if ($Command -eq 'verify' -or $Command -eq 'finalize') {
     if (-not $RunDirectory) {
         $RunDirectory = (Get-ChildItem -LiteralPath $runs -Directory | Sort-Object Name -Descending | Select-Object -First 1).FullName
     }
     if (-not $RunDirectory) { throw 'No lossless run found' }
-    & $Python $tool --ffmpeg $Ffmpeg verify-run --run $RunDirectory
+    if ($Command -eq 'finalize') {
+        & $Python (Join-Path $PSScriptRoot 'auto_finalize.py') --ffmpeg $Ffmpeg --run $RunDirectory
+    } else {
+        & $Python $tool --ffmpeg $Ffmpeg verify-run --run $RunDirectory
+    }
     if ($LASTEXITCODE -ne 0) { throw 'Verification failed' }
     exit
 }
 if (Get-Process -Name DSPGAME -ErrorAction SilentlyContinue) { throw 'Close DSP before preparing a run' }
 if ($Seconds -le 0) { throw 'Seconds must be positive' }
 if ($Codec -eq 'ffv1' -and -not (Test-Path -LiteralPath $Ffmpeg)) { throw 'FFmpeg executable missing' }
+if (-not (Test-Path -LiteralPath $Python)) { throw 'Python executable missing' }
 $project = Join-Path $PSScriptRoot '..\issue-4-recorder\DSPDreamer.CaptureProbe.csproj'
 dotnet build $project --configuration Release "-p:DSPRoot=$DspRoot"
 if ($LASTEXITCODE -ne 0) { throw 'Build failed; deployment skipped' }
@@ -38,6 +43,14 @@ $dll = Join-Path $pluginDirectory 'DSPDreamer.CaptureProbe.dll'
 $config = Join-Path $DspRoot 'BepInEx\config\tw.jaywu.dspdreamer.capture-probe.cfg'
 foreach ($path in @($dll, $config)) {
     if (Test-Path -LiteralPath $path) { Copy-Item -LiteralPath $path -Destination $backup }
+}
+$finalizerDirectory = Join-Path $pluginDirectory 'finalizer'
+if (Test-Path -LiteralPath $finalizerDirectory) {
+    Copy-Item -LiteralPath $finalizerDirectory -Destination (Join-Path $backup 'finalizer') -Recurse
+}
+New-Item -ItemType Directory -Path $finalizerDirectory -Force | Out-Null
+foreach ($workerFile in @('auto_finalize.py', 'merge_prototype.py', 'storage_probe.py')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot $workerFile) -Destination (Join-Path $finalizerDirectory $workerFile) -Force
 }
 $text = if (Test-Path -LiteralPath $config) { Get-Content -LiteralPath $config -Raw } else { "[Probe]`r`n" }
 function Set-ProbeValue([string]$Document, [string]$Key, [string]$Value, [string]$Section) {
@@ -53,7 +66,8 @@ function Set-ProbeValue([string]$Document, [string]$Key, [string]$Value, [string
 }
 foreach ($entry in @(@('CaptureHz','20','Probe'), @('DurationSeconds',[string]$Seconds,'Probe'),
     @('OutputRoot',$runs,'Probe'), @('Codec',$Codec,'StoragePrototype'), @('Ffmpeg',$Ffmpeg,'StoragePrototype'),
-    @('SegmentFrames','200','StoragePrototype'))) {
+    @('SegmentFrames','200','StoragePrototype'), @('AutoFinalize','true','StoragePrototype'),
+    @('FinalizePython',$Python,'StoragePrototype'))) {
     $text = Set-ProbeValue $text $entry[0] $entry[1] $entry[2]
 }
 [IO.File]::WriteAllText($config, $text, [Text.UTF8Encoding]::new($false))
@@ -64,4 +78,5 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\issue-4-recorder\bin\Release
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $backup 'deployment.json') -Encoding utf8
 Write-Host "Prepared $Codec at 20 Hz for $Seconds seconds. Backup: $backup"
 Write-Host 'Start DSP at 1280x720, load a scene, and press Ctrl+F8. Recording stops automatically.'
-Write-Host "After stopping: .\prototypes\issue-11-lossless\probe.ps1 verify"
+Write-Host 'After stopping, FFV1 automatically merges and verifies, then cleans this session temporary files.'
+Write-Host 'If finalization fails, sources remain. Retry with: .\prototypes\issue-11-lossless\probe.ps1 finalize -RunDirectory <run>'

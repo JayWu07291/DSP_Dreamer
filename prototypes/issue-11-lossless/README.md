@@ -4,6 +4,12 @@
 
 ## 目前結果
 
+0.1.17 已加入錄製後自動合併與清理。`prepare` 會部署 Python worker 並開啟 `AutoFinalize`，FFV1 停止且 writer 排空後自動啟動背景程序。先重驗來源，再合併與完整核對，最後發布 manifest，才刪除該次 run 中清單列出且 hash 一致的暫存段、索引及報告。成功後 run 根目錄只剩 `recording.mkv`、`events.ndjson`、`frames.ndjson`、`manifest.json`。合併期間不能開始下一次擷取，遊戲仍可操作；背景解码會使用 CPU 與磁碟。
+
+失敗時查看該 run 的 `.finalizing/error.txt`，來源或已驗證的最終資料會保留。可用 `probe.ps1 finalize -RunDirectory <該次run>` 重試，發布及清理中斷均可續做。此命令會在成功驗證後清理所指定 run 的暫存來源，請勿拿舊實驗原件作額外測試。重複對已完成 run 執行不會改動四個最終檔。未正常寫完 summary 或仍有來源 `.partial` 的錄製交給復原流程，不自動清理。
+
+見[自動流程驗證](evidence/auto-finalize-20260907/review.md)。副本整合測試與部署 worker 測試通過；遊戲內停止時的觸發仍待一次新錄製確認。既有原始實驗錄製未清理。
+
 2026-09-07 已驗證錄製後合併為單一 MKV 與三個文件，見[合併驗證](evidence/merge-20260907/review.md)。執行 `python prototypes/issue-11-lossless/merge_prototype.py --run <已驗證的錄製目錄> --out <新的測試目錄>`，最終四檔在輸出下的 `artifact/`。工具只讀來源，不清理來源分段；`--stop-before-publish` 可測試未發布完成標記的狀態。`merge_checks.py --merged <成功測試目錄> --interrupted <中斷測試目錄> --out <新故障測試目錄>` 建立故障副本並驗證拒絕行為。
 
 見 [RESULTS.md](RESULTS.md) 與 `evidence/`。FFV1 與每幀 gzip 分塊均通過離線逐幀 RGBA 核對；FFV1 長程、raw 對照、RAM 與初始化修正確認已完成。[採用草案](PROPOSAL.md)等待使用者確認。正式錄製器仍需重新驗收。
@@ -16,13 +22,13 @@
 .\prototypes\issue-11-lossless\probe.ps1 prepare -Codec ffv1
 ```
 
-此命令建置 probe 0.1.16，將原 DLL 與設定備份到 `out/deployment-backup-<UTC>/`，設定 20 Hz、1800 秒、每段最多 200 幀，部署到既有 probe 位置。新資料寫入 `BepInEx/plugins/DSPDreamerCaptureProbe/runs-lossless/`，既有 `runs/` 不變。預設使用本機已安裝的 FFmpeg 6.1.1；可用 `-Ffmpeg` 指定另一個 executable，但版本變更需要重測。
+此命令建置 probe 0.1.17，將原 DLL、設定及既有 finalizer 備份到 `out/deployment-backup-<UTC>/`，設定 20 Hz、1800 秒、每段最多 200 幀，部署到既有 probe 位置。新資料寫入 `BepInEx/plugins/DSPDreamerCaptureProbe/runs-lossless/`，既有 `runs/` 不變。預設使用本機已安裝的 FFmpeg 6.1.1；可用 `-Ffmpeg` 指定另一個 executable，但版本變更需要重測。
 
 1. 開啟 DSP，使用 1280×720、60 FPS，載入可操作的場景。
 2. 按 `Ctrl+F8` 開始。錄製會在 30 分鐘後自動停止，期間 probe 狀態面板隱藏。
 3. 過程涵蓋科技樹、背包、合成器與機器面板，文字／游標互動、移動／快速轉動視角、建造與拆除。可自由安排，不要求重新完成全部十六項微任務。記下做過的內容與任何卡頓。
 4. 若需中止，按 `Ctrl+Shift+F11`，或 `Ctrl+F8` 正常停止。短錄製保留，但不能通過 30 分鐘門檻。
-5. 待停止完成後驗證：
+5. FFV1 停止後會自動合併、驗證並清理，等待畫面顯示完成。只有停用 AutoFinalize 或其他 codec 的舊分段流程才手動驗證：
 
 ```powershell
 .\prototypes\issue-11-lossless\probe.ps1 verify
