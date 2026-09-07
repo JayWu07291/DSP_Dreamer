@@ -1,0 +1,50 @@
+{
+  "frames": 35989,
+  "rgba_hashes_match": true,
+  "playback_timestamps_match_20fps": true,
+  "last_pts_seconds": 1799.4,
+  "seek_frame_ordinals": [
+    0,
+    199,
+    200,
+    399,
+    400,
+    18000,
+    18199,
+    18200,
+    18399,
+    35599,
+    35600,
+    35799,
+    35800,
+    35988
+  ],
+  "seek_hashes_match": true,
+  "events_byte_identical": true,
+  "event_records": 193571,
+  "frame_index_roundtrip": true,
+  "remux_seconds": 13.977179199999227,
+  "total_seconds": 96.98463099999935,
+  "source_segments": 180,
+  "source_image_bytes": 9258245010,
+  "output_files": {
+    "recording.mkv": {
+      "bytes": 9258206066,
+      "sha256": "1adbfa82cca1c69d8ccd91a72ca9d65c888d12d3fc9190d5eb9cd845136d465e"
+    },
+    "events.ndjson": {
+      "bytes": 73215967,
+      "sha256": "f5a32ddc167b7baf07ab846af29897306124c56e25459b90d447e7c9caa0bd96"
+    },
+    "frames.ndjson": {
+      "bytes": 23243001,
+      "sha256": "172b96d853f356c571ccfca1efdb4497411efc2780d79c41b3709b605aaefe31"
+    }
+  },
+  "artifact_files": [
+    "events.ndjson",
+    "frames.ndjson",
+    "manifest.json",
+    "recording.mkv"
+  ]
+}

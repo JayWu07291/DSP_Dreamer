@@ -1,0 +1,18 @@
+{
+  "interrupted_publish_rejected": "no completion manifest",
+  "truncated_video_rejected": "short decode at 709",
+  "changed_event_rejected": "checksum mismatch: events.ndjson",
+  "preview_frame_ordinals": [
+    0,
+    199,
+    200,
+    599,
+    600,
+    1197
+  ],
+  "limitations": [
+    "Controlled stop before publication, not OS power loss.",
+    "Cleanup of sources remains unimplemented and untested.",
+    "FFmpeg playback decoding and seek tested, no interactive player UI."
+  ]
+}

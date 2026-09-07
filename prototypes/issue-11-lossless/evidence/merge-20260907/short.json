@@ -1,0 +1,48 @@
+{
+  "frames": 1198,
+  "rgba_hashes_match": true,
+  "playback_timestamps_match_20fps": true,
+  "last_pts_seconds": 59.85,
+  "seek_frame_ordinals": [
+    0,
+    199,
+    200,
+    399,
+    400,
+    599,
+    600,
+    799,
+    800,
+    999,
+    1000,
+    1197
+  ],
+  "seek_hashes_match": true,
+  "events_byte_identical": true,
+  "event_records": 6131,
+  "frame_index_roundtrip": true,
+  "remux_seconds": 0.4091006999988167,
+  "total_seconds": 4.098460999997769,
+  "source_segments": 6,
+  "source_image_bytes": 282693391,
+  "output_files": {
+    "recording.mkv": {
+      "bytes": 282689841,
+      "sha256": "af2fe6a2447fa3f73c037f637483b522844c0b30730da8117f6dbe4fe6f29965"
+    },
+    "events.ndjson": {
+      "bytes": 2287844,
+      "sha256": "683603a3f2f541e6b8e87a65ae5eb03ad07eb1cf1ddaf4bd6cc98d662c7a7758"
+    },
+    "frames.ndjson": {
+      "bytes": 784631,
+      "sha256": "17b9f4878f98f23e03451c531e59ea71d43376bd3f189dc29260d45cdfa2b694"
+    }
+  },
+  "artifact_files": [
+    "events.ndjson",
+    "frames.ndjson",
+    "manifest.json",
+    "recording.mkv"
+  ]
+}
