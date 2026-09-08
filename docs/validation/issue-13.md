@@ -28,3 +28,20 @@
 下一步請啟動 DSP、載入基準場景，再按一次 F8。將 `runs/live/runtime-candidate.json` 與已安裝的二進位檔案及設定逐一核對，只核准相符的指紋。接著錄製至少 15 秒，涵蓋 UI 操作、游標移動與 Digit1。核對新產生的四檔錄製證據、資料集讀回、輸出檔案校驗碼與遊戲紀錄，並將該次結果補入本報告後，才能宣稱此 Issue 已完成。
 
 完整的連續回合生命週期、終止觀測、故障恢復與清理留待後續工作票處理。目前編譯器保留錄製事件與實際動作；任務與 reward 標籤，以及 10 Hz 模型視圖，尚未包含在這次初步整合中。
+
+## 2026-09-09：F8 指紋檢查的空路徑修正
+
+使用者首次按 F8 時，`Runtime()` 呼叫 `HashFile(assembly.Location)`，發生 `ArgumentException: Path is empty`。BepInEx 紀錄顯示 `UnityEngine.CoreModule` 經過啟動修補；[BepInEx 5.4.23.5 原始碼](https://github.com/BepInEx/BepInEx/blob/v5.4.23.5/BepInEx.Preloader/Patching/AssemblyPatcher.cs)會將修補後的組件載入記憶體。[Microsoft 文件](https://learn.microsoft.com/en-us/dotnet/api/system.reflection.assembly.location?view=netframework-4.8.1)說明，從位元組陣列載入的組件，其 `Assembly.Location` 為空字串。
+
+已用 `Assembly.Load(byte[])` 重現同一空路徑錯誤。修正後，所有組件指紋都經由 `HashAssembly`：有 `Location` 時沿用原路徑，沒有時使用 BepInEx 提供的 Managed／core 目錄或插件的 `Info.Location`。讀取前核對來源的組件完整身分；缺檔、身分不符或未知遊戲雜湊仍然拒絕。指紋代表磁碟來源檔案，不宣稱是執行中已修補程式碼的雜湊。
+
+可重跑的檢查：
+
+```powershell
+dotnet build tests/RuntimeFingerprint/RuntimeFingerprint.csproj
+& tests/RuntimeFingerprint/bin/Debug/net472/RuntimeFingerprint.exe 'E:\Steam\steamapps\common\Dyson Sphere Program\DSPGAME_Data\Managed\UnityEngine.CoreModule.dll'
+```
+
+結果：記憶體載入、磁碟載入、缺檔拒絕、身分不符拒絕，以及實際 `UnityEngine.CoreModule.dll` 的來源雜湊檢查皆通過。Release net472 建置零警告、零錯誤。修正版 DLL SHA-256 為 `3fa74e054c3d890e6299fe43e87829454b70e8e043b5826c78ed1932d09aee9a`。
+
+最初的重現程式未捕捉例外，曾彈出 Windows 應用程式錯誤視窗；測試入口已改為捕捉例外、輸出原因並回傳非零結束碼。遊戲內 F8 及新的實機錄製仍待重試，不能以這次離線檢查宣稱實機驗收通過。

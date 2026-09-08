@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -22,6 +23,15 @@ namespace DSPDreamer.Recorder
         {
             using (var stream = File.OpenRead(path))
             using (var hash = SHA256.Create()) return Hex(hash.ComputeHash(stream));
+        }
+        internal static string HashAssembly(Assembly assembly, string sourcePath)
+        {
+            // BepInEx 修補後從記憶體載入的組件沒有 Location；指紋記錄其磁碟來源。
+            string path = string.IsNullOrEmpty(assembly.Location) ? sourcePath : assembly.Location;
+            if (string.IsNullOrEmpty(path)) throw new IOException("找不到組件來源：" + assembly.FullName);
+            if (AssemblyName.GetAssemblyName(path).FullName != assembly.FullName)
+                throw new IOException("組件來源身分不符：" + path);
+            return HashFile(path);
         }
         internal static string Hash(byte[] bytes)
         {

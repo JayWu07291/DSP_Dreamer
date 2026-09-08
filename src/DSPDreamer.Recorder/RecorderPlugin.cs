@@ -67,7 +67,13 @@ namespace DSPDreamer.Recorder
             foreach (var assembly in new[] { typeof(GameMain).Assembly, typeof(BaseUnityPlugin).Assembly,
                      typeof(Harmony).Assembly, typeof(RecorderPlugin).Assembly, typeof(Input).Assembly,
                      typeof(ScreenCapture).Assembly, typeof(RenderTexture).Assembly })
-                hashes[assembly.GetName().Name] = SegmentWriter.HashFile(assembly.Location);
+            {
+                string name = assembly.GetName().Name;
+                string sourcePath = assembly == typeof(RecorderPlugin).Assembly ? Info.Location :
+                    Path.Combine(assembly == typeof(BaseUnityPlugin).Assembly || assembly == typeof(Harmony).Assembly
+                        ? Paths.BepInExAssemblyDirectory : Paths.ManagedPath, name + ".dll");
+                hashes[name] = SegmentWriter.HashAssembly(assembly, sourcePath);
+            }
             hashes["UnityPlayer"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "UnityPlayer.dll"));
             hashes["DSPGAME"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "DSPGAME.exe"));
             if ((string)hashes["Assembly-CSharp"] != "ae0ba95f75bd879a62aa4ce253b2ab78eaa4fb3c7c595f5e1fee75ebe0e0ef85")
