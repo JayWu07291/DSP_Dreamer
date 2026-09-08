@@ -42,6 +42,8 @@ dotnet build tests/RuntimeFingerprint/RuntimeFingerprint.csproj
 & tests/RuntimeFingerprint/bin/Debug/net472/RuntimeFingerprint.exe 'E:\Steam\steamapps\common\Dyson Sphere Program\DSPGAME_Data\Managed\UnityEngine.CoreModule.dll'
 ```
 
-結果：記憶體載入、磁碟載入、缺檔拒絕、身分不符拒絕，以及實際 `UnityEngine.CoreModule.dll` 的來源雜湊檢查皆通過。Release net472 建置零警告、零錯誤。修正版 DLL SHA-256 為 `3fa74e054c3d890e6299fe43e87829454b70e8e043b5826c78ed1932d09aee9a`。
+結果：記憶體載入、磁碟載入、缺檔拒絕、身分不符拒絕，以及實際 `UnityEngine.CoreModule.dll` 的來源雜湊檢查皆通過。13 項整合測試全部通過，耗時 22.93 秒；Release net472 建置零警告、零錯誤。獨立的規範與規格審查均未發現新增待修正項目。
+
+修正提交為 `49c947a`，已重新建置並部署，備份位於 `runs/deployment-20260909-004010`。已部署 DLL SHA-256 為 `ac59770ed9790d123f92cd052e79f458a89468a7752cba3499a6fc5e98a1f88b`，指紋設定仍未核准。
 
 最初的重現程式未捕捉例外，曾彈出 Windows 應用程式錯誤視窗；測試入口已改為捕捉例外、輸出原因並回傳非零結束碼。遊戲內 F8 及新的實機錄製仍待重試，不能以這次離線檢查宣稱實機驗收通過。
