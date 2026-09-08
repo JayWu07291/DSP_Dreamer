@@ -1,0 +1,83 @@
+{
+  "source": "runs\\live\\340fc115-9fc7-4721-b336-4b0fd818bb84.source",
+  "artifact_id": "7651fef7-16ff-427e-ab9a-b37594c82b46",
+  "frame_count": 1066,
+  "event_count": 3232,
+  "input_samples": 3226,
+  "transition_count": 1065,
+  "duration_seconds": 53.3445754,
+  "segments": {
+    "segment-000000.mkv": 200,
+    "segment-000001.mkv": 200,
+    "segment-000002.mkv": 200,
+    "segment-000003.mkv": 200,
+    "segment-000004.mkv": 200,
+    "segment-000005.mkv": 66
+  },
+  "valid_transitions": 1062,
+  "gap_events": [
+    {
+      "game_tick": 623,
+      "gap_end_ticks": 569399413,
+      "gap_start_ticks": 568545782,
+      "missed": 1,
+      "reason": "scheduler",
+      "sequence_number": 247,
+      "ticks": 569399552,
+      "type": "gap",
+      "unity_frame": 2345
+    },
+    {
+      "game_tick": 3352,
+      "gap_end_ticks": 1024069817,
+      "gap_start_ticks": 1023545782,
+      "missed": 1,
+      "reason": "scheduler",
+      "sequence_number": 3882,
+      "ticks": 1024069887,
+      "type": "gap",
+      "unity_frame": 5069
+    }
+  ],
+  "down_counts": {
+    "MouseRight": 5,
+    "T": 1,
+    "MouseLeft": 39,
+    "Escape": 5,
+    "W": 4,
+    "C": 3,
+    "LeftControl": 1,
+    "F": 1,
+    "D": 3,
+    "A": 4,
+    "MouseMiddle": 3,
+    "S": 1,
+    "Digit2": 1,
+    "LeftShift": 1,
+    "Digit1": 1,
+    "F8": 1
+  },
+  "cursor_visible_frames": 1066,
+  "file_checksums": {
+    "events.ndjson": {
+      "bytes": 926758,
+      "sha256": "ec251e1d5167b391fdc4e758f887122ab1b6e5102b3c0f6182df2fcacddf11e9"
+    },
+    "frames.ndjson": {
+      "bytes": 347694,
+      "sha256": "b48331580f9b47511360df8ebf86e1c44c2bd775db9355850994ab121b41c071"
+    },
+    "recording.mkv": {
+      "bytes": 256706223,
+      "sha256": "9a2e6358420eb9c8a4bd5e43ccb41d88926f706b42e3f1f91d58b407c2e88065"
+    }
+  },
+  "source_verified": true,
+  "final_rgba_verified": true,
+  "compiled_rgb_verified": true,
+  "actual_action_refs_and_sums_verified": true,
+  "completed": {
+    "bytes": 143438,
+    "sha256": "203abb65347e6a037b6f965c2039ab11f502d1956d170e8936b04f5d197fcbb3"
+  }
+}
