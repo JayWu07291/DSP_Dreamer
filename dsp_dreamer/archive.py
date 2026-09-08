@@ -56,7 +56,6 @@ def validate_indices(frames, events):
         require(segment == f"segment-{ordinal // 200:06}.mkv", "Invalid cross-segment index")
         require(frame["segment_ordinal"] == ordinal % 200, "Invalid segment ordinal")
         identities.append(frame["sequence_number"])
-    previous = (-1, -1)
     for event in events:
         for name in ("ticks", "sequence_number"):
             require(type(event.get(name)) is int and event[name] >= 0, f"Invalid event {name}")
@@ -73,9 +72,10 @@ def validate_indices(frames, events):
             require(all(type(x) in (float, int) and math.isfinite(x) for x in values), "Invalid input number")
         if event["type"] == "gap":
             require(event.get("reason") in ("scheduler", "no_free_buffer", "gpu_readback_error", "writer_backpressure"), "Unknown gap reason")
-        key = event["ticks"], event["sequence_number"]
-        require(key > previous, "Events not ordered by ticks and sequence_number")
-        previous = key
+            if event["reason"] == "scheduler":
+                require(type(event.get("gap_start_ticks")) is int and type(event.get("gap_end_ticks")) is int,
+                        "Missing scheduler gap range")
+                require(0 <= event["gap_start_ticks"] < event["gap_end_ticks"] <= event["ticks"], "Invalid gap range")
         identities.append(event["sequence_number"])
     require(len(set(identities)) == len(identities) and all(x >= 0 for x in identities), "Duplicate sequence identity")
 

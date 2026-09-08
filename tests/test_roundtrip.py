@@ -126,3 +126,33 @@ def test_unknown_event_is_refused_at_publication(tmp_path):
             recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
     with pytest.raises(InvalidRecording, match="event"):
         recording.publish(tmp_path / "evidence")
+
+
+def test_scheduler_gap_invalidates_preceding_interval_only(tmp_path):
+    with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
+        recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        for ticks in (50, 150, 200):
+            request = recording.request(ticks, unity_frame=ticks, game_tick=ticks)
+            recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
+            if ticks == 150:
+                recording.gap(151, "scheduler", gap_start_ticks=100, gap_end_ticks=150)
+    evidence = recording.publish(tmp_path / "evidence")
+    compile_recording(evidence, tmp_path / "dataset", FFMPEG)
+    dataset = open_dataset(tmp_path / "dataset")
+    assert dataset[0]["valid"] is False
+    assert dataset[1]["valid"] is True
+
+
+def test_compiler_sorts_actual_input_by_ticks_then_sequence(tmp_path):
+    with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
+        recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        recording.input(100, held=[], down=[], up=[], delta=[2, 0], wheel=0)
+        recording.input(50, held=[], down=[], up=[], delta=[1, 0], wheel=0)
+        for ticks in (50, 100, 150):
+            request = recording.request(ticks, unity_frame=ticks, game_tick=ticks)
+            recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
+    evidence = recording.publish(tmp_path / "evidence")
+    compile_recording(evidence, tmp_path / "dataset", FFMPEG)
+    dataset = open_dataset(tmp_path / "dataset")
+    assert dataset[0]["action"]["delta"] == [1, 0]
+    assert dataset[1]["action"]["delta"] == [2, 0]

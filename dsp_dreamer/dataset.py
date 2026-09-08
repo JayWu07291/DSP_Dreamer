@@ -15,6 +15,11 @@ from .contract import CATALOG, CONTROLS, atomic_save, file_info, load, require, 
 from .video import decode
 
 
+def observation_contract(count):
+    return dict(dtype="uint8", shape=[count, 360, 640, 3], chunks=[1, 360, 640, 3],
+                shards=None, codec="blosc/zstd", zarr_format=3)
+
+
 def aggregate(samples, start, end, initial):
     held = set(initial)
     start_held = sorted(held)
@@ -57,6 +62,8 @@ def aggregate(samples, start, end, initial):
 def compile_recording(source, destination, ffmpeg):
     source, destination = Path(source), Path(destination)
     manifest, frames, events = verify_recording(source, ffmpeg)
+    events.sort(key=lambda event: (event["ticks"], event["sequence_number"]))
+    scheduler_gaps = [e for e in events if e["type"] == "gap" and e["reason"] == "scheduler"]
     destination.mkdir(parents=True, exist_ok=False)
     group = zarr.open_group(str(destination / "observations.zarr"), mode="w", zarr_format=3)
     rgb = group.create_array("rgb", shape=(len(frames), 360, 640, 3), chunks=(1, 360, 640, 3),
@@ -83,7 +90,9 @@ def compile_recording(source, destination, ffmpeg):
         samples = [event for event in interval if event["type"] == "input"]
         action = aggregate(samples, start, end, held)
         held = action["end_held"]
-        gap = second["capture_id"] != first["capture_id"] + 1 or any(e["type"] == "gap" for e in interval)
+        gap = second["capture_id"] != first["capture_id"] + 1 or any(
+            e["type"] == "gap" and e["reason"] != "scheduler" for e in interval)
+        gap |= any(e["gap_start_ticks"] < end and e["gap_end_ticks"] > start for e in scheduler_gaps)
         invalid_input = any(not s.get("focused", True) for s in samples)
         rows.append(dict(observation_index=index, next_observation_index=index + 1,
                          requested_ticks=start, next_requested_ticks=end, capture_id=first["capture_id"],
@@ -102,8 +111,7 @@ def compile_recording(source, destination, ffmpeg):
                     source_artifact_id=manifest["artifact_id"], source_manifest=file_info(source / "manifest.json"),
                     source_kind=manifest["source_kind"], episode_id=manifest["episode_id"],
                     ticks_frequency=manifest["ticks_frequency"], frame_count=len(frames), rgb_sha256=rgb_hashes,
-                    observation=dict(dtype="uint8", shape=[len(frames), 360, 640, 3], chunks=[1, 360, 640, 3],
-                                     shards=None, codec="blosc/zstd", zarr_format=3),
+                    observation=observation_contract(len(frames)),
                     table=dict(compression="zstd", row_group_size=1024),
                     tools=dict(compiler="0.1.0", zarr=zarr.__version__, pyarrow=pa.__version__, numpy=np.__version__))
     save(destination / "dataset.json", metadata)
@@ -132,8 +140,7 @@ class Dataset:
         self.metadata = load(self.path / "dataset.json")
         require(self.metadata["schema"] == "dsp-transitions/1" and self.metadata["catalog"] == CATALOG,
                 "Unknown dataset schema/catalog")
-        require(self.metadata["observation"] == dict(dtype="uint8", shape=[self.metadata["frame_count"], 360, 640, 3],
-                    chunks=[1, 360, 640, 3], shards=None, codec="blosc/zstd", zarr_format=3), "Unknown observation codec/layout")
+        require(self.metadata["observation"] == observation_contract(self.metadata["frame_count"]), "Unknown observation codec/layout")
         group = zarr.open_group(str(self.path / "observations.zarr"), mode="r")
         self.rgb = group["rgb"]
         assert isinstance(self.rgb, zarr.Array)

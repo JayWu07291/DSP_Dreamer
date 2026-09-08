@@ -31,6 +31,7 @@ namespace DSPDreamer.Recorder
         private bool stopping;
         private long sequence, capture, nextDue, startTicks;
         private int pending;
+        private int lastInputFrame = -1;
         private string source;
         private Dictionary<string, object> metadata;
         private GameHistoryData history;
@@ -109,13 +110,13 @@ namespace DSPDreamer.Recorder
             foreach (var slot in slots) { slot.Full.Create(); slot.Small.Create(); }
             storage = new SegmentWriter(source, ffmpeg.Value);
             sequence = capture = 0;
+            lastInputFrame = -1;
             failed = drained = stopping = false;
             startTicks = nextDue = Stopwatch.GetTimestamp();
             writer = new Thread(Write) { IsBackground = true, Name = "DSP recording writer" };
             writer.Start();
             active = true;
             BindWorld();
-            RecordInput();
             Logger.LogInfo("Recording started: " + source);
         }
 
@@ -137,7 +138,8 @@ namespace DSPDreamer.Recorder
 
         internal void RecordInput()
         {
-            if (!active) return;
+            if (!active || lastInputFrame == Time.frameCount) return;
+            lastInputFrame = Time.frameCount;
             Func<KeyCode, string> name = key => key == KeyCode.Alpha1 ? "Digit1" : key == KeyCode.Alpha2 ? "Digit2" :
                 key == KeyCode.Mouse0 ? "MouseLeft" : key == KeyCode.Mouse1 ? "MouseRight" : key == KeyCode.Mouse2 ? "MouseMiddle" : key.ToString();
             Emit("input", Json.Fields("held", Keys.Where(Input.GetKey).Select(name).ToArray(),
@@ -155,10 +157,12 @@ namespace DSPDreamer.Recorder
             {
                 yield return end;
                 if (!active) continue;
+                if (lastInputFrame != Time.frameCount) continue;
                 long now = Stopwatch.GetTimestamp();
                 if (now < nextDue) continue;
                 long period = Stopwatch.Frequency / 20;
-                if (now >= nextDue + period) Emit("gap", Json.Fields("reason", "scheduler", "missed", (now - nextDue) / period));
+                if (now >= nextDue + period) Emit("gap", Json.Fields("reason", "scheduler", "missed", (now - nextDue) / period,
+                    "gap_start_ticks", nextDue, "gap_end_ticks", now));
                 nextDue += ((now - nextDue) / period + 1) * period;
                 Slot slot = slots.FirstOrDefault(s => Interlocked.CompareExchange(ref s.Busy, 1, 0) == 0);
                 if (slot == null) { Emit("gap", Json.Fields("reason", "no_free_buffer")); continue; }

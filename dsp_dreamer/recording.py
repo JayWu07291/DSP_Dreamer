@@ -37,6 +37,9 @@ class Recording:
     def event(self, ticks, name, **fields):
         self.events.append(dict(self.identity(ticks), type="game_event", name=name, **fields))
 
+    def gap(self, ticks, reason, **fields):
+        self.events.append(dict(self.identity(ticks), type="gap", reason=reason, **fields))
+
     def request(self, ticks, unity_frame, game_tick):
         require(not self.closed and self.next_capture - self.next_write < 12, "Capture buffers exhausted")
         request = dict(self.identity(ticks), requested_ticks=ticks, capture_id=self.next_capture,
