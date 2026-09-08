@@ -1,30 +1,30 @@
-# Issue 13 validation
+# Issue #13 驗證報告
 
-Status on 2026-09-08: implementation and synthetic integration checks pass. Fresh live acceptance remains pending. Issue #13 must remain open until that evidence is verified.
+2026-09-08 狀態：實作已完成，合成資料的整合驗證通過。新的實機錄製仍待驗收；在該份證據通過驗證前，Issue #13 必須保持開啟。
 
-## Automated checks
+## 自動化檢查
 
-- Full public-interface suite: 13 passed in 20.47 seconds.
-- Python type checking: no issues in seven source files.
-- Release net472 build: zero warnings and zero errors.
-- Deployed DLL SHA-256: `7f705deb9624457036cefba8f4717ff574bbbafe0412a322c8439058cb5d73f9`.
+- 公開介面的完整測試套件：13 項通過，耗時 20.47 秒。
+- Python 型別檢查：七個原始碼檔案均無問題。
+- Release net472 建置：零警告、零錯誤。
+- 已部署 DLL 的 SHA-256：`7f705deb9624457036cefba8f4717ff574bbbafe0412a322c8439058cb5d73f9`。
 
-The suite exercises request identity under reversed callbacks, adjacent RGB and actual-action readback, a 205-frame recording with a five-frame tail, nonconstant alpha, both sides of the segment boundary, missing files, corrupted evidence and tables, unknown fingerprints/events, same-tick sequence ordering, half-open boundary events, and scheduler-gap attribution.
+測試涵蓋回呼逆序時的擷取要求身分、相鄰 RGB 觀測與實際動作讀回、205 幀錄製及其五幀尾段、非固定 alpha、段邊界兩側讀取、缺檔、錄製證據與表格損毀、未知指紋與事件、相同 tick 的序號定序、半開區間邊界事件，以及排程漏幀的區間歸屬。
 
-## Standards review
+## 程式規範審查
 
-The independent standards reviewer found no documented-standard violations. A duplicated observation-layout definition was extracted into `observation_contract`. The reviewer also identified scheduler-gap attribution to the wrong interval; explicit affected-time ranges and a regression test resolve it. Follow-up review confirmed both fixes.
+獨立的規範審查未發現違反既有書面規範的項目。重複的觀測儲存配置定義已抽出為 `observation_contract`。審查也發現排程漏幀被歸入錯誤區間；目前已明確記錄受影響的時間範圍，並加入迴歸測試。後續複查確認兩項修正皆已完成。
 
-## Spec review
+## 規格符合性審查
 
-The independent spec reviewer identified duplicate or stale startup input sampling and missing stable event sorting. The plugin now records input only once per completed `VFInput.OnUpdate` frame and waits for that sample before capture. The compiler stably sorts ticks and sequence numbers while preserving evidence bytes. Follow-up review confirmed the fixes and reported no additional actionable findings in those changes.
+獨立的規格審查發現啟動時可能重複取樣輸入或讀到舊輸入，且缺少事件的穩定排序。插件現在只在每個完成 `VFInput.OnUpdate` 的畫面幀記錄一次輸入，並等待該次取樣後才擷取畫面。編譯器依 ticks 與 sequence number 穩定排序，同時保留錄製證據的原始位元組。後續複查確認修正有效，且未在這些變更中發現其他待修正項目。
 
-Remaining spec finding: no new live recording has yet exercised this C# plugin. Synthetic passing results do not establish full UI/cursor capture, actual game-input correspondence or successful Unity stop-to-worker integration.
+尚未完成的規格驗收：目前沒有使用這個 C# 插件完成新的實機錄製。合成測試通過，不能證明完整 UI 與游標擷取、遊戲實際輸入對應，或 Unity 停止錄製後銜接背景處理程序的流程已通過驗證。
 
-## Live handoff
+## 實機驗證交接
 
-The reviewed Release DLL and config are deployed under the installed game's BepInEx directory. The deployment backup directory is `runs/deployment-20260908-090825`. The config starts with no approved runtime fingerprint, so F8 first emits a candidate and refuses recording.
+已審查的 Release DLL 與設定檔已部署至遊戲安裝位置的 BepInEx 目錄。部署備份位於 `runs/deployment-20260908-090825`。初始設定未核准任何執行環境指紋，因此第一次按 F8 只會產生候選指紋，並拒絕開始錄製。
 
-Next, start DSP, load the baseline and press F8 once. Inspect `runs/live/runtime-candidate.json` against the installed binaries and settings, approve only the matching fingerprint, then record at least 15 seconds with UI, cursor motion and Digit1. Verify the new four-file evidence, dataset readback, output checksums and game log. Save that run's results here before claiming issue completion.
+下一步請啟動 DSP、載入基準場景，再按一次 F8。將 `runs/live/runtime-candidate.json` 與已安裝的二進位檔案及設定逐一核對，只核准相符的指紋。接著錄製至少 15 秒，涵蓋 UI 操作、游標移動與 Digit1。核對新產生的四檔錄製證據、資料集讀回、輸出檔案校驗碼與遊戲紀錄，並將該次結果補入本報告後，才能宣稱此 Issue 已完成。
 
-Full episode lifecycle, terminal observations, recovery and cleanup remain for later tickets. The current compiler preserves recording events and actual actions; task/reward labels and the 10 Hz model view are not implemented by this first integration slice.
+完整的連續回合生命週期、終止觀測、故障恢復與清理留待後續工作票處理。目前編譯器保留錄製事件與實際動作；任務與 reward 標籤，以及 10 Hz 模型視圖，尚未包含在這次初步整合中。
