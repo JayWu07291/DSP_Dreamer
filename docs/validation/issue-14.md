@@ -1,6 +1,6 @@
 # Issue #14 生命週期驗證
 
-狀態：程式與離線整合已實作；同一工作階段的實機重試、科技與工廠事件重綁仍待驗證。既有單回合證據不代表 #14 全部驗收通過。
+2026-09-09 最新狀態：程式、離線整合及使用者操作的同工作階段實機重試驗證通過，科技與工廠事件重綁已有新證據。以下保留早期單回合結果與後續驗證；短流程不替代完整 30 分鐘資源品質門檻。
 
 ## 契約與實作
 
@@ -56,7 +56,7 @@
 
 已修正控制釋放拋錯阻斷清理、晚到 callback 誤判 final、未知控制後的範圍、fatal fault 漏記結束、首次重載失敗的清理、錯誤原因混用，以及 live trial 缺必要欄位未拒絕等問題。獨立複查確認最後三項修正通過，未發現仍有重大缺口；實機重綁保持待驗證。
 
-審查收尾：Standards 0 項待修；Spec 已指出問題均修正，實機驗收尚未完成。
+審查收尾：Standards 0 項待修；Spec 已指出問題均修正，後續實機重綁結果見文末。
 
 ## 使用者實機操作
 
@@ -70,3 +70,35 @@
 4. 第二次操作結束後按 F8，等待背景處理完成再退出遊戲，回報「實機重試完成」。agent 會讀取 LogOutput 與新產物，核對 IDs、trial、邊界、事件及 dataset。
 
 本次短流程驗證生命週期及事件重綁；完整 30 分鐘資源／掉幀品質門檻仍須依正式整合驗收另測。
+
+## 2026-09-09：使用者實機重試驗證通過
+
+使用者自行完成兩次電磁學研究、建造及拆除，中間以 F9 重試、最後 F8 停止；此階段沒有使用 Computer Use。候選指紋經九個二進位及輸入設定核對後核准，SHA-256 為 `f0aa3c24fd3b92394c987d9951888a8cd7cbe7ab439b7db154a952c82ce7310a`。
+
+新來源為 `runs/live/d41c9b63-468c-4d52-bc46-069278daa15c.source`，同名 `.source.evidence` 與 `.source.dataset` 已產生。使用 `tmp/verify-issue14-live.py` 呼叫正式 `verify_recording` 與 `open_dataset`，完成影片全幀解碼、RGBA／檔案 checksum、RGB chunks 讀回、來源身分與 sequence 邊界斷言，退出碼 0。
+
+| 項目 | 第一次回合 | F9 重試後 |
+| --- | --- | --- |
+| attempt_id | `289f18f3-418d-442a-b4e8-0d569c47d835` | `1abcda08-94bb-4860-b33b-2e3214172eb6` |
+| episode_id | `97ba2e48-cd1f-4359-b5cb-84d9f1f4bb1c` | `f4d0a5a5-3e6c-4cb5-b21c-592d6a74b893` |
+| world_binding | 3 | 4 |
+| 幀數 | 1,208 | 1,356 |
+| 回合秒數 | 60.438123 | 67.7844409 |
+| world_ready 至起點 | 35.3825 ms | 33.9636 ms |
+| 科技／建造／拆除事件 | 1／2／2 | 1／2／2 |
+| 結束原因 | reset | stopped |
+| final capture_id | 1207 | 2563 |
+
+兩回合共享 session `9ff0496d-adef-4ced-9b71-f4b4da944e12`、trial manifest／split group `bec428373a7da8bf99c5a69cb730c84a3e5aa88ea62d693ce857793aa652f824`。基準 hash、三個 seeds 與偏航值均保持原樣。每個世界只有一次 world_ready、擾動、episode_started 與 episode_ended；兩次科技均為 `tech_id=1001`、`direct=false`，建造／拆除的 proto_id 均為 2301 與 2203，沒有重複訂閱造成的重複事件。
+
+總計 2,564 幀、8,159 事件、2,563 轉移，其中 2,555 筆合法，合法 64-step 起點為 2,240 個。跨回合 row 1207 無效；兩個 final 尾轉移皆無效且 bootstrap=0，因為此次是人工 reset／stop，不是任務 success。合法前綴仍可使用，全部 sequence 起點不跨 episode 或 gap。
+
+九次 release_all 回傳成功。記錄到兩個 scheduler gap，沒有 no_free_buffer、GPU readback error 或 writer backpressure 事件；這是短流程計數，沒有據此宣稱長程品質 gate 通過。LogOutput 保留於 `runs/live/issue14-LogOutput.log`，包含首次未核准指紋的預期拒絕及既有 numcodecs 棄用警告；資料完成以實際檔案驗證為準。
+
+| 證據檔 | SHA-256 |
+| --- | --- |
+| evidence/manifest.json | `9e5c4450bad137e4394005e107a73a7dedb7517cc15fd8592914a69099b476e4` |
+| evidence/recording.mkv | `15d730020f76dfa7159653fcbad01e8310863b88c8446854bff2f90a0b623b53` |
+| evidence/frames.ndjson | `c30b11365c739750d6ee326263165656c6cf9f3593f43044a95ae1f255e0b228` |
+| evidence/events.ndjson | `f5ea8ccbe84b3004e5cac441ea64e9070cd799df037d89a87371eadcce7868c6` |
+| dataset/dataset.json | `53ed1c7a9801c1f00163bdb624386957bf257c151ca9b01be0b996f87034955a` |
