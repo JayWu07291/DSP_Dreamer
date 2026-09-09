@@ -25,6 +25,26 @@ class Recording:
         self.sequence = self.next_capture = self.next_write = self.segment = 0
         self.encoder: Encoder | None = Encoder(ffmpeg, self.path / "segment-000000.mkv")
         self.closed = False
+        self.episode = None
+
+    def begin_attempt(self, manifest):
+        require(not self.pending, "Pending observations from previous attempt")
+        require(self.episode is None or self.episode["end_ticks"] is not None, "Episode still running")
+        if "trial_manifest" in self.metadata:
+            require(manifest == self.metadata["trial_manifest"], "Trial manifest changed during session")
+        self.metadata.update(lifecycle_version=1, trial_manifest=manifest.copy())
+        self.episode = dict(episode_id=str(uuid.uuid4()), attempt_id=str(uuid.uuid4()), start_ticks=None,
+                            end_ticks=None, final_capture_id=None, episode_outcome=None,
+                            validity_status="incomplete", validity_reasons=[])
+        self.metadata.setdefault("episodes", []).append(self.episode)
+        if len(self.metadata["episodes"]) == 1:
+            self.metadata.update(episode_id=self.episode["episode_id"], attempt_id=self.episode["attempt_id"])
+
+    def end_episode(self, ticks, outcome=None, reason=None):
+        require(self.episode is not None and self.episode["end_ticks"] is None, "No active episode")
+        assert self.episode is not None
+        self.episode.update(end_ticks=ticks, episode_outcome=outcome,
+                            validity_reasons=[reason] if reason else [])
 
     def identity(self, ticks):
         result = dict(ticks=ticks, sequence_number=self.sequence)
@@ -44,6 +64,9 @@ class Recording:
         require(not self.closed and self.next_capture - self.next_write < 12, "Capture buffers exhausted")
         request = dict(self.identity(ticks), requested_ticks=ticks, capture_id=self.next_capture,
                        unity_frame=unity_frame, game_tick=game_tick, cursor={"visible": False})
+        if self.episode is not None:
+            require(self.episode["final_capture_id"] is None, "Episode already has final observation")
+            request.update(episode_id=self.episode["episode_id"], attempt_id=self.episode["attempt_id"])
         self.next_capture += 1
         self.pending[request["capture_id"]] = [request.copy(), None]
         return request
@@ -63,6 +86,12 @@ class Recording:
             frame.update(ordinal=self.next_write, segment=f"segment-{self.segment:06}.mkv",
                          segment_ordinal=self.next_write % 200, rgba_sha256=sha(data))
             self.frames.append(frame)
+            if self.episode is not None:
+                if self.episode["start_ticks"] is None:
+                    self.episode["start_ticks"] = frame["requested_ticks"]
+                if self.episode["end_ticks"] is not None and frame["requested_ticks"] >= self.episode["end_ticks"]:
+                    self.episode["final_capture_id"] = frame["capture_id"]
+                    self.episode["validity_status"] = "invalid" if self.episode["validity_reasons"] else "valid"
             self.next_write += 1
             if self.next_write % 200 == 0:
                 self.encoder.close()

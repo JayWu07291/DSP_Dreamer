@@ -10,6 +10,7 @@ import math
 from .contract import (CATALOG, ENCODE, FFMPEG_SHA, SCHEMA, atomic_save, file_info,
                        load, records, require, sha)
 from .video import check_ffmpeg, decode, run
+from .lifecycle import validate_lifecycle
 
 
 def validate_metadata(metadata):
@@ -61,7 +62,8 @@ def validate_indices(frames, events):
             require(type(event.get(name)) is int and event[name] >= 0, f"Invalid event {name}")
         require(event["type"] in ("input", "game_event", "gap", "control_request"), "Unknown event type")
         if event["type"] == "game_event":
-            require(event.get("name") in ("tech_unlocked", "factory_build", "factory_dismantled", "recording_stopped"), "Unknown game event")
+            require(event.get("name") in ("tech_unlocked", "factory_build", "factory_dismantled", "recording_stopped",
+                    "world_ready", "perturbation_applied", "episode_started", "episode_ended"), "Unknown game event")
         if event["type"] == "input":
             for field in ("held", "down", "up"):
                 keys = event.get(field)
@@ -102,6 +104,7 @@ def verify_recording(path, ffmpeg):
         require(file_info(path / name) == info, f"File checksum mismatch: {name}")
     frames, events = list(records(path / "frames.ndjson")), list(records(path / "events.ndjson"))
     validate_indices(frames, events)
+    validate_lifecycle(manifest, frames)
     require(len(frames) == manifest["frame_count"] and len(events) == manifest["event_count"], "Count mismatch")
     verify_video(ffmpeg, path / "recording.mkv", frames)
     return manifest, frames, events
@@ -114,6 +117,7 @@ def publish(source, destination, ffmpeg):
     validate_metadata(metadata)
     frames, events = list(records(source / "frames.ndjson")), list(records(source / "events.ndjson"))
     validate_indices(frames, events)
+    validate_lifecycle(metadata, frames)
     segments = list(dict.fromkeys(frame["segment"] for frame in frames))
     source_files = {name: file_info(source / name) for name in ["SOURCE.json", "frames.ndjson", "events.ndjson", *segments]}
     for segment in segments:

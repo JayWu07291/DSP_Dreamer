@@ -16,7 +16,7 @@ using UnityEngine.Rendering;
 namespace DSPDreamer.Recorder
 {
     [BepInPlugin("tw.jaywu.dspdreamer.recorder", "DSP Dreamer Recorder", "0.1.0")]
-    public sealed class RecorderPlugin : BaseUnityPlugin
+    public sealed partial class RecorderPlugin : BaseUnityPlugin
     {
         internal static RecorderPlugin Current;
         private ConfigEntry<string> output, ffmpeg, approved, python, repository;
@@ -29,9 +29,10 @@ namespace DSPDreamer.Recorder
         private Thread writer;
         private volatile bool active, failed, drained;
         private bool stopping;
-        private long sequence, capture, nextDue, startTicks;
+        private long sequence, capture, nextDue;
         private int pending;
         private int lastInputFrame = -1;
+        private int worldBinding;
         private string source;
         private Dictionary<string, object> metadata;
         private GameHistoryData history;
@@ -46,6 +47,7 @@ namespace DSPDreamer.Recorder
             internal RenderTexture Full, Small;
             internal int Busy;
             internal Dictionary<string, object> Identity;
+            internal bool Dropped;
         }
 
         private void Awake()
@@ -56,6 +58,7 @@ namespace DSPDreamer.Recorder
             approved = Config.Bind("Recording", "ApprovedFingerprint", "", "Reviewed runtime candidate SHA-256. Unknown fingerprints refuse capture.");
             python = Config.Bind("Recording", "Python", "", "Python with dsp-dreamer dependencies.");
             repository = Config.Bind("Recording", "Repository", "", "Production dsp_dreamer package directory.");
+            ConfigureEpisodes();
             harmony = new Harmony("tw.jaywu.dspdreamer.recorder");
             harmony.PatchAll(typeof(RecorderPlugin).Assembly);
             StartCoroutine(CaptureLoop());
@@ -104,25 +107,34 @@ namespace DSPDreamer.Recorder
                 throw new InvalidOperationException("Unknown fingerprint. Review runtime-candidate.json; SHA-256=" + digest);
             runtime["fingerprint_verified"] = true;
             runtime["approved_fingerprint"] = digest;
+            trial = TrialManifest();
+            CheckWorld();
             source = Path.Combine(output.Value, Guid.NewGuid().ToString() + ".source");
             Directory.CreateDirectory(source);
             metadata = Json.Fields("schema", "dsp-recording/1", "catalog", "action_catalog_v2", "source_kind", "live",
                 "recording_session_id", session, "attempt_id", Guid.NewGuid().ToString(), "episode_id", Guid.NewGuid().ToString(),
                 "ticks_frequency", Stopwatch.Frequency, "runtime", runtime);
+            episodes = new List<Dictionary<string, object>>();
+            episode = null;
+            metadata["lifecycle_version"] = 1;
+            metadata["trial_manifest"] = trial;
+            metadata["episodes"] = episodes;
+            metadata["capture_rate_hz"] = 20;
             slots = Enumerable.Range(0, 12).Select(_ => new Slot {
                 Full = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB),
                 Small = new RenderTexture(640, 360, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
             }).ToArray();
             foreach (var slot in slots) { slot.Full.Create(); slot.Small.Create(); }
             storage = new SegmentWriter(source, ffmpeg.Value);
-            sequence = capture = 0;
+            capture = 0;
             lastInputFrame = -1;
             failed = drained = stopping = false;
-            startTicks = nextDue = Stopwatch.GetTimestamp();
+            nextDue = Stopwatch.GetTimestamp();
             writer = new Thread(Write) { IsBackground = true, Name = "DSP recording writer" };
             writer.Start();
             active = true;
-            BindWorld();
+            try { ReloadBaseline(); }
+            catch { failed = true; StopRecording(); throw; }
             Logger.LogInfo("Recording started: " + source);
         }
 
@@ -138,6 +150,12 @@ namespace DSPDreamer.Recorder
             row["type"] = type;
             row["unity_frame"] = Time.frameCount;
             row["game_tick"] = GameMain.gameTick;
+            row["world_binding"] = worldBinding;
+            if (episode != null)
+            {
+                row["episode_id"] = episode["episode_id"];
+                row["attempt_id"] = episode["attempt_id"];
+            }
             foreach (var pair in fields) row[pair.Key] = pair.Value;
             if (!events.TryAdd(Json.Encode(row))) { failed = true; active = false; }
         }
@@ -163,8 +181,22 @@ namespace DSPDreamer.Recorder
             {
                 yield return end;
                 if (!active) continue;
+                if (episode == null || !worldReady || !GameMain.isRunning || GameMain.isLoading) continue;
+                if (episode["end_ticks"] != null && !finalPending) continue;
+                if (!perturbed)
+                {
+                    if (CanStartEpisode)
+                    {
+                        try { PrepareEpisode(); }
+                        catch (Exception ex) { EndEpisode(reason: "recorder_fault"); Logger.LogError(ex); }
+                    }
+                    continue;
+                }
+                if (Time.frameCount <= perturbFrame || firstPending || finalPending && pending > 0) continue;
+                if (episode["start_ticks"] == null && !CanStartEpisode) continue;
                 if (lastInputFrame != Time.frameCount) continue;
                 long now = Stopwatch.GetTimestamp();
+                if (episode["start_ticks"] == null) nextDue = now;
                 if (now < nextDue) continue;
                 long period = Stopwatch.Frequency / 20;
                 if (now >= nextDue + period) Emit("gap", Json.Fields("reason", "scheduler", "missed", (now - nextDue) / period,
@@ -172,6 +204,7 @@ namespace DSPDreamer.Recorder
                 nextDue += ((now - nextDue) / period + 1) * period;
                 Slot slot = slots.FirstOrDefault(s => Interlocked.CompareExchange(ref s.Busy, 1, 0) == 0);
                 if (slot == null) { Emit("gap", Json.Fields("reason", "no_free_buffer")); continue; }
+                slot.Identity = null;
                 try
                 {
                     var cursor = SnapshotCursor();
@@ -181,6 +214,10 @@ namespace DSPDreamer.Recorder
                     slot.Identity["unity_frame"] = Time.frameCount;
                     slot.Identity["game_tick"] = GameMain.gameTick;
                     slot.Identity["cursor"] = cursor.Item1;
+                    slot.Identity["episode_id"] = episode["episode_id"];
+                    slot.Identity["attempt_id"] = episode["attempt_id"];
+                    slot.Dropped = false;
+                    if (episode["start_ticks"] == null) firstPending = true;
                     ScreenCapture.CaptureScreenshotIntoRenderTexture(slot.Full);
                     Graphics.Blit(slot.Full, slot.Small);
                     pending++;
@@ -191,14 +228,45 @@ namespace DSPDreamer.Recorder
                             if (request.hasError) throw new IOException("GPU readback failed");
                             request.GetData<byte>().CopyTo(slot.Pixels);
                             cursor.Item2(slot.Pixels);
+                            CaptureCompleted(slot.Identity);
                             if (!frames.TryAdd(slot)) throw new IOException("Writer queue full");
                         }
-                        catch (Exception ex) { failed = true; active = false; Logger.LogError(ex); }
+                        catch (Exception ex)
+                        {
+                            slot.Dropped = true;
+                            firstPending = false;
+                            bool wasEnding = episode["end_ticks"] != null;
+                            EndEpisode(reason: "recorder_fault");
+                            if (wasEnding)
+                            {
+                                if ((long)slot.Identity["requested_ticks"] >= (long)episode["end_ticks"])
+                                {
+                                    finalPending = false;
+                                    episode["final_capture_id"] = null;
+                                    episode["validity_status"] = "incomplete";
+                                }
+                                var reasons = (List<string>)episode["validity_reasons"];
+                                if (!reasons.Contains("recorder_fault")) reasons.Add("recorder_fault");
+                            }
+                            if (!frames.TryAdd(slot)) { failed = true; active = false; }
+                            Logger.LogError(ex);
+                        }
                         finally { pending--; }
                     }); }
                     catch { pending--; throw; }
                 }
-                catch (Exception ex) { failed = true; active = false; slot.Busy = 0; Logger.LogError(ex); }
+                catch (Exception ex)
+                {
+                    firstPending = false;
+                    EndEpisode(reason: "recorder_fault");
+                    if (slot.Identity != null)
+                    {
+                        slot.Dropped = true;
+                        if (!frames.TryAdd(slot)) { failed = true; active = false; }
+                    }
+                    else slot.Busy = 0;
+                    Logger.LogError(ex);
+                }
             }
         }
 
@@ -249,7 +317,7 @@ namespace DSPDreamer.Recorder
                         if (frames.TryTake(out Slot frame, 5)) ordered.Add((long)frame.Identity["capture_id"], frame);
                         while (ordered.TryGetValue(next, out Slot slot))
                         {
-                            storage.Write(slot.Pixels, slot.Identity);
+                            if (!slot.Dropped) storage.Write(slot.Pixels, slot.Identity);
                             ordered.Remove(next++);
                             Interlocked.Exchange(ref slot.Busy, 0);
                         }
@@ -287,14 +355,29 @@ namespace DSPDreamer.Recorder
         {
             if (Input.GetKeyDown(KeyCode.F8))
             {
-                try { if (active) StopRecording(); else if (!stopping) StartRecording(); }
+                try
+                {
+                    if (active) { stopPending = true; EndEpisode(reason: "stopped"); }
+                    else if (!stopping) StartRecording();
+                }
                 catch (Exception ex) { Logger.LogError(ex); }
             }
-            if (active && (!Application.isFocused || Stopwatch.GetTimestamp() - startTicks > 1800L * Stopwatch.Frequency)) StopRecording();
+            try
+            {
+                if (active && Input.GetKeyDown(KeyCode.F9)) { resetPending = true; EndEpisode(reason: "reset"); }
+                EpisodeUpdate();
+            }
+            catch (Exception ex) { failed = true; Logger.LogError(ex); }
             if (failed && !stopping && writer != null) StopRecording();
             if (stopping && pending == 0) drained = true;
-            if (stopping && writer != null && !writer.IsAlive)
+            if (stopping && pending == 0 && writer != null && !writer.IsAlive)
             {
+                if (failed && !File.Exists(Path.Combine(source, "SOURCE.json")))
+                {
+                    // Diagnostic metadata only; it cannot authorize publication or recovery.
+                    try { File.WriteAllText(Path.Combine(source, "INCOMPLETE.json"), Json.Encode(metadata), new UTF8Encoding(false)); }
+                    catch (Exception ex) { Logger.LogError(ex); }
+                }
                 foreach (var slot in slots) { slot.Full.Release(); slot.Small.Release(); Destroy(slot.Full); Destroy(slot.Small); }
                 writer = null; stopping = false;
                 Logger.LogInfo(failed ? "Recording failed; source retained" : "Ready for next recording");
@@ -304,6 +387,19 @@ namespace DSPDreamer.Recorder
         internal void StopRecording()
         {
             if (writer == null || stopping) return;
+            // A fatal writer/queue fault may already have disabled capture. Close its episode anyway.
+            // Finalize-worker failures occur after stopping and must not rewrite capture outcomes.
+            if (failed && episode != null)
+            {
+                if (episode["end_ticks"] == null) episode["end_ticks"] = Stopwatch.GetTimestamp();
+                var reasons = (List<string>)episode["validity_reasons"];
+                if (!reasons.Contains("recorder_fault")) reasons.Add("recorder_fault");
+                episode["final_capture_id"] = null;
+                episode["validity_status"] = "incomplete";
+                finalPending = false;
+                Logger.LogError("Incomplete episode: " + Json.Encode(episode));
+            }
+            ReleaseControls();
             try
             {
                 var expected = (Dictionary<string, object>)metadata["runtime"];
@@ -324,6 +420,9 @@ namespace DSPDreamer.Recorder
             PlanetFactory.onFactoryBuildEntity += Build;
             PlanetFactory.beforeFactoryDismantleObject += BeforeDismantle;
             PlanetFactory.onFactoryDismantleObject += Dismantle;
+            worldReady = true;
+            worldBinding++;
+            Emit("game_event", Json.Fields("name", "world_ready"));
         }
         private void UnbindWorld()
         {
@@ -348,6 +447,7 @@ namespace DSPDreamer.Recorder
         }
         private void OnDestroy()
         {
+            EndEpisode(reason: "stopped");
             StopRecording();
             if (pending != 0) AsyncGPUReadback.WaitAllRequests();
             drained = true;
@@ -360,5 +460,5 @@ namespace DSPDreamer.Recorder
     [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin))]
     internal static class BeginPatch { private static void Postfix() { RecorderPlugin.Current?.BindWorld(); } }
     [HarmonyPatch(typeof(GameMain), nameof(GameMain.End))]
-    internal static class EndPatch { private static void Prefix() { RecorderPlugin.Current?.StopRecording(); } }
+    internal static class EndPatch { private static void Prefix() { RecorderPlugin.Current?.WorldEnded(); } }
 }

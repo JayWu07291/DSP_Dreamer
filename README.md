@@ -1,6 +1,6 @@
 # DSP Dreamer
 
-Issue [#13](https://github.com/JayWu07291/DSP_Dreamer/issues/13) 建立第一條單回合錄製流程。Windows Unity 插件記錄人工輸入與完整畫面；Python 入口驗證並發布四檔錄製證據，編譯相鄰觀測與實際動作，再讀回轉移資料集。
+Windows Unity 插件記錄人工輸入與完整畫面；Python 入口驗證並發布四檔錄製證據，編譯相鄰觀測與實際動作，再讀回轉移資料集。#14 加入基準重設、同一工作階段的回合邊界與終止標籤。
 
 ## 環境設定
 
@@ -21,12 +21,16 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 1. 結束 DSP，執行 `tools/deploy-recorder.ps1`。腳本會建置 Release、備份此錄製器既有的 DLL 與設定檔，再部署專案 DLL；執行環境指紋的核准欄位保持空白。
 2. 啟動 DSP、載入預定的基準場景，再按 **F8**。錄製器會寫出 `runs/live/runtime-candidate.json`，並在指紋核准前拒絕錄製。請核對遊戲與 Unity 版本、二進位雜湊、輸入設定雜湊、畫面尺寸與 graphics API。插件與驗證器皆固定檢查支援的 Assembly-CSharp 雜湊。
 3. 將 `BepInEx/config/tw.jaywu.dspdreamer.recorder.cfg` 中的 `ApprovedFingerprint` 設為已核對候選檔案的 SHA-256。插件會在下次開始錄製時重讀設定，不必重啟遊戲。若重建插件後雜湊改變，必須重新核對指紋。
-4. 按 **F8** 開始錄製，操作至少 15 秒，涵蓋移動、Digit1、UI 面板與游標移動，再按 **F8** 停止。不要同時按住 Ctrl，避免觸發舊原型的快捷鍵。
+4. 確認基準存檔為登陸後尚未操作的 `Starting Save`。按 **F8** 開始錄製時會重新載入它；操作至少 15 秒，涵蓋移動、Digit1、UI 面板與游標移動。**F9** 先結束目前回合，再從同一基準重試；**F8** 結束錄製並發布。不要同時按住 Ctrl，避免觸發舊原型的快捷鍵。
 5. 停止後，`.source` 旁會產生同名的 `.evidence` 與 `.dataset` 目錄。完成訊息為 `Recording, compilation, and readback completed`，寫入 `BepInEx/LogOutput.log`；仍須使用下方的驗證與讀回指令確認產物，不能只憑訊息判定成功。請保留遊戲紀錄與輸出目錄作為實機驗收證據。
 
 擷取使用 12 個可重用緩衝區與有界寫入佇列，編碼器在擷取計時開始前完成準備。輸入在 `VFInput.OnUpdate` 後取樣，畫面透過 `WaitForEndOfFrame` 擷取，包含 UI 與合成的 DSP 游標紋理。每次要求都在 GPU 回呼前固定 ticks、序號、capture ID、Unity frame、game tick 與游標資訊；寫入程序依要求順序處理回呼結果。
 
-按 F8、失去焦點、世界卸載或達到 30 分鐘時，錄製器會停止。擷取或寫入故障會保留來源檔案，且不發布完成標記；故障後請重新啟動 DSP。錄製過程不注入控制。完整生命週期、最終終止觀測、故障前綴恢復與來源清理留待後續工作票處理。
+`[Trial]` 設定包含 `BaselineSave`、`MechaSeed`（預設 17）、`CameraSeed`（29）與 `PolicySeed`（41）。開始時凍結基準存檔 SHA-256、世界種子、設定及獨立偏航擾動；機甲與相機各從 ±15 度均勻取樣。F9 保留 trial manifest 與 split group，每次重試產生新的 attempt／episode ID，並重新訂閱科技與工廠事件。基準檔案或設定不符時拒絕重試。
+
+回合從擾動後第一張可控制且有效的 RGB 要求時間起算，30 分鐘使用單調時鐘，包含 UI 與暫停，不把載入時間算入。死亡與超時自動結束回合；任務模組可呼叫 `EndEpisode("success")` 或 `EndEpisode("unrecoverable")`，控制模組可傳入 `reason: "human_intervention"` 等有效性原因。人工示範本身不被當成人工介入故障，也沒有新增卡住提前終止規則。
+
+停止、重設、失焦、世界卸載及故障會釋放鍵鼠控制。回合結束時最多等待兩秒取得 final observation；缺失則標為 `incomplete`。回合結束後按 F9 重試或 F8 發布工作階段。GPU 擷取故障可保留已驗證的合法前綴；writer／佇列致命故障不發布成功標記，並盡力留下 `INCOMPLETE.json` 診斷，之後須重啟 DSP。診斷檔不能當作可編譯來源，故障檔案恢復與來源清理仍屬後續工作。
 
 ## 驗證、編譯與讀回
 
@@ -45,6 +49,8 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
 
+資料集格式為 `dsp-transitions/2`。舊 `/1` 資料集必須從原始 evidence 重編譯到新目錄，不原地修改。沒有 lifecycle 標記的舊 evidence 仍可編譯，但不推測終止結果，bootstrap mask 保守設為 0。
+
 ```python
 from dsp_dreamer import open_dataset
 
@@ -54,9 +60,12 @@ rgb = transition["observation"]
 next_rgb = transition["next_observation"]
 actual_action = transition["action"]
 source_identity = transition["source"]
+legal_starts = dataset.sequence_starts(64)
 ```
 
-這個最小編譯器尚未產生任務、reward、終止標籤或 10 Hz 模型視圖，但會保存所有錄製事件，供後續編譯器使用。目前 metadata 載入記憶體，畫面則串流解碼。長時間錄製的記憶體使用量、完整恢復與訓練門檻需另行驗收。
+轉移包含 `episode_outcome`、`validity_status`、原因、`is_terminal`、`truncation` 與 `bootstrap_mask`。success／death／unrecoverable 的終止轉移不 bootstrap；timeout 可 bootstrap；無效或 incomplete 尾端不 bootstrap。缺 next observation 的動作不產生轉移。`sequence_starts` 只回傳不跨回合、gap 或無效範圍的固定長度起點；未知控制之後的同回合範圍不納入訓練。
+
+目前尚未產生任務、reward 或 10 Hz 模型視圖，但保存所有錄製事件供後續使用。metadata 載入記憶體，畫面串流解碼。長時間錄製的記憶體使用量、完整恢復與訓練門檻需另行驗收。#14 的已測範圍及實機操作步驟見[生命週期驗證報告](docs/validation/issue-14.md)。
 
 ## 驗證
 

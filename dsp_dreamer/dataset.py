@@ -3,6 +3,7 @@ from collections import Counter
 from pathlib import Path
 import json
 import uuid
+import copy
 
 import numpy as np
 import pyarrow as pa
@@ -13,6 +14,7 @@ from zarr.codecs.blosc import BloscCodec
 from .archive import verify_recording
 from .contract import CATALOG, CONTROLS, atomic_save, file_info, load, require, save, sha
 from .video import decode
+from .lifecycle import transition_lifecycle
 
 
 def observation_contract(count):
@@ -75,6 +77,8 @@ def compile_recording(source, destination, ffmpeg):
         rgb[index] = pixels
         rgb_hashes.append(sha(pixels.tobytes()))
     rows = []
+    derived_episodes = copy.deepcopy(manifest.get("episodes", []))
+    control_faults = set()
     held = []
     event_index = 0
     for index, (first, second) in enumerate(zip(frames, frames[1:])):
@@ -94,12 +98,33 @@ def compile_recording(source, destination, ffmpeg):
             e["type"] == "gap" and e["reason"] != "scheduler" for e in interval)
         gap |= any(e["gap_start_ticks"] < end and e["gap_end_ticks"] > start for e in scheduler_gaps)
         invalid_input = any(not s.get("focused", True) for s in samples)
+        lifecycle = transition_lifecycle(manifest, first, second)
+        if action["unsupported"]:
+            control_faults.add(lifecycle["episode_id"])
+        if lifecycle["episode_id"] in control_faults:
+            lifecycle["lifecycle_valid"] = False
+        valid = not (gap or invalid_input or action["ambiguous"] or action["unsupported"] or action["forbidden"])
+        valid &= lifecycle.pop("lifecycle_valid")
+        last = index == len(frames) - 2 or second.get("episode_id") != frames[index + 2].get("episode_id")
+        if not valid or last and lifecycle["validity_status"] != "valid":
+            lifecycle["bootstrap_mask"] = 0
         rows.append(dict(observation_index=index, next_observation_index=index + 1,
                          requested_ticks=start, next_requested_ticks=end, capture_id=first["capture_id"],
                          next_capture_id=second["capture_id"], action_json=json.dumps(action, sort_keys=True),
                          event_refs=[e["sequence_number"] for e in interval if e["type"] != "input"],
-                         valid=not (gap or invalid_input or action["ambiguous"] or action["unsupported"] or action["forbidden"]),
-                         gap=gap, is_first=index == 0, is_last=index == len(frames) - 2))
+                         valid=valid, **lifecycle,
+                         gap=gap, is_first=index == 0 or first.get("episode_id") != frames[index - 1].get("episode_id"),
+                         is_last=last))
+    for episode in derived_episodes:
+        if episode["episode_id"] in control_faults:
+            if "unknown_control" not in episode["validity_reasons"]:
+                episode["validity_reasons"].append("unknown_control")
+            if episode["validity_status"] == "valid":
+                episode["validity_status"] = "invalid"
+            for row in rows:
+                if row["episode_id"] == episode["episode_id"]:
+                    row["validity_status"] = episode["validity_status"]
+                    row["validity_reasons"] = episode["validity_reasons"]
     pq.write_table(pa.Table.from_pylist(rows), destination / "transitions.parquet", compression="zstd", row_group_size=1024)
     # All raw event fields remain available without repeating observation pixels.
     event_rows = [{"ticks": e["ticks"], "sequence_number": e["sequence_number"], "type": e["type"],
@@ -107,13 +132,15 @@ def compile_recording(source, destination, ffmpeg):
     event_schema = pa.schema([("ticks", pa.int64()), ("sequence_number", pa.int64()),
                              ("type", pa.string()), ("payload_json", pa.string())])
     pq.write_table(pa.Table.from_pylist(event_rows, schema=event_schema), destination / "events.parquet", compression="zstd", row_group_size=1024)
-    metadata = dict(schema="dsp-transitions/1", catalog=CATALOG, artifact_id=str(uuid.uuid4()),
+    metadata = dict(schema="dsp-transitions/2", catalog=CATALOG, artifact_id=str(uuid.uuid4()),
                     source_artifact_id=manifest["artifact_id"], source_manifest=file_info(source / "manifest.json"),
                     source_kind=manifest["source_kind"], episode_id=manifest["episode_id"],
                     ticks_frequency=manifest["ticks_frequency"], frame_count=len(frames), rgb_sha256=rgb_hashes,
                     observation=observation_contract(len(frames)),
                     table=dict(compression="zstd", row_group_size=1024),
                     tools=dict(compiler="0.1.0", zarr=zarr.__version__, pyarrow=pa.__version__, numpy=np.__version__))
+    metadata.update(recording_session_id=manifest["recording_session_id"], attempt_id=manifest["attempt_id"],
+                    trial_manifest=manifest.get("trial_manifest"), episodes=derived_episodes)
     save(destination / "dataset.json", metadata)
     # Reopen actual stored chunks and tables before publication.
     for index in range(len(frames)):
@@ -138,8 +165,8 @@ class Dataset:
         for name, info in completed["files"].items():
             require(file_info(self.path / name) == info, f"Dataset checksum mismatch: {name}")
         self.metadata = load(self.path / "dataset.json")
-        require(self.metadata["schema"] == "dsp-transitions/1" and self.metadata["catalog"] == CATALOG,
-                "Unknown dataset schema/catalog")
+        require(self.metadata["schema"] == "dsp-transitions/2" and self.metadata["catalog"] == CATALOG,
+                "Unsupported dataset schema/catalog. Recompile original evidence into a new dataset.")
         require(self.metadata["observation"] == observation_contract(self.metadata["frame_count"]), "Unknown observation codec/layout")
         group = zarr.open_group(str(self.path / "observations.zarr"), mode="r")
         self.rgb = group["rgb"]
@@ -165,9 +192,20 @@ class Dataset:
         return dict(observation=np.asarray(self.rgb[row["observation_index"]]),
                     next_observation=np.asarray(self.rgb[row["next_observation_index"]]),
                     action=json.loads(row["action_json"]), event_refs=row["event_refs"], valid=row["valid"],
+                    **{key: row[key] for key in ("episode_outcome", "validity_status", "validity_reasons",
+                       "is_terminal", "truncation", "bootstrap_mask", "is_first", "is_last")},
                     source=dict(artifact_id=self.metadata["source_artifact_id"], capture_id=row["capture_id"],
+                                recording_session_id=self.metadata["recording_session_id"],
+                                episode_id=row["episode_id"], attempt_id=row["attempt_id"],
+                                split_group_id=(self.metadata.get("trial_manifest") or {}).get("split_group_id", row["episode_id"]),
                                 next_capture_id=row["next_capture_id"], requested_ticks=row["requested_ticks"],
                                 next_requested_ticks=row["next_requested_ticks"]))
+
+    def sequence_starts(self, length):
+        require(type(length) is int and length > 0, "Invalid sequence length")
+        return [start for start in range(len(self.rows) - length + 1)
+                if all(row["valid"] and row["episode_id"] == self.rows[start]["episode_id"]
+                       for row in self.rows[start:start + length])]
 
 
 def open_dataset(path):
