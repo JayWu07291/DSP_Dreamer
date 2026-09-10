@@ -1,6 +1,6 @@
 # Issue #14 生命週期驗證
 
-2026-09-09 最新狀態：程式、離線整合及使用者操作的同工作階段實機重試驗證通過，科技與工廠事件重綁已有新證據。以下保留早期單回合結果與後續驗證；短流程不替代完整 30 分鐘資源品質門檻。
+2026-09-10 最新狀態：實機重試與事件重綁已驗證，新增 30 分鐘自動超時證據（見文末）。人工介入及受控故障的實機控制釋放仍未直接驗證；本報告不宣稱 #14 全部條件或 #21 資源品質 gate 已通過。
 
 ## 契約與實作
 
@@ -102,3 +102,30 @@
 | evidence/frames.ndjson | `c30b11365c739750d6ee326263165656c6cf9f3593f43044a95ae1f255e0b228` |
 | evidence/events.ndjson | `f5ea8ccbe84b3004e5cac441ea64e9070cd799df037d89a87371eadcce7868c6` |
 | dataset/dataset.json | `53ed1c7a9801c1f00163bdb624386957bf257c151ca9b01be0b996f87034955a` |
+
+## 2026-09-10：30 分鐘自動超時
+
+使用者自行操作，回報科技面板與暫停各約兩分鐘。來源為 `runs/live/4f3908b4-197f-404f-b835-a2f615b963cb.source`；沿用已核准的 DLL 與 trial。沒有使用 Computer Use，也沒有縮短 timeout 或修改證據。
+
+| 項目 | 實測 |
+| --- | --- |
+| session_id | `c1ec3ae4-03b5-4db7-adf8-6b0626c32ce5` |
+| attempt_id | `77e530e1-cadd-4076-9d69-7ca128dbcb36` |
+| episode_id | `f75e7b54-83c8-4556-879e-fe21a54823a4` |
+| 起點至 timeout | 1,800.0119748 秒 |
+| paused 取樣累計 | 約 127.9768663 秒 |
+| fullscreen_ui 取樣累計 | 約 256.1344991 秒（包含暫停 UI，不與 paused 相加） |
+| 幀／事件 | 35,992／119,724 |
+| final capture_id | 35991，擷取要求晚於 timeout 約 5.2589 ms |
+| 控制釋放要求 | 5 次 succeeded=true |
+| gap 事件 | scheduler 7 次，其餘類別 0 次 |
+
+UI 時長按相鄰 input 取樣以左端狀態累加，屬取樣估計。起點為擾動後第一幀，而非 world_ready；即使 game tick 因暫停落後，仍在約 1,800 秒結束。這次直接驗證了 #14 的正常自動超時計時與 final observation，不代表 #21 的全部長程資源／吞吐驗收。
+
+`tmp/verify-issue14-timeout.py` 已透過正式 `verify_recording` 完整解碼並核對 checksum，通過。evidence manifest SHA-256：`d9f2c501af23d5b13eb0ae29af6fd1e1c840e45451c1d5580f9bddf2d1071ce2`。
+
+另記錄到不支援的 Space 按下 37 次、E 按下 2 次。來源 outcome 為 timeout；編譯時必須將未知控制之後的範圍標無效，而不能強制讓尾端 bootstrap=1。純合法 timeout 的 mask=1 仍由整合 fixture 覆蓋；此次資料不能冒充該項實機正例。
+
+背景處理發布 COMPLETED 後，再以正式 `open_dataset` 完整讀回，退出碼 0。總計 35,991 筆轉移、112 筆合法前綴轉移；尾端為 `episode_outcome=timeout`、`truncation=true`、`is_terminal=false`、`validity_status=invalid`、`unknown_control`、`bootstrap_mask=0`，符合無效尾端不 bootstrap 的規則。dataset.json SHA-256：`a8ba1c50d857404837e558782560beb3c8c1f97de4466b6245ea1c06866815e8`。機器可讀結果保存於 `runs/live/issue14-timeout-verification.json`。
+
+結論：30 分鐘計時包含暫停與 UI、final observation、timeout 與有效性分離已取得實機證據；不必為計時項目重錄。本次尚未涵蓋人工介入、注入失敗與 recorder fault 的受控實機測試，也沒有量測 #21 要求的完整資源／容量指標。
