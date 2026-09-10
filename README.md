@@ -67,7 +67,7 @@ legal_starts = dataset.sequence_starts(64)
 
 轉移包含 `episode_outcome`、`validity_status`、原因、`is_terminal`、`truncation` 與 `bootstrap_mask`。success／death／unrecoverable 的終止轉移不 bootstrap；timeout 可 bootstrap；無效或 incomplete 尾端不 bootstrap。缺 next observation 的動作不產生轉移。`sequence_starts` 只回傳不跨回合、gap 或無效範圍的固定長度起點；未知控制之後的同回合範圍不納入訓練。
 
-早期進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。完整 ID 與依賴保留，未實作後期 predicate 不完成。判定、欄位時間語意與實機步驟見[早期進度驗證](docs/validation/issue-15.md)。10 Hz 模型視圖、長程記憶體、完整恢復與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
+進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。新版 `progress_version=2` 加入四項科技供料、全部科技完成、三條熔煉支線、兩條製造支線與研究站實際產出。原始事實追蹤 cargo 與分揀器的物品來源；人工研究站送料不算最終成功。舊版 1 保持早期判定語意。完整契約、已測範圍與待做實機驗收見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。10 Hz 模型視圖、長程記憶體、完整恢復與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
 
 ## 驗證
 

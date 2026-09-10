@@ -20,9 +20,12 @@ namespace DSPDreamer.Recorder
         internal int[] RewardVector = new int[16], Completions = new int[0];
         private int[] observed = new int[23];
         private readonly int[] techIds;
+        private readonly int version;
+        private readonly ProductionProgress production;
         private long coils, boards, copper, landerFuel, foreignFuel;
 
-        internal TaskProgress(int[] techIds) { this.techIds = techIds; }
+        internal TaskProgress(int[] techIds, int version = 1)
+        { this.techIds = techIds; this.version = version; production = new ProductionProgress(Done); }
         private static int Number(Dictionary<string, object> e, string name) => Convert.ToInt32(e[name]);
         private static int[] Numbers(Dictionary<string, object> e, string name) =>
             ((IEnumerable)e[name]).Cast<object>().Select(Convert.ToInt32).ToArray();
@@ -30,6 +33,7 @@ namespace DSPDreamer.Recorder
         internal void Apply(Dictionary<string, object> e)
         {
             string kind = (string)e["kind"];
+            if (version == 2) production.Apply(e);
             if (kind == "lander_work" && Number(e, "work_ticks") > 0) Done[0] = 1;
             else if (kind == "lander_removed") Done[16] = 1;
             else if (kind == "research_queue" && Numbers(e, "tech_ids").Take(5).SequenceEqual(techIds)) Done[1] = 1;
@@ -59,7 +63,20 @@ namespace DSPDreamer.Recorder
                 if (landerFuel > 0 && Number(e, "count") > 0 && Number(e, "reactor_count") > foreignFuel) Done[3] = 1;
             }
             else if (kind == "foreign_fuel_produced") foreignFuel += Number(e, "count");
-            else if (kind == "tech_state" && Number(e, "tech_id") == techIds[0] && (bool)e["unlocked"]) Done[17] = 1;
+            else if (kind == "tech_state" && (bool)e["unlocked"])
+            {
+                int index = Array.IndexOf(techIds, Number(e, "tech_id"));
+                if (index == 0 || version == 2 && index > 0) Done[17 + index] = 1;
+            }
+            else if (version == 2 && kind == "research_supply")
+            {
+                int index = Array.IndexOf(techIds, Number(e, "tech_id"));
+                int[] points = Numbers(e, "item_points"), buffered = Numbers(e, "buffered_points");
+                long remaining = Convert.ToInt64(e["remaining_hash"]);
+                if (index > 0 && remaining > 0 && points.Length > 0 &&
+                    Enumerable.Range(0, points.Length).All(i => buffered[i] >= remaining * points[i]))
+                    Done[new[] { 0, 5, 8, 10, 12 }[index]] = 1;
+            }
             else if (kind == "miner_output")
             {
                 int item = Number(e, "item_id");

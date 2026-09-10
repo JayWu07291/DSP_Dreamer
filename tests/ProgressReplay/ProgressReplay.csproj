@@ -7,5 +7,6 @@
   <ItemGroup>
     <Reference Include="System.Web.Extensions" />
     <Compile Include="../../src/DSPDreamer.Recorder/TaskProgress.cs" Link="TaskProgress.cs" />
+    <Compile Include="../../src/DSPDreamer.Recorder/ProductionProgress.cs" Link="ProductionProgress.cs" />
   </ItemGroup>
 </Project>

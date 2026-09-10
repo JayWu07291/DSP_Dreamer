@@ -16,6 +16,7 @@ namespace DSPDreamer.Recorder
         private long progressBoundary;
         private int reactorFuel;
         private StorageComponent reactor;
+        private readonly HashSet<int> suppliedTechs = new HashSet<int>();
         internal bool ProgressEnabled => active && perturbed && episode != null &&
             (episode["start_ticks"] != null || firstPending) && episode["end_ticks"] == null;
 
@@ -40,14 +41,23 @@ namespace DSPDreamer.Recorder
             lock (progressGate)
             {
                 progressFacts.Clear();
-                progress = new TaskProgress(progressTechIds);
+                progress = new TaskProgress(progressTechIds, 2);
                 progressBoundary = 0;
             }
-            metadata["progress_version"] = 1;
+            ProductionCapture.Reset();
+            suppliedTechs.Clear();
+            metadata["progress_version"] = 2;
             metadata["progress_tech_ids"] = progressTechIds;
             reactor = player.mecha.reactorStorage;
             reactorFuel = reactor.GetItemCount(1801);
             reactor.onStorageChange += ReactorChanged;
+        }
+
+        internal void RecordResearchSupply(TechProto tech, long remaining, int[] buffered)
+        {
+            if (!progressTechIds.Skip(1).Contains(tech.ID) || !suppliedTechs.Add(tech.ID)) return;
+            RecordProgressFact("research_supply", Json.Fields("tech_id", tech.ID, "remaining_hash", remaining,
+                "item_ids", (int[])tech.Items.Clone(), "item_points", (int[])tech.ItemPoints.Clone(), "buffered_points", buffered));
         }
 
         private void ReactorChanged()

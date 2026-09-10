@@ -162,7 +162,9 @@ namespace DSPDreamer.Recorder
             if (!Application.isFocused) EndEpisode(reason: "focus_loss");
             if (episode["end_ticks"] == null && episode["start_ticks"] != null)
             {
-                if (GameMain.mainPlayer != null && !GameMain.mainPlayer.isAlive) EndEpisode("death");
+                lock (progressGate) DrainProgress();
+                if (progress.Done[22] == 1) EndEpisode("success");
+                else if (GameMain.mainPlayer != null && !GameMain.mainPlayer.isAlive) EndEpisode("death");
                 else if (Stopwatch.GetTimestamp() - (long)episode["start_ticks"] >= 1800L * Stopwatch.Frequency)
                     EndEpisode("timeout");
             }

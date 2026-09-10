@@ -12,6 +12,223 @@ from dsp_dreamer.contract import file_info
 FFMPEG = Path(r"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe")
 
 
+def compile_progress_fixture(tmp_path, batches, success=False):
+    project = Path(__file__).parent / "ProgressReplay" / "ProgressReplay.csproj"
+    subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--nologo", "--no-restore"], check=True)
+    runner = project.parent / "bin" / "Release" / "net472" / "ProgressReplay.exe"
+    techs = [1001, 1002, 1003, 1004, 1005]
+    with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
+        recording.metadata.update(progress_version=2, progress_tech_ids=techs)
+        recording.begin_attempt(dict(manifest_id="trial", split_group_id="trial", mecha_seed=1, camera_seed=2, policy_seed=3))
+        episode = recording.episode["episode_id"]
+        recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        for index, batch in enumerate([[]] + batches):
+            ticks = (index + 1) * 50
+            for fact in batch:
+                recording.event(ticks - 1, "progress_fact", episode_id=episode, **fact)
+            if success and index == len(batches):
+                recording.end_episode(ticks, outcome="success")
+            request = recording.request(ticks, 1, 1)
+            recording.event(ticks, "progress_observation", episode_id=episode, capture_id=request["capture_id"])
+            recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
+        if not success:
+            recording.end_episode(ticks + 1, reason="stopped")
+        events = [e for e in recording.events if e.get("name", "").startswith("progress_")]
+        result = subprocess.run([str(runner)], input=json.dumps(dict(tech_ids=techs, version=2)) + "\n" +
+                                "\n".join(map(json.dumps, events)) + "\n", capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", check=True)
+        claims = {e["capture_id"]: e for e in map(json.loads, result.stdout.splitlines())}
+        for event in events:
+            if event["name"] == "progress_observation":
+                event.update(claims[event["capture_id"]])
+    evidence = recording.publish(tmp_path / "evidence")
+    return open_dataset(compile_recording(evidence, tmp_path / "dataset", FFMPEG))
+
+
+def test_research_requires_all_remaining_materials_and_latches_after_takeback(tmp_path):
+    def supply(points):
+        return dict(kind="research_supply", tech_id=1002, remaining_hash=10,
+                    item_ids=[1202, 1301], item_points=[2, 3], buffered_points=points)
+
+    dataset = compile_progress_fixture(tmp_path, [
+        [supply([20, 29])], [supply([20, 30])], [supply([0, 0])],
+        [dict(kind="tech_state", tech_id=i, unlocked=True) for i in range(1001, 1006)],
+        [dict(kind="tech_state", tech_id=1002, unlocked=False)],
+    ])
+    assert dataset[0]["node_completions"] == []
+    assert dataset[1]["node_completions"] == [5] and dataset[1]["reward"] == 0
+    assert dataset[2]["microtask_completed"][5] == 1 and dataset[2]["node_completions"] == []
+    assert dataset[3]["node_completions"] == [17, 18, 19, 20, 21]
+    assert dataset[4]["milestone_completed"] == [0, 1, 1, 1, 1, 1, 0]
+
+
+def machine(product, entity):
+    proto, requires, counts, batch = {
+        1101: (2302, [1001], [1], 1), 1102: (2302, [1001], [1], 1),
+        1104: (2302, [1002], [1], 1), 1202: (2303, [1102, 1104], [2, 1], 2),
+        1301: (2303, [1101, 1104], [2, 1], 2), 6001: (2901, [1202, 1301], [1, 1], 1),
+    }[product]
+    return dict(kind="machine_config", target=f"m:0:{entity}", product=product, proto_id=proto,
+                recipe_id=product, requires=requires, counts=counts, batch_size=batch)
+
+
+def step(entity, before, after, cycles=0, output_before=0, auto_input=True):
+    return dict(kind="machine_step", target=f"m:0:{entity}", before=before, after=after,
+                cycles=cycles, output_before=output_before, auto_input=auto_input)
+
+
+def transfer(source, target, item, count, before=None):
+    return dict(kind="flow_transfer", source=source, target=target, item_id=item,
+                count=count, source_before=count if before is None else before)
+
+
+def feed(source, entity, item, count, before=None):
+    return [transfer(source, f"s:0:{entity}", item, count, before),
+            transfer(f"s:0:{entity}", f"m:0:{entity}", item, count)]
+
+
+def production_batches(lab_manual=False):
+    batches = [[machine(p, i) for p, i in ((1101, 1), (1102, 2), (1104, 3), (1202, 4), (1301, 5), (6001, 6))]]
+    # Three fixed smelters produce manually first; no automatic line is complete.
+    batches.append([event for i in (1, 2, 3) for event in
+                    (step(i, [1], [0], auto_input=False), step(i, [0], [0], cycles=1, auto_input=False))])
+    for entity, ore in ((1, 1001), (2, 1001), (3, 1002)):
+        batch = [dict(kind="miner_stock", target="m:0:10", item_id=ore, count=2,
+                      vein_item_id=ore, power=1.0, network_id=1, proto_id=2301),
+                 transfer("m:0:10", f"c:0:{entity}", ore, 2)]
+        batch += feed(f"c:0:{entity}", entity, ore, 2)
+        batch += [step(entity, [2], [1]), step(entity, [1], [0], cycles=1),
+                  step(entity, [0], [0], cycles=1, output_before=1)]
+        batches.append(batch)
+    batches.append(feed("m:0:2", 4, 1102, 2) + feed("m:0:3", 4, 1104, 1, 2) +
+                   [step(4, [2, 1], [0, 0]), step(4, [0, 0], [0, 0], cycles=1)])
+    batches.append(feed("m:0:1", 5, 1101, 2) + feed("m:0:3", 5, 1104, 1) +
+                   [step(5, [2, 1], [0, 0]), step(5, [0, 0], [0, 0], cycles=1)])
+    if lab_manual:
+        batches.append([dict(kind="machine_manual", target="m:0:6", inserted=True)])
+    batches.append(feed("m:0:4", 6, 1202, 1, 2) + feed("m:0:5", 6, 1301, 1, 2))
+    batches.append([step(6, [1, 1], [0, 0])])
+    batches.append([step(6, [0, 0], [0, 0], cycles=1)])
+    return batches
+
+
+@pytest.mark.parametrize("lab_manual", [False, True])
+def test_full_production_requires_proven_materials_and_actual_lab_output(tmp_path, lab_manual):
+    batches = production_batches(lab_manual)
+    dataset = compile_progress_fixture(tmp_path, batches)
+    assert dataset[1]["node_completions"] == [9]
+    assert dataset[4]["node_completions"] == [11]
+    assert dataset[5]["node_completions"] == [13]
+    assert dataset[6]["node_completions"] == [14]
+    assert dataset[len(dataset) - 3]["node_completions"] == ([] if lab_manual else [15])
+    assert dataset[len(dataset) - 2]["node_completions"] == []
+    assert dataset[len(dataset) - 1]["node_completions"] == ([] if lab_manual else [22])
+    assert all(dataset[i]["reward"] == 0 and dataset[i]["task_id"] == 0 for i in range(len(dataset)))
+
+
+@pytest.mark.parametrize("fault", ["unpowered", "manual_belt", "no_belt", "recipe_switch", "mixed_stock", "manual_lab_reset"])
+def test_unproven_sources_and_recipe_reuse_cannot_finish(tmp_path, fault):
+    batches = production_batches(fault == "manual_lab_reset")
+    if fault == "manual_lab_reset":
+        batches[7].append(machine(6001, 6))
+    for batch in batches:
+        for fact in batch:
+            if fault == "unpowered" and fact["kind"] == "miner_stock":
+                fact["power"] = 0
+            elif fault == "manual_belt" and fact.get("source") == "m:0:10":
+                fact["source"] = "unknown"
+            elif fault == "mixed_stock" and fact.get("source") == "m:0:3":
+                fact["source_before"] += 1
+            elif fault == "no_belt" and fact.get("target", "").startswith("c:"):
+                fact["target"] = "discard"
+            if fault == "no_belt" and fact.get("source", "").startswith("c:"):
+                fact["source"] = "m:0:10"
+            if fault == "recipe_switch":
+                for field in ("source", "target"):
+                    if fact.get(field) == "m:0:5":
+                        fact[field] = "m:0:4"
+    dataset = compile_progress_fixture(tmp_path, batches)
+    assert not any(22 in row["node_completions"] for row in dataset.rows)
+
+
+def test_progress_hooks_bind_to_supported_game_assemblies():
+    root = Path(__file__).resolve().parents[1]
+    subprocess.run(["dotnet", "build", str(root / "src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj"),
+                    "--no-restore", "-c", "Release"], check=True)
+    subprocess.run(["dotnet", "build", str(root / "tests/ProgressReplay/ProgressReplay.csproj"),
+                    "--no-restore", "-c", "Release"], check=True)
+    result = subprocess.run([str(root / "tests/ProgressReplay/bin/Release/net472/ProgressReplay.exe"),
+                             r"E:\Steam\steamapps\common\Dyson Sphere Program",
+                             str(root / "src/DSPDreamer.Recorder/bin/Release/DSPDreamer.Recorder.dll")],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
+    assert "ProgressManualLabPatch" in result.stdout and "ProgressMinerPatch" in result.stdout
+
+
+def test_every_task_prompt_advances_to_a_terminal_matrix_output(tmp_path):
+    def tech(index):
+        return [dict(kind="tech_state", tech_id=1001 + index, unlocked=True)]
+
+    def supply(index):
+        return [dict(kind="research_supply", tech_id=1001 + index, remaining_hash=1,
+                     item_ids=[1202], item_points=[1], buffered_points=[1])]
+
+    def miner(item, entity):
+        return [dict(kind="miner_output", item_id=item, vein_item_id=item, entity_id=entity,
+                     factory_index=0, proto_id=2301, power=1.0, network_id=1, count=1)]
+
+    production = production_batches()
+    batches = [
+        [dict(kind="lander_work", work_ticks=1)],
+        [dict(kind="research_queue", tech_ids=[1001, 1002, 1003, 1004, 1005])],
+        [dict(kind="lander_removed")],
+        [dict(kind="craft_queued", item_ids=[1202, 1301], item_counts=[10, 10])],
+        [dict(kind="item_received", origin="lander", item_id=1801, count=3),
+         dict(kind="fuel_inserted", item_id=1801, count=1, reactor_count=1)],
+        [dict(kind="item_received", origin="manual", item_id=1002, count=4)],
+        tech(0), supply(1), miner(1001, 10), miner(1002, 11), tech(1), supply(2),
+        production[0], production[1], tech(2), supply(3), *production[2:5],
+        tech(3), supply(4), production[5], production[6], tech(4), *production[7:],
+    ]
+    dataset = compile_progress_fixture(tmp_path, batches, success=True)
+    prompts = [dataset[0]["task_id"]] + [dataset[i]["next_task_id"] for i in range(len(dataset))]
+    assert prompts == [0, 1, 16, 2, 3, 4, 16, 5, 6, 7, 16, 8, 9, 9, 16,
+                       10, 11, 11, 11, 16, 12, 13, 14, 16, 15, 16, 16, 16]
+    assert sum(row["reward"] for row in dataset.rows) == 16
+    assert sorted(n for row in dataset.rows for n in row["node_completions"]) == list(range(23))
+    last = dataset[len(dataset) - 1]
+    assert last["episode_outcome"] == "success" and last["is_terminal"] and last["bootstrap_mask"] == 0
+
+
+def test_rebuilt_single_smelter_does_not_stand_in_for_three_furnaces(tmp_path):
+    batches = []
+    for product in (1101, 1102, 1104):
+        batches.append([dict(kind="flow_reset", target="m:0:1"), machine(product, 1),
+                        step(1, [1], [0], auto_input=False), step(1, [0], [0], cycles=1, auto_input=False)])
+    dataset = compile_progress_fixture(tmp_path, batches)
+    assert all(row["node_completions"] == [] for row in dataset.rows)
+
+
+def test_production_facts_reject_legacy_version_and_inconsistent_input_width(tmp_path):
+    compile_progress_fixture(tmp_path, [[machine(1101, 1)], [step(1, [0], [0])]])
+    evidence = tmp_path / "evidence"
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["progress_version"] = 1
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(InvalidRecording, match="require progress version 2"):
+        compile_recording(evidence, tmp_path / "legacy", FFMPEG)
+    manifest["progress_version"] = 2
+    events_path = evidence / "events.ndjson"
+    events = [json.loads(line) for line in events_path.read_text().splitlines()]
+    event = next(e for e in events if e.get("kind") == "machine_step")
+    event.update(before=[0, 0], after=[0, 0])
+    events_path.write_text("\n".join(map(json.dumps, events)) + "\n")
+    manifest["files"]["events.ndjson"] = file_info(events_path)
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(InvalidRecording, match="Machine input width differs"):
+        compile_recording(evidence, tmp_path / "bad-width", FFMPEG)
+
+
 def test_early_progress_is_reconstructed_from_evidence(tmp_path):
     with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
         recording.metadata["progress_version"] = 1
