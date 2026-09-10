@@ -1,0 +1,162 @@
+{
+  "source": "runs\\live\\0eec2f28-174d-4f1a-88d4-c2819e3b01c7.source",
+  "implementation_commit": "ef2e3a5",
+  "progress_version": 3,
+  "status": "passed_live_flow",
+  "frame_count": 7204,
+  "event_count": 31605,
+  "transitions": 7203,
+  "valid_transitions": 7198,
+  "duration_seconds": 360.2997619,
+  "completed_nodes": [
+    "start_dismantle",
+    "queue_research",
+    "queue_crafting",
+    "fuel_mecha",
+    "mine_copper",
+    "supply_metallurgy",
+    "place_iron_miner",
+    "place_copper_miner",
+    "supply_logistics",
+    "manual_smelting",
+    "supply_manufacturing",
+    "connect_smelters",
+    "supply_matrix_tech",
+    "setup_coil_line",
+    "setup_board_line",
+    "setup_lab",
+    "lander_done",
+    "electromagnetism_done",
+    "metallurgy_done",
+    "logistics_done",
+    "manufacturing_done",
+    "matrix_tech_done",
+    "matrix_done"
+  ],
+  "completion_counts": {
+    "start_dismantle": 1,
+    "queue_research": 1,
+    "queue_crafting": 1,
+    "fuel_mecha": 1,
+    "mine_copper": 1,
+    "supply_metallurgy": 1,
+    "place_iron_miner": 1,
+    "place_copper_miner": 1,
+    "supply_logistics": 1,
+    "manual_smelting": 1,
+    "supply_manufacturing": 1,
+    "connect_smelters": 1,
+    "supply_matrix_tech": 1,
+    "setup_coil_line": 1,
+    "setup_board_line": 1,
+    "setup_lab": 1,
+    "lander_done": 1,
+    "electromagnetism_done": 1,
+    "metallurgy_done": 1,
+    "logistics_done": 1,
+    "manufacturing_done": 1,
+    "matrix_tech_done": 1,
+    "matrix_done": 1
+  },
+  "completion_game_ticks": {
+    "start_dismantle": 426,
+    "queue_research": 896,
+    "lander_done": 1324,
+    "queue_crafting": 1601,
+    "fuel_mecha": 1686,
+    "mine_copper": 1770,
+    "electromagnetism_done": 2733,
+    "place_iron_miner": 3770,
+    "place_copper_miner": 7716,
+    "supply_metallurgy": 8301,
+    "metallurgy_done": 9677,
+    "manual_smelting": 11244,
+    "supply_logistics": 11351,
+    "logistics_done": 12911,
+    "connect_smelters": 14430,
+    "supply_manufacturing": 15402,
+    "supply_matrix_tech": 16962,
+    "manufacturing_done": 16962,
+    "matrix_tech_done": 18761,
+    "setup_coil_line": 20930,
+    "setup_board_line": 20978,
+    "setup_lab": 21309,
+    "matrix_done": 21831
+  },
+  "scalar_reward": 11,
+  "prompt_sequence": [
+    "start_dismantle",
+    "queue_research",
+    "wait_for_progress",
+    "queue_crafting",
+    "fuel_mecha",
+    "mine_copper",
+    "wait_for_progress",
+    "supply_metallurgy",
+    "wait_for_progress",
+    "supply_logistics",
+    "wait_for_progress",
+    "supply_manufacturing",
+    "wait_for_progress",
+    "setup_coil_line",
+    "setup_board_line",
+    "setup_lab",
+    "wait_for_progress"
+  ],
+  "first_automatic_smelter_inputs": {
+    "m:0:7": {
+      "game_tick": 14175,
+      "before": [
+        36
+      ]
+    },
+    "m:0:6": {
+      "game_tick": 14212,
+      "before": [
+        28
+      ]
+    },
+    "m:0:5": {
+      "game_tick": 14305,
+      "before": [
+        23
+      ]
+    }
+  },
+  "episodes": [
+    {
+      "attempt_id": "e7d09d17-863c-446e-b72e-54ceb0ef1cfa",
+      "end_ticks": 5642696021,
+      "episode_id": "d113ce73-c87e-423b-bd10-0f6e2a65c7cd",
+      "episode_outcome": "success",
+      "final_capture_id": 7203,
+      "start_ticks": 2039698402,
+      "validity_reasons": [],
+      "validity_status": "valid"
+    }
+  ],
+  "gaps": {
+    "scheduler": 2
+  },
+  "final_transition": {
+    "valid": true,
+    "is_terminal": true,
+    "bootstrap_mask": 0,
+    "episode_outcome": "success",
+    "validity_status": "valid"
+  },
+  "all_release_requests_succeeded": true,
+  "live_offline_match": true,
+  "full_evidence_decode_verified": true,
+  "dataset_readback_verified": true,
+  "evidence_manifest": {
+    "bytes": 8819,
+    "sha256": "84bf101f29f94a5a8b09e561ce31843efd1c0bc3afe2227cd6f0c1436bcc64e0"
+  },
+  "dataset_manifest": {
+    "bytes": 492463,
+    "sha256": "d15565fdc1d2276202a7528405b44df8c58d4cac530c8eadb8c1bdcadb11705f"
+  },
+  "runtime_fingerprint": "1c9ebe5ae80b81419bfb9ea7160795186019fd19152b08020b8c3fcdade0c406",
+  "plugin_sha256": "2181c6dbc5f8a3ca25f755459c9892714ee8c87a4d0e834ae1652db8a548baf8"
+}
