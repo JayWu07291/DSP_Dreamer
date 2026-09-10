@@ -1,6 +1,21 @@
 # Issue #14 生命週期驗證
 
-2026-09-10 最新狀態：實機重試與事件重綁已驗證，新增 30 分鐘自動超時證據（見文末）。人工介入及受控故障的實機控制釋放仍未直接驗證；本報告不宣稱 #14 全部條件或 #21 資源品質 gate 已通過。
+2026-09-10 結案狀態：#14 六項驗收條件已有實作、整合測試與相應實機證據。實機重試、事件重綁、30 分鐘自動超時及三項受控故障均已驗證。#21 資源品質 gate 不在本次結案範圍。
+
+## 驗收對照
+
+| #14 條件 | 證據與範圍 |
+| --- | --- |
+| 固定 trial、獨立 seeds、±15 度偏航與首張有效 RGB 起點 | `EpisodeLifecycle.cs` 實作；下方兩次實機重載保存相同 seeds／偏航，起點晚於 world_ready |
+| session／attempt／episode 身分與世界事件重綁 | 下方 2026-09-09 實機重試：相同 session／trial、不同 attempt／episode，兩個世界科技／建造／拆除事件各自正確記錄 |
+| 30 分鐘包含 UI／暫停、排除載入，outcome 與 validity 分離 | 下方 2026-09-10 實機 1,800.0119748 秒；`tests/test_lifecycle.py` 覆蓋四種 outcome 及 validity，不以停滯提前結束 |
+| 各結束路徑釋放控制、final observation、缺失標 incomplete | 停止／失焦／重設實機記錄及[三項受控測試](issue-14-controlled-tests.md)；缺 final 與缺 next observation 由整合 fixtures 覆蓋 |
+| terminal／truncation／bootstrap 與合法故障前綴 | `tests/test_lifecycle.py` 整合 fixtures；實機 timeout 無效尾端與診斷資料 bootstrap=0 的完整讀回 |
+| 錄製至編譯整合、實機重載、sequence 邊界 | lifecycle fixtures、兩次重載與受控故障的正式 verify_recording／open_dataset；sequence 不跨回合、gap 或無效範圍 |
+
+Space／E 依使用者追加要求納入 `action_catalog_v3`，舊原始 evidence 可重編譯；下方 v2 timeout 結果保留為當時版本的歷史證據。成功／無法繼續的任務判定模組、任意磁碟故障恢復與 #21 長程資源指標未被宣稱完成。
+
+診斷設定已關閉。避開 DSP F11 的 Shift+F10 修正已建置通過，尚未部署或實機驗證；使用者明確決定不再追加此快捷鍵測試，不影響既有故障收尾證據。
 
 ## 契約與實作
 
@@ -21,7 +36,7 @@
 - gap 不跨 sequence、未知控制之後同回合範圍排除。
 - 舊資料集版本與缺基準 provenance 的 live source 拒絕。
 
-完整 pytest 套件 24 案通過，耗時 30.81 秒（`tmp/issue14-tests.xml`）；mypy 檢查八個原始碼檔案無問題；Release net472 建置零警告、零錯誤。合成案例不證明 Unity 真實暫停 30 分鐘、控制注入故障或磁碟故障行為；這些不得記為實機已測。
+生命週期實作時完整 pytest 套件 24 案通過（`tmp/issue14-tests.xml`）；追加 v3 動作與診斷隔離後完整套件 27 案通過，耗時 32.12 秒。mypy 檢查八個原始碼檔案無問題；最新 Release net472 建置零警告、零錯誤。實機證據另列如下；合成案例不作為真實磁碟故障的驗證。
 
 ## 已有實機證據
 
