@@ -1,0 +1,64 @@
+{
+  "source": "runs\\live\\6a7e9323-6442-4f13-b38a-3d9e171cbf1b.source",
+  "status": "failed_predicate",
+  "eligible_for_training": false,
+  "frame_count": 7595,
+  "event_count": 34938,
+  "transitions": 7594,
+  "valid_transitions": 7590,
+  "completed_node_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+  ],
+  "missing_node_ids": [
+    13,
+    14,
+    15,
+    22
+  ],
+  "scalar_reward": 11,
+  "episodes": [
+    {
+      "attempt_id": "b730d651-75c5-49ba-9e4d-62d3b5c4e9fd",
+      "end_ticks": 7151327696,
+      "episode_id": "bfb41f16-1100-4073-8782-e7ce675b54e5",
+      "episode_outcome": null,
+      "final_capture_id": 7594,
+      "start_ticks": 3353636810,
+      "validity_reasons": [
+        "stopped"
+      ],
+      "validity_status": "invalid"
+    }
+  ],
+  "gaps": {
+    "scheduler": 2
+  },
+  "all_release_requests_succeeded": true,
+  "evidence_manifest": {
+    "bytes": 8960,
+    "sha256": "62b6032dc2c5cfb42cf541211b27f88be5df6984a7ee4e749c60211e46a79474"
+  },
+  "dataset_manifest": {
+    "bytes": 519076,
+    "sha256": "dffdb3096fab6601c3263270b90af82bf76b087817c9a222eb22f64d9ad57123"
+  },
+  "first_lost_copper_cargo_sequence": 29099
+}

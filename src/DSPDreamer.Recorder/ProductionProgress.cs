@@ -16,6 +16,10 @@ namespace DSPDreamer.Recorder
             internal readonly HashSet<int> Delivered = new HashSet<int>();
         }
         private readonly int[] done;
+        private readonly int version;
+        private readonly Dictionary<string, Dictionary<string, object>> lines = new Dictionary<string, Dictionary<string, object>>();
+        private readonly Dictionary<string, int> miners = new Dictionary<string, int>();
+        private readonly HashSet<string> produced = new HashSet<string>();
         private readonly Dictionary<string, Machine> machines = new Dictionary<string, Machine>();
         private readonly Dictionary<Tuple<string, int>, long> stock = new Dictionary<Tuple<string, int>, long>();
         private readonly Dictionary<string, int> manual = new Dictionary<string, int>(), automatic = new Dictionary<string, int>();
@@ -24,7 +28,7 @@ namespace DSPDreamer.Recorder
             { 1104, new[] { 2302, 1, 1002, 1 } }, { 1202, new[] { 2303, 2, 1102, 2, 1104, 1 } },
             { 1301, new[] { 2303, 2, 1101, 2, 1104, 1 } }, { 6001, new[] { 2901, 1, 1202, 1, 1301, 1 } }
         };
-        internal ProductionProgress(int[] done) { this.done = done; }
+        internal ProductionProgress(int[] done, int version = 2) { this.done = done; this.version = version; }
         private static int Number(Dictionary<string, object> e, string key) => Convert.ToInt32(e[key]);
         private static int[] Numbers(Dictionary<string, object> e, string key) =>
             ((IEnumerable)e[key]).Cast<object>().Select(Convert.ToInt32).ToArray();
@@ -34,12 +38,29 @@ namespace DSPDreamer.Recorder
             foreach (var key in stock.Keys.Where(k => k.Item1 == target).ToArray()) stock.Remove(key);
         }
 
+        private bool Connected(string target, HashSet<string> seen = null)
+        {
+            if (miners.TryGetValue(target, out int ore)) return ore > 0;
+            if (seen == null) seen = new HashSet<string>();
+            if (seen.Contains(target) || !machines.TryGetValue(target, out Machine m) || !m.Fixed ||
+                !lines.TryGetValue(target, out var line) || !(bool)line["powered"]) return false;
+            var next = new HashSet<string>(seen) { target };
+            string[] sources = ((IEnumerable)line["sources"]).Cast<string>().ToArray();
+            int[] items = Numbers(line, "items"), belts = Numbers(line, "belts");
+            return m.Requires.All(need => Enumerable.Range(0, sources.Length).Any(i => items[i] == need &&
+                (miners.TryGetValue(sources[i], out int item) && item == need && belts[i] == 1 ||
+                 produced.Contains(sources[i]) && machines.TryGetValue(sources[i], out Machine source) && source.Product == need) &&
+                Connected(sources[i], next)));
+        }
+
         internal void Apply(Dictionary<string, object> e)
         {
             string kind = (string)e["kind"];
             string target = e.ContainsKey("target") ? (string)e["target"] : "";
+            if (kind == "line_state") { lines[target] = e; return; }
             if (kind == "machine_config")
             {
+                produced.Remove(target);
                 machines.TryGetValue(target, out Machine old);
                 int product = Number(e, "product"), recipeId = Number(e, "recipe_id");
                 int[] requires = Numbers(e, "requires"), counts = Numbers(e, "counts");
@@ -47,13 +68,15 @@ namespace DSPDreamer.Recorder
                     Number(e, "batch_size") == recipe[1] && requires.SequenceEqual(recipe.Where((v, i) => i >= 2 && i % 2 == 0)) &&
                     counts.SequenceEqual(recipe.Where((v, i) => i >= 2 && i % 2 == 1));
                 machines[target] = new Machine { Product = product, Recipe = recipeId, Requires = requires, Counts = counts,
-                    Batch = Number(e, "batch_size"), Fixed = allowed && (old == null || old.Fixed && old.Recipe == recipeId), ManualLab = old != null && old.ManualLab };
+                    Batch = Number(e, "batch_size"), Fixed = allowed && (version >= 3 || old == null || old.Fixed && old.Recipe == recipeId), ManualLab = old != null && old.ManualLab };
                 manual.Remove(target); automatic.Remove(target);
                 ClearStock(target);
             }
-            else if (kind == "flow_reset") { machines.Remove(target); manual.Remove(target); automatic.Remove(target); ClearStock(target); }
+            else if (kind == "flow_reset") { machines.Remove(target); manual.Remove(target); automatic.Remove(target); ClearStock(target);
+                lines.Remove(target); miners.Remove(target); produced.Remove(target); }
             else if (kind == "flow_transfer")
             {
+                if (version >= 3) return;
                 int item = Number(e, "item_id"), count = Number(e, "count"), before = Number(e, "source_before");
                 string source = (string)e["source"];
                 var key = Tuple.Create(source, item);
@@ -83,9 +106,11 @@ namespace DSPDreamer.Recorder
                 bool valid = (item == 1001 || item == 1002) && item == Number(e, "vein_item_id") &&
                     Convert.ToDouble(e["power"]) >= 0.1 && Number(e, "network_id") > 0 && Number(e, "proto_id") == 2301;
                 stock[Tuple.Create(target, item)] = valid ? Number(e, "count") : 0;
+                miners[target] = valid ? item : 0;
             }
             else if ((kind == "machine_manual" || kind == "manual_inventory") && machines.TryGetValue(target, out Machine manualMachine))
             {
+                if (version >= 3) return;
                 bool inserted;
                 if (kind == "manual_inventory")
                 {
@@ -102,6 +127,8 @@ namespace DSPDreamer.Recorder
             else if (kind == "machine_step" && machines.TryGetValue(target, out Machine m))
             {
                 int product = m.Product, cycles = Number(e, "cycles");
+                bool connected = version >= 3 && Connected(target);
+                if (connected && product == 6001) done[15] = 1;
                 var key = Tuple.Create(target, product);
                 stock[key] = Math.Min(Get(stock, key), Number(e, "output_before"));
                 if (cycles > 0)
@@ -111,8 +138,9 @@ namespace DSPDreamer.Recorder
                         manual[target] = product;
                         if (new[] { 1101, 1102, 1104 }.All(manual.Values.Contains)) done[9] = 1;
                     }
-                    if (m.Fixed && m.Pending && !m.ManualLab)
+                    if (m.Fixed && m.Pending && !m.ManualLab && (version < 3 || connected))
                     {
+                        produced.Add(target);
                         stock[key] += (long)cycles * m.Batch;
                         if (product == 1101 || product == 1102 || product == 1104)
                         {
@@ -135,7 +163,7 @@ namespace DSPDreamer.Recorder
                         eligible &= before[i] - after[i] == m.Counts[i] && credit == before[i];
                         m.Inputs[m.Requires[i]] = Math.Max(0, credit - (before[i] - after[i]));
                     }
-                    m.Pending = eligible;
+                    m.Pending = version >= 3 ? connected : eligible;
                     m.PendingManual = !(bool)e["auto_input"];
                 }
                 else for (int i = 0; i < before.Length; i++) m.Inputs[m.Requires[i]] = Math.Min(Get(m.Inputs, m.Requires[i]), before[i]);

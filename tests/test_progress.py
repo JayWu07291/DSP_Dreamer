@@ -12,13 +12,13 @@ from dsp_dreamer.contract import file_info
 FFMPEG = Path(r"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe")
 
 
-def compile_progress_fixture(tmp_path, batches, success=False):
+def compile_progress_fixture(tmp_path, batches, success=False, version=2):
     project = Path(__file__).parent / "ProgressReplay" / "ProgressReplay.csproj"
     subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--nologo", "--no-restore"], check=True)
     runner = project.parent / "bin" / "Release" / "net472" / "ProgressReplay.exe"
     techs = [1001, 1002, 1003, 1004, 1005]
     with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
-        recording.metadata.update(progress_version=2, progress_tech_ids=techs)
+        recording.metadata.update(progress_version=version, progress_tech_ids=techs)
         recording.begin_attempt(dict(manifest_id="trial", split_group_id="trial", mecha_seed=1, camera_seed=2, policy_seed=3))
         episode = recording.episode["episode_id"]
         recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
@@ -34,7 +34,7 @@ def compile_progress_fixture(tmp_path, batches, success=False):
         if not success:
             recording.end_episode(ticks + 1, reason="stopped")
         events = [e for e in recording.events if e.get("name", "").startswith("progress_")]
-        result = subprocess.run([str(runner)], input=json.dumps(dict(tech_ids=techs, version=2)) + "\n" +
+        result = subprocess.run([str(runner)], input=json.dumps(dict(tech_ids=techs, version=version)) + "\n" +
                                 "\n".join(map(json.dumps, events)) + "\n", capture_output=True, text=True,
                                 encoding="utf-8", errors="replace", check=True)
         claims = {e["capture_id"]: e for e in map(json.loads, result.stdout.splitlines())}
@@ -133,6 +133,51 @@ def test_selecting_lab_recipe_is_not_manual_material_insertion(tmp_path, invento
     batches[0].append(dict(kind="manual_inventory", target="m:0:6", before=[], after=inventory))
     dataset = compile_progress_fixture(tmp_path, batches)
     assert (22 in dataset[len(dataset) - 1]["node_completions"]) == (inventory == [0, 0])
+
+
+@pytest.mark.parametrize("fault", [None, "missing_belt", "missing_copper", "disconnected", "unpowered", "no_output", "single_machine", "recipe_corrected"])
+def test_connected_production_accepts_manual_materials_but_requires_working_lines(tmp_path, fault):
+    batches = production_batches(lab_manual=True)
+    # v3 checks current connections and completed production, not material provenance.
+    for batch in batches:
+        for fact in batch:
+            if fact.get("source") == "m:0:10":
+                fact["source"] = "unknown"
+            if fact["kind"] == "miner_stock" and fact["item_id"] == 1002:
+                fact["target"] = "m:0:11"
+    miners = [dict(kind="miner_stock", target=f"m:0:{i}", item_id=item, count=1,
+                   vein_item_id=item, power=1.0, network_id=1, proto_id=2301)
+              for i, item in ((10, 1001), (11, 1002))]
+    def links(entity, sources, items, belts, powered=True):
+        return dict(kind="line_state", target=f"m:0:{entity}", sources=[f"m:0:{i}" for i in sources],
+                    items=items, belts=belts, powered=powered)
+    states = [links(1, [10], [1001], [1]), links(2, [10], [1001], [1]),
+              links(3, [11], [1002], [1]), links(4, [2, 3], [1102, 1104], [0, 0]),
+              links(5, [1, 3], [1101, 1104], [0, 0]), links(6, [4, 5], [1202, 1301], [0, 0])]
+    if fault == "missing_belt":
+        states[2]["belts"] = [0]
+    if fault == "missing_copper":
+        states[3] = links(4, [2], [1102], [0])
+    if fault == "unpowered":
+        states[2]["powered"] = False
+    batches[2][0:0] = miners + states
+    # Leave manual leftovers in all three smelters while automation starts.
+    for batch in batches[2:5]:
+        for fact in batch:
+            if fact["kind"] == "machine_step":
+                fact["before"] = [v + 40 for v in fact["before"]]
+                fact["after"] = [v + 40 for v in fact["after"]]
+    if fault == "disconnected":
+        batches[-1].insert(0, links(3, [], [], []))
+    if fault == "no_output":
+        batches[-1][0]["cycles"] = 0
+    if fault == "recipe_corrected":
+        batches[5].insert(0, machine(1301, 4))
+        batches[5].insert(1, machine(1202, 4))
+    if fault == "single_machine":
+        states[5]["sources"] = ["m:0:4", "m:0:4"]
+    dataset = compile_progress_fixture(tmp_path, batches, version=3)
+    assert any(22 in row["node_completions"] for row in dataset.rows) == (fault in (None, "recipe_corrected"))
 
 
 @pytest.mark.parametrize("fault", ["unpowered", "manual_belt", "no_belt", "recipe_switch", "mixed_stock", "manual_lab_reset"])

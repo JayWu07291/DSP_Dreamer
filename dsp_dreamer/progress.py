@@ -30,7 +30,7 @@ def validate_fact(event):
         "flow_reset": [], "flow_transfer": ["item_id", "count", "source_before"],
         "miner_stock": ["item_id", "count", "vein_item_id", "network_id", "proto_id"], "machine_manual": [],
         "machine_step": ["output_before", "cycles"],
-        "manual_inventory": [],
+        "manual_inventory": [], "line_state": [],
     }
     require(kind in integers, "Unknown progress fact")
     for field in integers[kind]:
@@ -38,7 +38,7 @@ def validate_fact(event):
     for field in {"research_queue": ["tech_ids"], "craft_queued": ["item_ids", "item_counts"],
                   "research_supply": ["item_ids", "item_points", "buffered_points"],
                   "machine_config": ["requires", "counts"], "machine_step": ["before", "after"],
-                  "manual_inventory": ["before", "after"]}.get(kind, []):
+                  "manual_inventory": ["before", "after"], "line_state": ["items", "belts"]}.get(kind, []):
         require(isinstance(event.get(field), list) and all(type(x) is int and 0 <= x <= 2147483647 for x in event[field]),
                 f"Invalid progress {field}")
     if kind == "craft_queued":
@@ -47,7 +47,7 @@ def validate_fact(event):
         require(0 < len(event["item_ids"]) == len(event["item_points"]) == len(event["buffered_points"])
                 and len(set(event["item_ids"])) == len(event["item_ids"])
                 and all(x > 0 for x in event["item_ids"] + event["item_points"]), "Invalid research arrays")
-    if kind in ("machine_config", "flow_reset", "flow_transfer", "miner_stock", "machine_manual", "machine_step", "manual_inventory"):
+    if kind in ("machine_config", "flow_reset", "flow_transfer", "miner_stock", "machine_manual", "machine_step", "manual_inventory", "line_state"):
         for field in (["source", "target"] if kind == "flow_transfer" else ["target"]):
             require(isinstance(event.get(field), str) and 0 < len(event[field]) <= 100
                     and event[field].split(":")[0] in ("m", "s", "c", "unknown", "discard"), "Invalid flow identity")
@@ -61,6 +61,11 @@ def validate_fact(event):
                 and all(a <= b for a, b in zip(event["after"], event["before"])), "Invalid machine step")
     if kind == "manual_inventory":
         require(max(len(event["before"]), len(event["after"])) <= 6, "Invalid manual inventory width")
+    if kind == "line_state":
+        require(type(event.get("powered")) is bool and isinstance(event.get("sources"), list)
+                and len(event["sources"]) == len(event["items"]) == len(event["belts"]) <= 256
+                and all(isinstance(s, str) and s.startswith("m:") and len(s) <= 100 for s in event["sources"])
+                and all(b in (0, 1) for b in event["belts"]), "Invalid line connections")
     for fact_kind, field in (("machine_manual", "inserted"), ("machine_step", "auto_input")):
         if kind == fact_kind:
             require(type(event.get(field)) is bool, "Invalid production flag")
@@ -98,13 +103,13 @@ class Progress:
         self.tech_ids = tech_ids
         self.version = version
         self.done = [0] * 23
-        self.production = Production(self.done)
+        self.production = Production(self.done, version)
         self.active = 0
         self.coils = self.boards = self.copper = self.lander_fuel = self.foreign_fuel = 0
 
     def apply(self, event):
         kind = event["kind"]
-        if self.version == 2:
+        if self.version >= 2:
             self.production.apply(event)
         if kind == "lander_work" and event["work_ticks"] > 0:
             self.done[0] = 1
@@ -134,9 +139,9 @@ class Progress:
             self.foreign_fuel += event["count"]
         elif kind == "tech_state" and event["tech_id"] in self.tech_ids and event["unlocked"]:
             index = self.tech_ids.index(event["tech_id"])
-            if index == 0 or self.version == 2:
+            if index == 0 or self.version >= 2:
                 self.done[17 + index] = 1
-        elif self.version == 2 and kind == "research_supply" and event["tech_id"] in self.tech_ids[1:]:
+        elif self.version >= 2 and kind == "research_supply" and event["tech_id"] in self.tech_ids[1:]:
             if event["remaining_hash"] > 0 and all(b >= event["remaining_hash"] * p
                                                   for b, p in zip(event["buffered_points"], event["item_points"])):
                 self.done[[0, 5, 8, 10, 12][self.tech_ids.index(event["tech_id"])]] = 1
@@ -155,7 +160,7 @@ class Progress:
 
 def replay_progress(manifest, frames, events):
     version = manifest.get("progress_version")
-    require(version is None or type(version) is int and version in (1, 2), "Unknown progress version")
+    require(version is None or type(version) is int and version in (1, 2, 3), "Unknown progress version")
     facts = [e for e in events if e.get("name") in ("progress_fact", "progress_observation")]
     require(version is not None or not facts, "Progress facts lack version")
     tech_ids = manifest.get("progress_tech_ids", [])
@@ -180,7 +185,8 @@ def replay_progress(manifest, frames, events):
         require(key in episodes, "Unknown progress episode")
         if event["name"] == "progress_fact":
             validate_fact(event)
-            require(version == 2 or event["kind"] in ("lander_work", "lander_removed", "research_queue",
+            require(event["kind"] != "line_state" or version == 3, "Line connections require progress version 3")
+            require(version >= 2 or event["kind"] in ("lander_work", "lander_removed", "research_queue",
                     "craft_queued", "item_received", "fuel_inserted", "foreign_fuel_produced", "tech_state", "miner_output"),
                     "Production facts require progress version 2")
             episode = episodes[key]
@@ -224,5 +230,5 @@ def replay_progress(manifest, frames, events):
         rows.append(dict(task_id=task, next_task_id=next_task, task_condition=[int(i == task) for i in range(17)],
                          reward_vector=completed[:16], reward=completed[task] if task < 16 else 0,
                          microtask_completed=before[:16], milestone_completed=before[16:],
-                         node_completions=[i for i, value in enumerate(completed) if value], progress_available=version in (1, 2)))
+                         node_completions=[i for i, value in enumerate(completed) if value], progress_available=version in (1, 2, 3)))
     return rows

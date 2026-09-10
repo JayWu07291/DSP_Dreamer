@@ -25,7 +25,7 @@ namespace DSPDreamer.Recorder
         private long coils, boards, copper, landerFuel, foreignFuel;
 
         internal TaskProgress(int[] techIds, int version = 1)
-        { this.techIds = techIds; this.version = version; production = new ProductionProgress(Done); }
+        { this.techIds = techIds; this.version = version; production = new ProductionProgress(Done, version); }
         private static int Number(Dictionary<string, object> e, string name) => Convert.ToInt32(e[name]);
         private static int[] Numbers(Dictionary<string, object> e, string name) =>
             ((IEnumerable)e[name]).Cast<object>().Select(Convert.ToInt32).ToArray();
@@ -33,7 +33,7 @@ namespace DSPDreamer.Recorder
         internal void Apply(Dictionary<string, object> e)
         {
             string kind = (string)e["kind"];
-            if (version == 2) production.Apply(e);
+            if (version >= 2) production.Apply(e);
             if (kind == "lander_work" && Number(e, "work_ticks") > 0) Done[0] = 1;
             else if (kind == "lander_removed") Done[16] = 1;
             else if (kind == "research_queue" && Numbers(e, "tech_ids").Take(5).SequenceEqual(techIds)) Done[1] = 1;
@@ -66,9 +66,9 @@ namespace DSPDreamer.Recorder
             else if (kind == "tech_state" && (bool)e["unlocked"])
             {
                 int index = Array.IndexOf(techIds, Number(e, "tech_id"));
-                if (index == 0 || version == 2 && index > 0) Done[17 + index] = 1;
+                if (index == 0 || version >= 2 && index > 0) Done[17 + index] = 1;
             }
-            else if (version == 2 && kind == "research_supply")
+            else if (version >= 2 && kind == "research_supply")
             {
                 int index = Array.IndexOf(techIds, Number(e, "tech_id"));
                 int[] points = Numbers(e, "item_points"), buffered = Numbers(e, "buffered_points");

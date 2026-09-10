@@ -9,33 +9,62 @@ RECIPES = {1101: (2302, [1001], [1], 1), 1102: (2302, [1001], [1], 1),
 
 
 class Production:
-    def __init__(self, done):
+    def __init__(self, done, version=2):
         self.done = done
+        self.version = version
+        self.lines: dict[str, dict] = {}
+        self.miners: dict[str, int] = {}
+        self.produced: set[str] = set()
         self.machines: dict[str, dict] = {}
         self.stock: dict[tuple[str, int], int] = {}
         self.manual: dict[str, int] = {}
         self.automatic: dict[str, int] = {}
 
+    def connected(self, key, seen=None):
+        if key in self.miners:
+            return bool(self.miners[key])
+        seen = set() if seen is None else seen
+        if key in seen:
+            return False
+        m, line = self.machines.get(key), self.lines.get(key)
+        if not m or not m["fixed"] or not line or not line["powered"]:
+            return False
+        return all(any(item == need and
+                       (self.miners.get(source) == need and belt or
+                        source in self.produced and self.machines.get(source, {}).get("product") == need) and
+                       self.connected(source, seen | {key})
+                       for source, item, belt in zip(line["sources"], line["items"], line["belts"]))
+                   for need in m["requires"])
+
     def apply(self, e):
         kind = e["kind"]
         key = e.get("target", "")
+        if kind == "line_state":
+            self.lines[key] = e
+            return
         if kind == "machine_config":
+            self.produced.discard(key)
             old = self.machines.get(key)
             recipe = RECIPES.get(e["product"])
             allowed = bool(recipe and (e["proto_id"], e["requires"], e["counts"], e["batch_size"]) == recipe)
             self.machines[key] = dict(product=e["product"], recipe_id=e["recipe_id"], requires=e["requires"],
                                       counts=e["counts"], batch=e["batch_size"], inputs={}, pending=False,
-                                      fixed=allowed and (old is None or old["fixed"] and old["recipe_id"] == e["recipe_id"]),
+                                      fixed=allowed and (self.version >= 3 or old is None or old["fixed"] and old["recipe_id"] == e["recipe_id"]),
                                       manual_lab=bool(old and old["manual_lab"]), delivered=set(), pending_manual=False)
             self.manual.pop(key, None)
             self.automatic.pop(key, None)
             self.stock = {k: v for k, v in self.stock.items() if k[0] != key}
         elif kind == "flow_reset":
+            self.lines.pop(key, None)
+            self.miners.pop(key, None)
+            self.produced.discard(key)
             self.machines.pop(key, None)
             self.manual.pop(key, None)
             self.automatic.pop(key, None)
             self.stock = {k: v for k, v in self.stock.items() if k[0] != key}
         elif kind == "flow_transfer":
+            if self.version >= 3:
+                return
             item, count, source = e["item_id"], e["count"], e["source"]
             stock_key = source, item
             trusted = min(self.stock.get(stock_key, 0), e["source_before"])
@@ -62,7 +91,10 @@ class Production:
             valid = (e["item_id"] in (1001, 1002) and e["item_id"] == e["vein_item_id"]
                      and e["power"] >= 0.1 and e["network_id"] > 0 and e["proto_id"] == 2301)
             self.stock[key, e["item_id"]] = e["count"] if valid else 0
+            self.miners[key] = e["item_id"] if valid else 0
         elif kind in ("machine_manual", "manual_inventory"):
+            if self.version >= 3:
+                return
             if kind == "manual_inventory":
                 changes = [after - before for before, after in zip_longest(e["before"], e["after"], fillvalue=0)]
                 if not any(changes):
@@ -80,6 +112,9 @@ class Production:
             m = self.machines[key]
             require(len(e["before"]) == len(m["requires"]), "Machine input width differs")
             product = m["product"]
+            connected = self.version >= 3 and self.connected(key)
+            if connected and product == 6001:
+                self.done[15] = 1
             stock_key = key, product
             self.stock[stock_key] = min(self.stock.get(stock_key, 0), e["output_before"])
             if e["cycles"] > 0:
@@ -87,7 +122,8 @@ class Production:
                     self.manual[key] = product
                     if set(self.manual.values()) >= {1101, 1102, 1104}:
                         self.done[9] = 1
-                if m["fixed"] and m["pending"] and not m["manual_lab"]:
+                if m["fixed"] and m["pending"] and not m["manual_lab"] and (self.version < 3 or connected):
+                    self.produced.add(key)
                     self.stock[stock_key] += e["cycles"] * m["batch"]
                     if product in (1101, 1102, 1104):
                         self.automatic[key] = product
@@ -106,7 +142,7 @@ class Production:
                     credit = min(m["inputs"].get(item, 0), before)
                     eligible &= before - after == need and credit == before
                     m["inputs"][item] = max(0, credit - (before - after))
-                m["pending"] = eligible
+                m["pending"] = connected if self.version >= 3 else eligible
                 m["pending_manual"] = not e["auto_input"]
             else:
                 for item, before in zip(m["requires"], e["before"]):

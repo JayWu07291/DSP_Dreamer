@@ -185,10 +185,10 @@ class Dataset:
         require(self.metadata.get("tasks") == TASKS and self.metadata.get("milestones") == MILESTONES,
                 "Invalid task/milestone catalog. Recompile original evidence.")
         version = self.metadata.get("progress_version")
-        require(version is None or type(version) is int and version in (1, 2), "Unknown progress version")
+        require(version is None or type(version) is int and version in (1, 2, 3), "Unknown progress version")
         require(len(self.rows) == self.metadata["frame_count"] - 1, "Invalid transition count")
         for index, row in enumerate(self.rows):
-            validate_progress_row(row, version in (1, 2))
+            validate_progress_row(row, version in (1, 2, 3))
             require(len(json.loads(row["action_json"])["binary"]) == len(CONTROLS), "Invalid action width")
             require(not self.metadata["diagnostic_mode"] or not row["valid"] and row["bootstrap_mask"] == 0,
                     "Diagnostic recording cannot train")
