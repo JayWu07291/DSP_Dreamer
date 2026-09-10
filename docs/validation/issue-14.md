@@ -128,4 +128,4 @@ UI 時長按相鄰 input 取樣以左端狀態累加，屬取樣估計。起點�
 
 背景處理發布 COMPLETED 後，再以正式 `open_dataset` 完整讀回，退出碼 0。總計 35,991 筆轉移、112 筆合法前綴轉移；尾端為 `episode_outcome=timeout`、`truncation=true`、`is_terminal=false`、`validity_status=invalid`、`unknown_control`、`bootstrap_mask=0`，符合無效尾端不 bootstrap 的規則。dataset.json SHA-256：`a8ba1c50d857404837e558782560beb3c8c1f97de4466b6245ea1c06866815e8`。機器可讀結果保存於 `runs/live/issue14-timeout-verification.json`。
 
-結論：30 分鐘計時包含暫停與 UI、final observation、timeout 與有效性分離已取得實機證據；不必為計時項目重錄。本次尚未涵蓋人工介入、注入失敗與 recorder fault 的受控實機測試，也沒有量測 #21 要求的完整資源／容量指標。
+結論：30 分鐘計時包含暫停與 UI、final observation、timeout 與有效性分離已取得實機證據；不必為計時項目重錄。後續人工介入、注入失敗與 recorder fault 的受控實機測試已完成，見 [受控測試結果](issue-14-controlled-tests.md)。仍未量測 #21 要求的完整資源／容量指標。

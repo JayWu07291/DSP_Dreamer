@@ -34,8 +34,9 @@ namespace DSPDreamer.Recorder
         private void DiagnosticUpdate()
         {
             if (!diagnosticMode || !active || episode == null || episode["start_ticks"] == null || episode["end_ticks"] != null) return;
-            string test = Input.GetKeyDown(KeyCode.F10) ? "human_intervention" :
-                Input.GetKeyDown(KeyCode.F11) ? "injection_failure" : Input.GetKeyDown(KeyCode.F7) ? "gpu_readback_error" : null;
+            string test = Input.GetKeyDown(KeyCode.F10) ?
+                (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? "injection_failure" : "human_intervention") :
+                Input.GetKeyDown(KeyCode.F7) ? "gpu_readback_error" : null;
             if (test == null) return;
             Emit("control_request", Json.Fields("operation", "diagnostic_fault", "case", test, "simulated", true));
             if (test == "gpu_readback_error") failNextReadback = true;

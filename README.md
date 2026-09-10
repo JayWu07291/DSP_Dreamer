@@ -90,7 +90,7 @@ dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore
 | 快捷鍵 | 受控情境 |
 | --- | --- |
 | F10 | 回報 human_intervention，走正常 EndEpisode 與控制釋放 |
-| F11 | 模擬一次 release 注入失敗，再立即實際重試 release；保留 injection_failure |
+| Shift+F10 | 模擬一次 release 注入失敗，再立即實際重試 release；保留 injection_failure |
 | F7 | 下一次 GPU readback callback 拋出測試例外，走 recorder_fault 與 final observation 收尾 |
 
 故障皆標 `simulated=true`，不宣稱 Windows 或 GPU 自然發生故障；F12 保留給 Steam 截圖。測試完成後將 Diagnostics 關閉，再開始正式錄製。
