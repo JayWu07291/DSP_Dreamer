@@ -30,13 +30,15 @@ def validate_fact(event):
         "flow_reset": [], "flow_transfer": ["item_id", "count", "source_before"],
         "miner_stock": ["item_id", "count", "vein_item_id", "network_id", "proto_id"], "machine_manual": [],
         "machine_step": ["output_before", "cycles"],
+        "manual_inventory": [],
     }
     require(kind in integers, "Unknown progress fact")
     for field in integers[kind]:
         require(type(event.get(field)) is int and 0 <= event[field] <= 2147483647, f"Invalid progress {field}")
     for field in {"research_queue": ["tech_ids"], "craft_queued": ["item_ids", "item_counts"],
                   "research_supply": ["item_ids", "item_points", "buffered_points"],
-                  "machine_config": ["requires", "counts"], "machine_step": ["before", "after"]}.get(kind, []):
+                  "machine_config": ["requires", "counts"], "machine_step": ["before", "after"],
+                  "manual_inventory": ["before", "after"]}.get(kind, []):
         require(isinstance(event.get(field), list) and all(type(x) is int and 0 <= x <= 2147483647 for x in event[field]),
                 f"Invalid progress {field}")
     if kind == "craft_queued":
@@ -45,7 +47,7 @@ def validate_fact(event):
         require(0 < len(event["item_ids"]) == len(event["item_points"]) == len(event["buffered_points"])
                 and len(set(event["item_ids"])) == len(event["item_ids"])
                 and all(x > 0 for x in event["item_ids"] + event["item_points"]), "Invalid research arrays")
-    if kind in ("machine_config", "flow_reset", "flow_transfer", "miner_stock", "machine_manual", "machine_step"):
+    if kind in ("machine_config", "flow_reset", "flow_transfer", "miner_stock", "machine_manual", "machine_step", "manual_inventory"):
         for field in (["source", "target"] if kind == "flow_transfer" else ["target"]):
             require(isinstance(event.get(field), str) and 0 < len(event[field]) <= 100
                     and event[field].split(":")[0] in ("m", "s", "c", "unknown", "discard"), "Invalid flow identity")
@@ -57,6 +59,8 @@ def validate_fact(event):
     if kind == "machine_step":
         require(len(event["before"]) == len(event["after"]) <= 6 and event["cycles"] in (0, 1)
                 and all(a <= b for a, b in zip(event["after"], event["before"])), "Invalid machine step")
+    if kind == "manual_inventory":
+        require(max(len(event["before"]), len(event["after"])) <= 6, "Invalid manual inventory width")
     for fact_kind, field in (("machine_manual", "inserted"), ("machine_step", "auto_input")):
         if kind == fact_kind:
             require(type(event.get(field)) is bool, "Invalid production flag")

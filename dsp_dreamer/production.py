@@ -1,5 +1,6 @@
 """Conservative material provenance from recorded transfers and machine cycles."""
 from .contract import require
+from itertools import zip_longest
 
 # product -> (building, input items, counts, batch size)
 RECIPES = {1101: (2302, [1001], [1], 1), 1102: (2302, [1001], [1], 1),
@@ -61,11 +62,18 @@ class Production:
             valid = (e["item_id"] in (1001, 1002) and e["item_id"] == e["vein_item_id"]
                      and e["power"] >= 0.1 and e["network_id"] > 0 and e["proto_id"] == 2301)
             self.stock[key, e["item_id"]] = e["count"] if valid else 0
-        elif kind == "machine_manual":
+        elif kind in ("machine_manual", "manual_inventory"):
+            if kind == "manual_inventory":
+                changes = [after - before for before, after in zip_longest(e["before"], e["after"], fillvalue=0)]
+                if not any(changes):
+                    return
+                inserted = any(change > 0 for change in changes)
+            else:
+                inserted = e["inserted"]  # Preserve legacy recorded claims.
             machine = self.machines.get(key)
             if machine:
                 machine["inputs"].clear()
-                if machine["product"] == 6001 and e["inserted"]:
+                if machine["product"] == 6001 and inserted:
                     machine["manual_lab"] = True
         elif kind == "machine_step":
             require(key in self.machines, "Machine step lacks configuration")

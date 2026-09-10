@@ -84,10 +84,20 @@ namespace DSPDreamer.Recorder
                     Convert.ToDouble(e["power"]) >= 0.1 && Number(e, "network_id") > 0 && Number(e, "proto_id") == 2301;
                 stock[Tuple.Create(target, item)] = valid ? Number(e, "count") : 0;
             }
-            else if (kind == "machine_manual" && machines.TryGetValue(target, out Machine manualMachine))
+            else if ((kind == "machine_manual" || kind == "manual_inventory") && machines.TryGetValue(target, out Machine manualMachine))
             {
+                bool inserted;
+                if (kind == "manual_inventory")
+                {
+                    int[] before = Numbers(e, "before"), after = Numbers(e, "after");
+                    int width = Math.Max(before.Length, after.Length);
+                    Array.Resize(ref before, width); Array.Resize(ref after, width);
+                    if (before.SequenceEqual(after)) return;
+                    inserted = Enumerable.Range(0, width).Any(i => after[i] > before[i]);
+                }
+                else inserted = (bool)e["inserted"]; // Preserve legacy recorded claims.
                 manualMachine.Inputs.Clear();
-                if (manualMachine.Product == 6001 && (bool)e["inserted"]) manualMachine.ManualLab = true;
+                if (manualMachine.Product == 6001 && inserted) manualMachine.ManualLab = true;
             }
             else if (kind == "machine_step" && machines.TryGetValue(target, out Machine m))
             {

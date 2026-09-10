@@ -1,0 +1,85 @@
+{
+  "source": "runs\\live\\cd82cd47-57e6-4669-a663-0c8f4ca0ff92.source",
+  "status": "failed_predicate",
+  "eligible_for_training": false,
+  "frame_count": 8406,
+  "event_count": 38805,
+  "transitions": 8405,
+  "valid_transitions": 8395,
+  "completed_nodes": [
+    "start_dismantle",
+    "queue_research",
+    "queue_crafting",
+    "fuel_mecha",
+    "mine_copper",
+    "supply_metallurgy",
+    "place_iron_miner",
+    "place_copper_miner",
+    "supply_logistics",
+    "manual_smelting",
+    "supply_manufacturing",
+    "connect_smelters",
+    "supply_matrix_tech",
+    "setup_coil_line",
+    "setup_board_line",
+    "lander_done",
+    "electromagnetism_done",
+    "metallurgy_done",
+    "logistics_done",
+    "manufacturing_done",
+    "matrix_tech_done"
+  ],
+  "missing_nodes": [
+    "setup_lab",
+    "matrix_done"
+  ],
+  "lab_cycles": 5,
+  "scalar_reward": 11,
+  "prompt_sequence": [
+    "start_dismantle",
+    "queue_research",
+    "wait_for_progress",
+    "queue_crafting",
+    "mine_copper",
+    "wait_for_progress",
+    "supply_metallurgy",
+    "wait_for_progress",
+    "supply_logistics",
+    "manual_smelting",
+    "wait_for_progress",
+    "supply_manufacturing",
+    "wait_for_progress",
+    "supply_matrix_tech",
+    "setup_coil_line",
+    "setup_board_line",
+    "setup_lab"
+  ],
+  "episodes": [
+    {
+      "attempt_id": "16021bd7-6b71-4d31-ad68-0c0f42488910",
+      "end_ticks": 6981306349,
+      "episode_id": "8593f986-4409-4c0d-a758-f1cb5e5d4d8c",
+      "episode_outcome": null,
+      "final_capture_id": 8405,
+      "start_ticks": 2778128848,
+      "validity_reasons": [
+        "stopped"
+      ],
+      "validity_status": "invalid"
+    }
+  ],
+  "gaps": {
+    "scheduler": 1
+  },
+  "all_release_requests_succeeded": true,
+  "live_offline_match": true,
+  "evidence_manifest": {
+    "bytes": 9624,
+    "sha256": "3cc04ff3f1df3d2cfa00e6b6b786ef88817dff9abc3b14e722112590feaf10be"
+  },
+  "dataset_manifest": {
+    "bytes": 574224,
+    "sha256": "4d6ce969e8d5acbe1414009972c0f0cc4bde693d44ad3085cc759e2c3b2ffb9b"
+  },
+  "false_manual_event_sequence": 42831
+}

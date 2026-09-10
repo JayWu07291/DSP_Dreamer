@@ -132,8 +132,7 @@ namespace DSPDreamer.Recorder
             if (!Enabled || before == null) return;
             int[] after = Inputs(factory, entity);
             if (before.SequenceEqual(after)) return;
-            Fact("machine_manual", "target", Key("m", factory, entity),
-                "inserted", after.Where((value, i) => i >= before.Length || value > before[i]).Any());
+            Fact("manual_inventory", "target", Key("m", factory, entity), "before", before, "after", after);
         }
         internal static void Transfer(string source, string target, int item, int count, int before)
         {

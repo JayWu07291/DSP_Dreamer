@@ -126,6 +126,15 @@ def test_full_production_requires_proven_materials_and_actual_lab_output(tmp_pat
     assert all(dataset[i]["reward"] == 0 and dataset[i]["task_id"] == 0 for i in range(len(dataset)))
 
 
+@pytest.mark.parametrize("inventory", [[0, 0], [1, 0]])
+def test_selecting_lab_recipe_is_not_manual_material_insertion(tmp_path, inventory):
+    batches = production_batches()
+    # Native OnItemButtonClick can select a recipe, allocating empty input slots.
+    batches[0].append(dict(kind="manual_inventory", target="m:0:6", before=[], after=inventory))
+    dataset = compile_progress_fixture(tmp_path, batches)
+    assert (22 in dataset[len(dataset) - 1]["node_completions"]) == (inventory == [0, 0])
+
+
 @pytest.mark.parametrize("fault", ["unpowered", "manual_belt", "no_belt", "recipe_switch", "mixed_stock", "manual_lab_reset"])
 def test_unproven_sources_and_recipe_reuse_cannot_finish(tmp_path, fault):
     batches = production_batches(fault == "manual_lab_reset")
