@@ -11,6 +11,7 @@ from .contract import (CATALOG, ENCODE, FFMPEG_SHA, SCHEMA, atomic_save, file_in
                        load, records, require, sha)
 from .video import check_ffmpeg, decode, run
 from .lifecycle import validate_lifecycle
+from .progress import validate_fact, replay_progress
 
 
 def validate_metadata(metadata):
@@ -64,7 +65,10 @@ def validate_indices(frames, events):
         require(event["type"] in ("input", "game_event", "gap", "control_request"), "Unknown event type")
         if event["type"] == "game_event":
             require(event.get("name") in ("tech_unlocked", "factory_build", "factory_dismantled", "recording_stopped",
-                    "world_ready", "perturbation_applied", "episode_started", "episode_ended"), "Unknown game event")
+                    "world_ready", "perturbation_applied", "episode_started", "episode_ended", "progress_fact",
+                    "progress_observation"), "Unknown game event")
+            if event.get("name") == "progress_fact":
+                validate_fact(event)
         if event["type"] == "input":
             for field in ("held", "down", "up"):
                 keys = event.get(field)
@@ -106,6 +110,7 @@ def verify_recording(path, ffmpeg):
     frames, events = list(records(path / "frames.ndjson")), list(records(path / "events.ndjson"))
     validate_indices(frames, events)
     validate_lifecycle(manifest, frames)
+    replay_progress(manifest, frames, events)
     require(len(frames) == manifest["frame_count"] and len(events) == manifest["event_count"], "Count mismatch")
     verify_video(ffmpeg, path / "recording.mkv", frames)
     return manifest, frames, events
@@ -119,6 +124,7 @@ def publish(source, destination, ffmpeg):
     frames, events = list(records(source / "frames.ndjson")), list(records(source / "events.ndjson"))
     validate_indices(frames, events)
     validate_lifecycle(metadata, frames)
+    replay_progress(metadata, frames, events)
     segments = list(dict.fromkeys(frame["segment"] for frame in frames))
     source_files = {name: file_info(source / name) for name in ["SOURCE.json", "frames.ndjson", "events.ndjson", *segments]}
     for segment in segments:

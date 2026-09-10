@@ -116,6 +116,7 @@ namespace DSPDreamer.Recorder
                 return;
             }
             var player = GameMain.mainPlayer;
+            PrepareProgress();
             var rotation = Quaternion.AngleAxis((float)(double)trial["mecha_yaw"], player.position.normalized);
             player.controller.model.rotation = rotation * player.controller.model.rotation;
             player.uRotation = GameMain.localPlanet.runtimeRotation * player.controller.model.rotation;
@@ -137,8 +138,13 @@ namespace DSPDreamer.Recorder
             if (reason != null && !allowed.Contains(reason)) throw new ArgumentException("Unknown validity reason");
             if (outcome == null && reason == null) throw new ArgumentException("Missing episode end reason");
             if (!active || episode == null || episode["end_ticks"] != null) return;
-            long now = Stopwatch.GetTimestamp();
-            episode["end_ticks"] = now;
+            long now;
+            lock (progressGate)
+            {
+                DrainProgress();
+                now = Math.Max(Stopwatch.GetTimestamp(), progressBoundary);
+                episode["end_ticks"] = now;
+            }
             episode["episode_outcome"] = outcome;
             var reasons = (List<string>)episode["validity_reasons"];
             if (reason != null && !reasons.Contains(reason)) reasons.Add(reason);

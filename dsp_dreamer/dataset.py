@@ -15,6 +15,7 @@ from .archive import verify_recording
 from .contract import CATALOG, CONTROLS, atomic_save, file_info, load, require, save, sha
 from .video import decode
 from .lifecycle import transition_lifecycle
+from .progress import FIELDS, TASKS, MILESTONES, replay_progress, validate_progress_row
 
 
 def observation_contract(count):
@@ -65,6 +66,7 @@ def compile_recording(source, destination, ffmpeg):
     source, destination = Path(source), Path(destination)
     manifest, frames, events = verify_recording(source, ffmpeg)
     events.sort(key=lambda event: (event["ticks"], event["sequence_number"]))
+    progress = replay_progress(manifest, frames, events)
     scheduler_gaps = [e for e in events if e["type"] == "gap" and e["reason"] == "scheduler"]
     destination.mkdir(parents=True, exist_ok=False)
     group = zarr.open_group(str(destination / "observations.zarr"), mode="w", zarr_format=3)
@@ -113,7 +115,7 @@ def compile_recording(source, destination, ffmpeg):
                          requested_ticks=start, next_requested_ticks=end, capture_id=first["capture_id"],
                          next_capture_id=second["capture_id"], action_json=json.dumps(action, sort_keys=True),
                          event_refs=[e["sequence_number"] for e in interval if e["type"] != "input"],
-                         valid=valid, **lifecycle,
+                         valid=valid, **lifecycle, **progress[index],
                          gap=gap, is_first=index == 0 or first.get("episode_id") != frames[index - 1].get("episode_id"),
                          is_last=last))
     for episode in derived_episodes:
@@ -133,7 +135,7 @@ def compile_recording(source, destination, ffmpeg):
     event_schema = pa.schema([("ticks", pa.int64()), ("sequence_number", pa.int64()),
                              ("type", pa.string()), ("payload_json", pa.string())])
     pq.write_table(pa.Table.from_pylist(event_rows, schema=event_schema), destination / "events.parquet", compression="zstd", row_group_size=1024)
-    metadata = dict(schema="dsp-transitions/2", catalog=CATALOG, artifact_id=str(uuid.uuid4()),
+    metadata = dict(schema="dsp-transitions/3", catalog=CATALOG, artifact_id=str(uuid.uuid4()),
                     source_artifact_id=manifest["artifact_id"], source_manifest=file_info(source / "manifest.json"),
                     source_kind=manifest["source_kind"], episode_id=manifest["episode_id"],
                     ticks_frequency=manifest["ticks_frequency"], frame_count=len(frames), rgb_sha256=rgb_hashes,
@@ -144,6 +146,7 @@ def compile_recording(source, destination, ffmpeg):
                     trial_manifest=manifest.get("trial_manifest"), episodes=derived_episodes,
                     source_catalog=manifest["catalog"], controls=CONTROLS,
                     diagnostic_mode=manifest.get("diagnostic_mode", False))
+    metadata.update(progress_version=manifest.get("progress_version"), tasks=TASKS, milestones=MILESTONES)
     save(destination / "dataset.json", metadata)
     # Reopen actual stored chunks and tables before publication.
     for index in range(len(frames)):
@@ -168,7 +171,7 @@ class Dataset:
         for name, info in completed["files"].items():
             require(file_info(self.path / name) == info, f"Dataset checksum mismatch: {name}")
         self.metadata = load(self.path / "dataset.json")
-        require(self.metadata["schema"] == "dsp-transitions/2" and self.metadata["catalog"] == CATALOG,
+        require(self.metadata["schema"] == "dsp-transitions/3" and self.metadata["catalog"] == CATALOG,
                 "Unsupported dataset schema/catalog. Recompile original evidence into a new dataset.")
         require(self.metadata.get("controls") == CONTROLS, "Invalid control order")
         require(type(self.metadata.get("diagnostic_mode")) is bool, "Missing diagnostic mode")
@@ -179,8 +182,13 @@ class Dataset:
         require(list(self.rgb.shape) == self.metadata["observation"]["shape"] and self.rgb.dtype == np.uint8,
                 "Observation shape/dtype mismatch")
         self.rows = pq.read_table(self.path / "transitions.parquet").to_pylist()
+        require(self.metadata.get("tasks") == TASKS and self.metadata.get("milestones") == MILESTONES,
+                "Invalid task/milestone catalog. Recompile original evidence.")
+        version = self.metadata.get("progress_version")
+        require(version is None or type(version) is int and version == 1, "Unknown progress version")
         require(len(self.rows) == self.metadata["frame_count"] - 1, "Invalid transition count")
         for index, row in enumerate(self.rows):
+            validate_progress_row(row, self.metadata.get("progress_version") == 1)
             require(len(json.loads(row["action_json"])["binary"]) == len(CONTROLS), "Invalid action width")
             require(not self.metadata["diagnostic_mode"] or not row["valid"] and row["bootstrap_mask"] == 0,
                     "Diagnostic recording cannot train")
@@ -200,6 +208,7 @@ class Dataset:
         return dict(observation=np.asarray(self.rgb[row["observation_index"]]),
                     next_observation=np.asarray(self.rgb[row["next_observation_index"]]),
                     action=json.loads(row["action_json"]), event_refs=row["event_refs"], valid=row["valid"],
+                    **{key: row[key] for key in FIELDS},
                     **{key: row[key] for key in ("episode_outcome", "validity_status", "validity_reasons",
                        "is_terminal", "truncation", "bootstrap_mask", "is_first", "is_last")},
                     source=dict(artifact_id=self.metadata["source_artifact_id"], capture_id=row["capture_id"],

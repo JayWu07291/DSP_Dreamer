@@ -211,6 +211,7 @@ namespace DSPDreamer.Recorder
                 try
                 {
                     var cursor = SnapshotCursor();
+                    now = CaptureProgress(capture);
                     slot.Identity = Identity(now);
                     slot.Identity["requested_ticks"] = now;
                     slot.Identity["capture_id"] = capture++;
@@ -219,6 +220,8 @@ namespace DSPDreamer.Recorder
                     slot.Identity["cursor"] = cursor.Item1;
                     slot.Identity["episode_id"] = episode["episode_id"];
                     slot.Identity["attempt_id"] = episode["attempt_id"];
+                    slot.Identity["task_id"] = progress.Active;
+                    slot.Identity["node_completed"] = (int[])progress.Done.Clone();
                     slot.Dropped = false;
                     if (episode["start_ticks"] == null) firstPending = true;
                     ScreenCapture.CaptureScreenshotIntoRenderTexture(slot.Full);
@@ -435,6 +438,7 @@ namespace DSPDreamer.Recorder
         }
         private void UnbindWorld()
         {
+            UnbindProgress();
             if (history != null) history.onTechUnlocked -= Tech;
             history = null;
             PlanetFactory.onFactoryBuildEntity -= Build;
@@ -442,7 +446,11 @@ namespace DSPDreamer.Recorder
             PlanetFactory.onFactoryDismantleObject -= Dismantle;
             dismantles.Clear();
         }
-        private void Tech(int id, int level, bool direct) { Emit("game_event", Json.Fields("name", "tech_unlocked", "tech_id", id, "level", level, "direct", direct)); }
+        private void Tech(int id, int level, bool direct)
+        {
+            Emit("game_event", Json.Fields("name", "tech_unlocked", "tech_id", id, "level", level, "direct", direct));
+            RecordProgressFact("tech_state", Json.Fields("tech_id", id, "unlocked", GameMain.history.TechUnlocked(id)));
+        }
         private void Build(PlanetFactory factory, int id, int prebuild) { Emit("game_event", Json.Fields("name", "factory_build", "factory_index", factory.index, "entity_id", id, "proto_id", factory.entityPool[id].protoId)); }
         private void BeforeDismantle(PlanetFactory factory, int id) { dismantles[factory.index + ":" + id] = id > 0 ? factory.entityPool[id].protoId : factory.prebuildPool[-id].protoId; }
         private void Dismantle(PlanetFactory factory, int id)

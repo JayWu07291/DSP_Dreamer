@@ -51,7 +51,7 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
 
-資料集格式為 `dsp-transitions/2`，catalog 為 `action_catalog_v3`。舊 `/1` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄，不原地修改或直接補兩個零。raw evidence v2／v3 皆可驗證，重新編譯會從保留的 Space／E 原始輸入產生新版動作，並保存 `source_catalog`。沒有 lifecycle 標記的舊 evidence 仍可編譯，但不推測終止結果，bootstrap mask 保守設為 0。
+資料集格式為 `dsp-transitions/3`，catalog 為 `action_catalog_v3`。舊 `/1`、`/2` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄。raw evidence v2／v3 皆可驗證，重編譯從原始輸入產生新版動作並保存 `source_catalog`。缺 lifecycle 的舊 evidence 不推測終止結果，bootstrap mask 為 0；缺進度事實時 `progress_available=false`，不推測任務或 reward。
 
 ```python
 from dsp_dreamer import open_dataset
@@ -67,11 +67,12 @@ legal_starts = dataset.sequence_starts(64)
 
 轉移包含 `episode_outcome`、`validity_status`、原因、`is_terminal`、`truncation` 與 `bootstrap_mask`。success／death／unrecoverable 的終止轉移不 bootstrap；timeout 可 bootstrap；無效或 incomplete 尾端不 bootstrap。缺 next observation 的動作不產生轉移。`sequence_starts` 只回傳不跨回合、gap 或無效範圍的固定長度起點；未知控制之後的同回合範圍不納入訓練。
 
-目前尚未產生任務、reward 或 10 Hz 模型視圖，但保存所有錄製事件供後續使用。metadata 載入記憶體，畫面串流解碼。長時間錄製的記憶體使用量、完整恢復與訓練門檻需另行驗收。#14 的已測範圍及實機操作步驟見[生命週期驗證報告](docs/validation/issue-14.md)。
+早期進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。完整 ID 與依賴保留，未實作後期 predicate 不完成。判定、欄位時間語意與實機步驟見[早期進度驗證](docs/validation/issue-15.md)。10 Hz 模型視圖、長程記憶體、完整恢復與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
 
 ## 驗證
 
 ```powershell
+dotnet restore tests/ProgressReplay/ProgressReplay.csproj
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m mypy dsp_dreamer
 dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore
