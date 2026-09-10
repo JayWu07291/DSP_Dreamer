@@ -6,7 +6,19 @@
 
 實作 `start_dismantle`、`queue_research`、`queue_crafting`、`fuel_mecha`、`mine_copper`、`place_iron_miner`、`place_copper_miner`，以及 `lander_done`、`electromagnetism_done`。其餘節點保留原 ID、依賴及優先順序，predicate 暫不成立，由 #16 接續。
 
-目前完整測試 30 項通過，mypy 九檔無問題，Release 建置零警告、零錯誤。實機驗收待執行；合成 fixture 與舊原型不能替代本票實機驗收。
+2026-09-10：完整測試 30 項通過，mypy 九檔無問題，Release 建置零警告、零錯誤。使用者操作的正式 20 Hz 早期流程與重試驗收已通過，完整解碼、checksum、實機／離線進度比對及 loader 讀回一致。
+
+## 實機結果
+
+實作提交 `1bf6340`，插件 SHA-256 為 `9f18c34c0b6701b78116df3c126c4207d320287b25c47d6b245f8e4a490d7ded`。來源為 `runs/live/9013a109-5dcb-4f89-b808-c1234d23b823.source`，相鄰 `.evidence`、`.dataset` 保留於本機。量化結果及 manifest 校驗碼見 [issue-15-live.json](issue-15-live.json)；本機重跑腳本為 `tmp/verify-issue15-live.py`。
+
+第一回合 138.463 秒，七個早期微任務及兩個背景里程碑各完成一次。提示依序為 `start_dismantle → queue_research → wait_for_progress → queue_crafting → fuel_mecha → mine_copper → wait_for_progress → supply_metallurgy`。scalar reward 合計 5；鐵／銅採礦機分別於 66.549／122.405 秒完成，當時 active 為 `supply_metallurgy`，兩者 reward_vector 各為 1、scalar reward 為 0。142 筆採礦機產出沒有造成重複完成。
+
+第二回合 28.749 秒，維持同一 trial／session，但 attempt／episode 與世界事件綁定均已更新。初始 23 個節點皆未完成；重新完成開始拆艙、排科技與拆艙完成，scalar reward 合計 2。提示切換沒有重設同一回合歷史，世界重載才重設。
+
+共 3,345 幀、15,835 事件、3,344 筆轉移，其中 3,337 筆有效，合法 64-step sequence 起點 3,085 個。兩次 scheduler gap 正確排除，未記錄 GPU readback、slot 或 writer gap。兩回合分別因 reset、stopped 結束，皆保留 final observation；無效尾端不 bootstrap，sequence 不跨回合。控制釋放要求全部成功。
+
+本次驗證早期判定與重載一致性，不宣稱通過 #21 的 30 分鐘資源門檻。錯礦種、供電／產量不足、混合燃料來源與多節點同區間等反例，由正式錄製到 loader 的整合 fixtures 覆蓋。
 
 ## 判定與時間契約
 
@@ -58,4 +70,4 @@ dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore -c 
 
 審查找到兩項判定風險。採礦機在多執行緒下的礦脈快照可能變動，已改為依原生順序鎖定礦脈及產量資料。燃料只用登陸艙取得額度抵扣插入量，可能誤認其他來源，已改為以外來來源上界及燃燒室現存量證明來源，並加入重複取放反例。
 
-規範軸原有三項判斷性意見，一項已修、兩項保留；規格軸原有兩項風險，均已修正。實機驗收仍待執行。
+規範軸原有三項判斷性意見，一項已修、兩項保留；規格軸原有兩項風險，均已修正並複查。上述實機驗收已完成。

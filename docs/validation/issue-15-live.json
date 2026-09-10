@@ -1,0 +1,103 @@
+{
+  "source": "runs\\live\\9013a109-5dcb-4f89-b808-c1234d23b823.source",
+  "frame_count": 3345,
+  "event_count": 15835,
+  "transitions": 3344,
+  "valid_transitions": 3337,
+  "sequence_starts_64": 3085,
+  "gaps": {
+    "scheduler": 2
+  },
+  "episodes": [
+    {
+      "episode_id": "8177231b-b2ab-49b2-aaad-524b920cbfba",
+      "attempt_id": "1c57e92d-9545-4e07-9a8a-4b1bbd18fbe6",
+      "world_binding": 3,
+      "duration_seconds": 138.4630988,
+      "completed_nodes": [
+        "start_dismantle",
+        "queue_research",
+        "queue_crafting",
+        "fuel_mecha",
+        "mine_copper",
+        "place_iron_miner",
+        "place_copper_miner",
+        "lander_done",
+        "electromagnetism_done"
+      ],
+      "scalar_reward": 5,
+      "prompt_sequence": [
+        "start_dismantle",
+        "queue_research",
+        "wait_for_progress",
+        "queue_crafting",
+        "fuel_mecha",
+        "mine_copper",
+        "wait_for_progress",
+        "supply_metallurgy"
+      ],
+      "completion_seconds": {
+        "0": 2.85,
+        "1": 10.606,
+        "2": 23.561,
+        "3": 24.658,
+        "4": 25.305,
+        "6": 66.549,
+        "7": 122.405,
+        "16": 17.909,
+        "17": 41.897
+      },
+      "facts": {
+        "lander_work": 899,
+        "research_queue": 5,
+        "item_received": 44,
+        "lander_removed": 1,
+        "craft_queued": 5,
+        "fuel_inserted": 1,
+        "tech_state": 1,
+        "miner_output": 142
+      },
+      "final_capture_id": 2769
+    },
+    {
+      "episode_id": "9e97c540-f34b-4af1-8b38-508d82a8ab2a",
+      "attempt_id": "ced07f0d-8d93-40e7-8f98-37c3d644aeed",
+      "world_binding": 4,
+      "duration_seconds": 28.748837,
+      "completed_nodes": [
+        "start_dismantle",
+        "queue_research",
+        "lander_done"
+      ],
+      "scalar_reward": 2,
+      "prompt_sequence": [
+        "start_dismantle",
+        "queue_research",
+        "wait_for_progress",
+        "queue_crafting"
+      ],
+      "completion_seconds": {
+        "0": 4.702,
+        "1": 13.151,
+        "16": 19.75
+      },
+      "facts": {
+        "lander_work": 899,
+        "research_queue": 5,
+        "item_received": 4,
+        "lander_removed": 1
+      },
+      "final_capture_id": 3344
+    }
+  ],
+  "evidence_manifest": {
+    "bytes": 6438,
+    "sha256": "498628257ec352679039ff556b69602ad2db92cb74b46708f8acd6b3f7f53a59"
+  },
+  "dataset_manifest": {
+    "bytes": 230369,
+    "sha256": "a4691a5f2a60a8a8d9b50dd66658a0ef5e9fe707a90e5d5f4dcbf7f28095708a"
+  },
+  "all_release_requests_succeeded": true,
+  "live_offline_match": true
+}
