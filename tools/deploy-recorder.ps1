@@ -1,6 +1,7 @@
 param(
     [string]$DSPRoot = 'E:\Steam\steamapps\common\Dyson Sphere Program',
-    [string]$FFmpeg = 'E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe'
+    [string]$FFmpeg = 'E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe',
+    [switch]$Diagnostics
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -31,6 +32,9 @@ FFmpeg = $FFmpeg
 ApprovedFingerprint =
 Python = $repoRoot\.venv\Scripts\python.exe
 Repository = $repoRoot
+
+[Diagnostics]
+Enabled = $($Diagnostics.IsPresent.ToString().ToLowerInvariant())
 "@
 Set-Content -LiteralPath $config -Value $settings -Encoding utf8
 Get-FileHash -LiteralPath $dll

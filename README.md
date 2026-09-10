@@ -45,11 +45,13 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 發布流程先產生 `recording.mkv`、`frames.ndjson`、`events.ndjson`，最後原子發布 `manifest.json`。流程會完整解碼來源各段與合併影片，比較每幀 RGBA SHA-256 與 ordinal，以 seek 檢查每個段邊界兩側，並核對事件位元組；發布後再次檢查檔案。輸出目錄必須是新目錄，重試不能覆寫既有產物。
 
-編譯器只接受已驗證的四檔錄製證據。動作區間為 `[requested_ticks_t, requested_ticks_next)`，事件依 `(ticks, sequence_number)` 排序。資料保留按住狀態、按住時間比例、按下與放開次數、observed delta／wheel 總和及原始取樣引用。不支援、有歧義、禁止的動作，以及漏幀區間，皆標為無效。Digit1 位於 `action_catalog_v2` 的 index 1，完整順序包含 18 個控制；不使用 Unity enum 數值代替硬體 scan code。
+編譯器只接受已驗證的四檔錄製證據。動作區間為 `[requested_ticks_t, requested_ticks_next)`，事件依 `(ticks, sequence_number)` 排序。資料保留按住狀態、按住時間比例、按下與放開次數、observed delta／wheel 總和及原始取樣引用。不支援、有歧義、禁止的動作，以及漏幀區間，皆標為無效。2026-09-10 使用者新增 Space（跳躍）及 E（單獨開關背包），動作契約升為 `action_catalog_v3`，共 20 維。原本 18 個 index 保持不變，Space 追加在 index 18、E 在 index 19，Digit1 仍在 index 1；不使用 Unity enum 數值代替硬體 scan code。
+
+這項使用者決議修訂 #12 的 v2／18 維設定。後續模型視圖、action encoder 與 policy head 應使用 v3／20 維，尚未實作的模型模組不宣稱已更新。完整控制順序以 `dsp_dreamer/contract.py` 的 `CONTROLS` 為準，並存入每份 dataset metadata 供 loader 核對。
 
 RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
 
-資料集格式為 `dsp-transitions/2`。舊 `/1` 資料集必須從原始 evidence 重編譯到新目錄，不原地修改。沒有 lifecycle 標記的舊 evidence 仍可編譯，但不推測終止結果，bootstrap mask 保守設為 0。
+資料集格式為 `dsp-transitions/2`，catalog 為 `action_catalog_v3`。舊 `/1` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄，不原地修改或直接補兩個零。raw evidence v2／v3 皆可驗證，重新編譯會從保留的 Space／E 原始輸入產生新版動作，並保存 `source_catalog`。沒有 lifecycle 標記的舊 evidence 仍可編譯，但不推測終止結果，bootstrap mask 保守設為 0。
 
 ```python
 from dsp_dreamer import open_dataset
@@ -80,3 +82,15 @@ dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore
 游標合成程式改編自 `codex/prototype-issue-11-lossless` 分支中的 #4 原型，其他正式程式與原型分開實作，既有原型錄製保持不變。
 
 新實機錄製與合成資料的最小整合驗收已通過，結果與限制見[Issue #13 驗證報告](docs/validation/issue-13.md)。`numcodecs` 的棄用警告目前會因 stderr 轉送方式而顯示為 `Error`；請以完整檔案驗證與讀回結果判斷資料是否可用。
+
+## 受控故障測試
+
+診斷模式預設關閉。測試部署使用 `tools/deploy-recorder.ps1 -Diagnostics`，或在開始錄製前設定 `[Diagnostics] Enabled = true`；模式在 F8 開始時固定，寫入來源 metadata。診斷錄製的所有轉移皆不供訓練。完整操作與核對方式見[受控測試步驟](docs/validation/issue-14-controlled-tests.md)。
+
+| 快捷鍵 | 受控情境 |
+| --- | --- |
+| F10 | 回報 human_intervention，走正常 EndEpisode 與控制釋放 |
+| F11 | 模擬一次 release 注入失敗，再立即實際重試 release；保留 injection_failure |
+| F7 | 下一次 GPU readback callback 拋出測試例外，走 recorder_fault 與 final observation 收尾 |
+
+故障皆標 `simulated=true`，不宣稱 Windows 或 GPU 自然發生故障；F12 保留給 Steam 截圖。測試完成後將 Diagnostics 關閉，再開始正式錄製。

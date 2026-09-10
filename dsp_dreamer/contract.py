@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 
 SCHEMA = "dsp-recording/1"
-CATALOG = "action_catalog_v2"
+CATALOG = "action_catalog_v3"
 CONTROLS = ["Escape", "Digit1", "Digit2", "Tab", "W", "R", "T", "LeftControl",
-            "A", "S", "D", "F", "LeftShift", "X", "C", "MouseLeft", "MouseRight", "MouseMiddle"]
+            "A", "S", "D", "F", "LeftShift", "X", "C", "MouseLeft", "MouseRight", "MouseMiddle", "Space", "E"]
 FFMPEG_SHA = "04e1307997530f9cf2fe35cba2ca7e8875ca91da02f89d6c7243df819c94ad00"
 FRAME_BYTES = 640 * 360 * 4
 ENCODE = ["-c:v", "ffv1", "-level", "3", "-coder", "1", "-context", "0",

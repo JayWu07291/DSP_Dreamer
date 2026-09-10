@@ -111,7 +111,7 @@ namespace DSPDreamer.Recorder
             CheckWorld();
             source = Path.Combine(output.Value, Guid.NewGuid().ToString() + ".source");
             Directory.CreateDirectory(source);
-            metadata = Json.Fields("schema", "dsp-recording/1", "catalog", "action_catalog_v2", "source_kind", "live",
+            metadata = Json.Fields("schema", "dsp-recording/1", "catalog", "action_catalog_v3", "source_kind", "live",
                 "recording_session_id", session, "attempt_id", Guid.NewGuid().ToString(), "episode_id", Guid.NewGuid().ToString(),
                 "ticks_frequency", Stopwatch.Frequency, "runtime", runtime);
             episodes = new List<Dictionary<string, object>>();
@@ -120,6 +120,9 @@ namespace DSPDreamer.Recorder
             metadata["trial_manifest"] = trial;
             metadata["episodes"] = episodes;
             metadata["capture_rate_hz"] = 20;
+            diagnosticMode = diagnostics.Value;
+            metadata["diagnostic_mode"] = diagnosticMode;
+            failNextRelease = failNextReadback = false;
             slots = Enumerable.Range(0, 12).Select(_ => new Slot {
                 Full = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB),
                 Small = new RenderTexture(640, 360, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
@@ -225,6 +228,11 @@ namespace DSPDreamer.Recorder
                     {
                         try
                         {
+                            if (failNextReadback)
+                            {
+                                failNextReadback = false;
+                                throw new IOException("Controlled GPU readback failure");
+                            }
                             if (request.hasError) throw new IOException("GPU readback failed");
                             request.GetData<byte>().CopyTo(slot.Pixels);
                             cursor.Item2(slot.Pixels);
@@ -364,6 +372,7 @@ namespace DSPDreamer.Recorder
             }
             try
             {
+                DiagnosticUpdate();
                 if (active && Input.GetKeyDown(KeyCode.F9)) { resetPending = true; EndEpisode(reason: "reset"); }
                 EpisodeUpdate();
             }

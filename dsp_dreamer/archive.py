@@ -14,7 +14,8 @@ from .lifecycle import validate_lifecycle
 
 
 def validate_metadata(metadata):
-    require(metadata["schema"] == SCHEMA and metadata["catalog"] == CATALOG, "Unknown schema or catalog")
+    require(metadata["schema"] == SCHEMA and metadata["catalog"] in ("action_catalog_v2", CATALOG), "Unknown schema or catalog")
+    require(type(metadata.get("diagnostic_mode", False)) is bool, "Invalid diagnostic mode")
     require(metadata["ticks_frequency"] > 0, "Invalid clock frequency")
     for field in ("recording_session_id", "attempt_id", "episode_id"):
         require(bool(metadata[field]), f"Missing {field}")

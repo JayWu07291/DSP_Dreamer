@@ -14,6 +14,8 @@ namespace DSPDreamer.Recorder
     {
         private ConfigEntry<string> baseline;
         private ConfigEntry<int> mechaSeed, cameraSeed, policySeed;
+        private ConfigEntry<bool> diagnostics;
+        private bool diagnosticMode, failNextRelease, failNextReadback;
         private Dictionary<string, object> trial, episode;
         private List<Dictionary<string, object>> episodes;
         private bool worldReady, perturbed, firstPending, finalPending, resetPending, stopPending;
@@ -26,6 +28,22 @@ namespace DSPDreamer.Recorder
             mechaSeed = Config.Bind("Trial", "MechaSeed", 17);
             cameraSeed = Config.Bind("Trial", "CameraSeed", 29);
             policySeed = Config.Bind("Trial", "PolicySeed", 41);
+            diagnostics = Config.Bind("Diagnostics", "Enabled", false, "受控故障測試；此模式的錄製不供訓練。");
+        }
+
+        private void DiagnosticUpdate()
+        {
+            if (!diagnosticMode || !active || episode == null || episode["start_ticks"] == null || episode["end_ticks"] != null) return;
+            string test = Input.GetKeyDown(KeyCode.F10) ? "human_intervention" :
+                Input.GetKeyDown(KeyCode.F11) ? "injection_failure" : Input.GetKeyDown(KeyCode.F7) ? "gpu_readback_error" : null;
+            if (test == null) return;
+            Emit("control_request", Json.Fields("operation", "diagnostic_fault", "case", test, "simulated", true));
+            if (test == "gpu_readback_error") failNextReadback = true;
+            else
+            {
+                failNextRelease = test == "injection_failure";
+                EndEpisode(reason: test);
+            }
         }
 
         private string BaselinePath(string name)
@@ -121,10 +139,11 @@ namespace DSPDreamer.Recorder
             long now = Stopwatch.GetTimestamp();
             episode["end_ticks"] = now;
             episode["episode_outcome"] = outcome;
-            if (reason != null) ((List<string>)episode["validity_reasons"]).Add(reason);
+            var reasons = (List<string>)episode["validity_reasons"];
+            if (reason != null && !reasons.Contains(reason)) reasons.Add(reason);
             Emit("game_event", Json.Fields("name", "episode_ended", "episode_id", episode["episode_id"],
                 "outcome", outcome, "reason", reason));
-            ReleaseControls();
+            if (!ReleaseControls()) ReleaseControls();
             finalPending = (episode["start_ticks"] != null || firstPending) && GameMain.isRunning && !GameMain.isLoading;
             finalDeadline = now + 2 * Stopwatch.Frequency;
             nextDue = now;
@@ -203,8 +222,10 @@ namespace DSPDreamer.Recorder
             inputs.Add(new NativeInput { Type = 0, Data = new InputUnion { Mouse = new MouseInput { Flags = 4 | 16 | 64 } } });
             inputs.Add(new NativeInput { Type = 0, Data = new InputUnion { Mouse = new MouseInput { Flags = 256, Data = 1 } } });
             inputs.Add(new NativeInput { Type = 0, Data = new InputUnion { Mouse = new MouseInput { Flags = 256, Data = 2 } } });
-            bool ok = SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput))) == inputs.Count;
-            Emit("control_request", Json.Fields("operation", "release_all", "succeeded", ok));
+            bool simulated = failNextRelease;
+            failNextRelease = false;
+            bool ok = !simulated && SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput))) == inputs.Count;
+            Emit("control_request", Json.Fields("operation", "release_all", "succeeded", ok, "simulated", simulated));
             if (!ok)
             {
                 if (episode != null)
@@ -213,7 +234,7 @@ namespace DSPDreamer.Recorder
                     if (!reasons.Contains("injection_failure")) reasons.Add("injection_failure");
                     if (episode["final_capture_id"] != null) episode["validity_status"] = "invalid";
                 }
-                Logger.LogError("Control release failed: " + Marshal.GetLastWin32Error());
+                Logger.LogError(simulated ? "Controlled injection failure; retrying release" : "Control release failed: " + Marshal.GetLastWin32Error());
             }
             return ok;
         }

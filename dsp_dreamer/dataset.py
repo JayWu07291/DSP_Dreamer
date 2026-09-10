@@ -105,6 +105,7 @@ def compile_recording(source, destination, ffmpeg):
             lifecycle["lifecycle_valid"] = False
         valid = not (gap or invalid_input or action["ambiguous"] or action["unsupported"] or action["forbidden"])
         valid &= lifecycle.pop("lifecycle_valid")
+        valid &= not manifest.get("diagnostic_mode", False)
         last = index == len(frames) - 2 or second.get("episode_id") != frames[index + 2].get("episode_id")
         if not valid or last and lifecycle["validity_status"] != "valid":
             lifecycle["bootstrap_mask"] = 0
@@ -140,7 +141,9 @@ def compile_recording(source, destination, ffmpeg):
                     table=dict(compression="zstd", row_group_size=1024),
                     tools=dict(compiler="0.1.0", zarr=zarr.__version__, pyarrow=pa.__version__, numpy=np.__version__))
     metadata.update(recording_session_id=manifest["recording_session_id"], attempt_id=manifest["attempt_id"],
-                    trial_manifest=manifest.get("trial_manifest"), episodes=derived_episodes)
+                    trial_manifest=manifest.get("trial_manifest"), episodes=derived_episodes,
+                    source_catalog=manifest["catalog"], controls=CONTROLS,
+                    diagnostic_mode=manifest.get("diagnostic_mode", False))
     save(destination / "dataset.json", metadata)
     # Reopen actual stored chunks and tables before publication.
     for index in range(len(frames)):
@@ -167,6 +170,8 @@ class Dataset:
         self.metadata = load(self.path / "dataset.json")
         require(self.metadata["schema"] == "dsp-transitions/2" and self.metadata["catalog"] == CATALOG,
                 "Unsupported dataset schema/catalog. Recompile original evidence into a new dataset.")
+        require(self.metadata.get("controls") == CONTROLS, "Invalid control order")
+        require(type(self.metadata.get("diagnostic_mode")) is bool, "Missing diagnostic mode")
         require(self.metadata["observation"] == observation_contract(self.metadata["frame_count"]), "Unknown observation codec/layout")
         group = zarr.open_group(str(self.path / "observations.zarr"), mode="r")
         self.rgb = group["rgb"]
@@ -176,6 +181,9 @@ class Dataset:
         self.rows = pq.read_table(self.path / "transitions.parquet").to_pylist()
         require(len(self.rows) == self.metadata["frame_count"] - 1, "Invalid transition count")
         for index, row in enumerate(self.rows):
+            require(len(json.loads(row["action_json"])["binary"]) == len(CONTROLS), "Invalid action width")
+            require(not self.metadata["diagnostic_mode"] or not row["valid"] and row["bootstrap_mask"] == 0,
+                    "Diagnostic recording cannot train")
             require(row["observation_index"] == index and row["next_observation_index"] == index + 1,
                     "Invalid observation index")
             require(row["requested_ticks"] < row["next_requested_ticks"], "Invalid interval time")
