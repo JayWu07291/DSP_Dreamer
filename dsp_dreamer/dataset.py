@@ -11,7 +11,8 @@ import pyarrow.parquet as pq
 import zarr
 from zarr.codecs.blosc import BloscCodec
 
-from .archive import capacity_preflight, verify_recording
+from .archive import capacity_preflight, verify_recording, validate_events
+from .actions import ACTION_CODEC, forbidden_buttons, validate_action_contract
 from .contract import CATALOG, CONTROLS, atomic_save, file_info, load, require, save, sha
 from .video import decode
 from .lifecycle import transition_lifecycle
@@ -20,7 +21,19 @@ from .progress import FIELDS, TASKS, MILESTONES, replay_progress, validate_progr
 
 def observation_contract(count):
     return dict(dtype="uint8", shape=[count, 360, 640, 3], chunks=[1, 360, 640, 3],
-                shards=None, codec="blosc/zstd", zarr_format=3)
+                shards=None, codec="blosc/zstd", zarr_format=3, color_space="sRGB", layout="HWC")
+
+
+def table_contract(path):
+    table = pq.ParquetFile(path)
+    return dict(schema=table.schema_arrow.serialize().to_pybytes().hex(),
+                rows=table.metadata.num_rows, row_group_size=1024,
+                row_groups=[dict(rows=table.metadata.row_group(i).num_rows,
+                    columns=[dict(name=table.metadata.row_group(i).column(j).path_in_schema,
+                                  dtype=table.metadata.row_group(i).column(j).physical_type,
+                                  codec=table.metadata.row_group(i).column(j).compression)
+                             for j in range(table.metadata.num_columns)])
+                            for i in range(table.metadata.num_row_groups)])
 
 
 def aggregate(samples, start, end, initial):
@@ -29,7 +42,7 @@ def aggregate(samples, start, end, initial):
     duration: Counter[str] = Counter()
     down: Counter[str] = Counter()
     up: Counter[str] = Counter()
-    delta, wheel = [0.0, 0.0], 0.0
+    delta, wheel, horizontal_wheel = [0.0, 0.0], 0.0, 0.0
     cursor = start
     ambiguous = False
     unsupported = bool(held - set(CONTROLS))
@@ -48,16 +61,16 @@ def aggregate(samples, start, end, initial):
         unsupported |= bool((held | downs | ups) - set(CONTROLS)) or bool(sample.get("horizontal_wheel", 0))
         delta = [delta[i] + sample["delta"][i] for i in range(2)]
         wheel += sample["wheel"]
+        horizontal_wheel += sample.get("horizontal_wheel", 0)
         refs.append(sample["sequence_number"])
     for key in held:
         duration[key] += end - cursor
     fraction = {key: duration[key] / (end - start) for key in sorted(set(CONTROLS) | set(duration))}
     active = {key for key in CONTROLS if down[key] > 0 or fraction[key] >= 0.5}
-    forbidden = any(set(pair) <= active for pair in [("W", "S"), ("A", "D"), ("LeftControl", "LeftShift"),
-                    ("MouseLeft", "MouseRight"), ("MouseLeft", "MouseMiddle"), ("MouseRight", "MouseMiddle")])
+    forbidden = forbidden_buttons([int(key in active) for key in CONTROLS])
     ambiguous |= any(count > 1 for count in (*down.values(), *up.values()))
     return dict(start_held=start_held, end_held=sorted(held), held_fraction=fraction,
-                down_counts=dict(down), up_counts=dict(up), delta=delta, wheel=wheel,
+                down_counts=dict(down), up_counts=dict(up), delta=delta, wheel=wheel, horizontal_wheel=horizontal_wheel,
                 sample_refs=refs, ambiguous=bool(ambiguous), unsupported=bool(unsupported),
                 forbidden=forbidden, binary=[int(key in active) for key in CONTROLS])
 
@@ -137,7 +150,7 @@ def compile_recording(source, destination, ffmpeg):
     event_schema = pa.schema([("ticks", pa.int64()), ("sequence_number", pa.int64()),
                              ("type", pa.string()), ("payload_json", pa.string())])
     pq.write_table(pa.Table.from_pylist(event_rows, schema=event_schema), destination / "events.parquet", compression="zstd", row_group_size=1024)
-    metadata = dict(schema="dsp-transitions/3", catalog=CATALOG, artifact_id=str(uuid.uuid4()),
+    metadata = dict(schema="dsp-transitions/4", catalog=CATALOG, artifact_id=str(uuid.uuid4()),
                     source_artifact_id=manifest["artifact_id"], source_manifest=file_info(source / "manifest.json"),
                     source_kind=manifest["source_kind"], episode_id=manifest["episode_id"],
                     ticks_frequency=manifest["ticks_frequency"], frame_count=len(frames), rgb_sha256=rgb_hashes,
@@ -150,6 +163,9 @@ def compile_recording(source, destination, ffmpeg):
                     diagnostic_mode=manifest.get("diagnostic_mode", False))
     metadata.update(progress_version=manifest.get("progress_version"), tasks=TASKS, milestones=MILESTONES)
     metadata["recovery"] = manifest.get("recovery")
+    metadata.update(action_codec=ACTION_CODEC, capture_hz=20, runtime=manifest.get("runtime"),
+                    array_metadata=rgb.metadata.to_dict(),
+                    tables={name: table_contract(destination / name) for name in ("transitions.parquet", "events.parquet")})
     save(destination / "dataset.json", metadata)
     # Reopen actual stored chunks and tables before publication.
     for index in range(len(frames)):
@@ -174,23 +190,62 @@ class Dataset:
         for name, info in completed["files"].items():
             require(file_info(self.path / name) == info, f"Dataset checksum mismatch: {name}")
         self.metadata = load(self.path / "dataset.json")
-        require(self.metadata["schema"] == "dsp-transitions/3" and self.metadata["catalog"] == CATALOG,
+        require({"schema", "catalog", "artifact_id", "source_artifact_id", "source_manifest", "source_kind",
+                 "recording_session_id", "attempt_id", "episode_id", "ticks_frequency", "frame_count", "rgb_sha256",
+                 "observation", "table", "tools", "trial_manifest", "episodes", "source_catalog", "controls",
+                 "diagnostic_mode", "progress_version", "tasks", "milestones", "recovery", "runtime",
+                 "action_codec", "capture_hz", "array_metadata", "tables"} <= self.metadata.keys(), "Missing dataset field")
+        require(self.metadata["schema"] == "dsp-transitions/4" and self.metadata["catalog"] == CATALOG,
                 "Unsupported dataset schema/catalog. Recompile original evidence into a new dataset.")
         require(self.metadata.get("controls") == CONTROLS, "Invalid control order")
+        require(type(self.metadata["frame_count"]) is int and self.metadata["frame_count"] >= 2, "Invalid frame count")
+        require(self.metadata["table"] == dict(compression="zstd", row_group_size=1024), "Unsupported table contract")
+        validate_action_contract(self.metadata.get("action_codec"))
+        require(self.metadata.get("capture_hz") == 20 and type(self.metadata.get("ticks_frequency")) is int
+                and self.metadata["ticks_frequency"] > 0, "Invalid capture clock")
         require(type(self.metadata.get("diagnostic_mode")) is bool, "Missing diagnostic mode")
         require(self.metadata["observation"] == observation_contract(self.metadata["frame_count"]), "Unknown observation codec/layout")
         group = zarr.open_group(str(self.path / "observations.zarr"), mode="r")
         self.rgb = group["rgb"]
         assert isinstance(self.rgb, zarr.Array)
+        actual_array = json.loads(json.dumps(self.rgb.metadata.to_dict()))
+        require(actual_array == self.metadata.get("array_metadata"), "Array metadata mismatch")
+        require(self.rgb.chunks == (1, 360, 640, 3) and self.rgb.shards is None
+                and self.rgb.metadata.zarr_format == 3
+                and actual_array["codecs"] == [dict(name="bytes"),
+                    BloscCodec(cname="zstd", clevel=3, typesize=1, shuffle="bitshuffle").to_dict()],
+                "Unsupported actual observation codec/layout")
         require(list(self.rgb.shape) == self.metadata["observation"]["shape"] and self.rgb.dtype == np.uint8,
                 "Observation shape/dtype mismatch")
+        for name in ("transitions.parquet", "events.parquet"):
+            actual_table = table_contract(self.path / name)
+            require(actual_table == self.metadata.get("tables", {}).get(name), "Table schema/layout mismatch")
+            require(all(0 <= group["rows"] <= 1024 and all(c["codec"] == "ZSTD" for c in group["columns"])
+                        for group in actual_table["row_groups"]), "Unsupported table codec/layout")
         self.rows = pq.read_table(self.path / "transitions.parquet").to_pylist()
+        event_rows = pq.read_table(self.path / "events.parquet").to_pylist()
+        self.events = [json.loads(e["payload_json"]) for e in event_rows]
+        validate_events(self.events)
+        require(all(all(row[k] == event[k] for k in ("ticks", "sequence_number", "type"))
+                    for row, event in zip(event_rows, self.events)), "Event payload identity mismatch")
+        require(self.events == sorted(self.events, key=lambda e: (e["ticks"], e["sequence_number"])),
+                "Nonmonotonic event time")
         require(self.metadata.get("tasks") == TASKS and self.metadata.get("milestones") == MILESTONES,
                 "Invalid task/milestone catalog. Recompile original evidence.")
         version = self.metadata.get("progress_version")
         require(version is None or type(version) is int and version in (1, 2, 3), "Unknown progress version")
         require(len(self.rows) == self.metadata["frame_count"] - 1, "Invalid transition count")
+        event_index, held = 0, []
         for index, row in enumerate(self.rows):
+            required = {"observation_index", "next_observation_index", "requested_ticks", "next_requested_ticks",
+                        "capture_id", "next_capture_id", "action_json", "event_refs", "valid", "gap", "episode_id",
+                        "attempt_id", "episode_outcome", "validity_status", "validity_reasons", "is_terminal",
+                        "truncation", "bootstrap_mask", "is_first", "is_last"}
+            require(required <= row.keys(), "Missing transition field")
+            require(all(type(row[k]) is int and row[k] >= 0 for k in ("observation_index", "next_observation_index",
+                        "requested_ticks", "next_requested_ticks", "capture_id", "next_capture_id")), "Invalid transition index/time")
+            require(row["capture_id"] < row["next_capture_id"] and (index == 0 or
+                    row["capture_id"] == self.rows[index - 1]["next_capture_id"]), "Nonmonotonic capture index")
             validate_progress_row(row, version in (1, 2, 3))
             require(len(json.loads(row["action_json"])["binary"]) == len(CONTROLS), "Invalid action width")
             require(not self.metadata["diagnostic_mode"] or not row["valid"] and row["bootstrap_mask"] == 0,
@@ -200,6 +255,25 @@ class Dataset:
             require(row["requested_ticks"] < row["next_requested_ticks"], "Invalid interval time")
             if index:
                 require(row["requested_ticks"] == self.rows[index - 1]["next_requested_ticks"], "Nonmonotonic transition time")
+            while event_index < len(self.events) and self.events[event_index]["ticks"] < row["requested_ticks"]:
+                if self.events[event_index]["type"] == "input":
+                    held = self.events[event_index]["held"]
+                event_index += 1
+            interval = []
+            while event_index < len(self.events) and self.events[event_index]["ticks"] < row["next_requested_ticks"]:
+                interval.append(self.events[event_index])
+                event_index += 1
+            action = aggregate([e for e in interval if e["type"] == "input"], row["requested_ticks"], row["next_requested_ticks"], held)
+            require(json.loads(row["action_json"]) == action, "Actual action differs from input evidence")
+            held = action["end_held"]
+            require(row["event_refs"] == [e["sequence_number"] for e in interval if e["type"] != "input"], "Invalid event reference")
+            require(all(type(row[k]) is bool for k in ("valid", "gap", "is_terminal", "truncation", "is_first", "is_last"))
+                    and type(row["bootstrap_mask"]) is int and row["bootstrap_mask"] in (0, 1), "Invalid validity flags")
+            require(not row["valid"] or not any(action[k] for k in ("ambiguous", "unsupported", "forbidden"))
+                    and not row["gap"] and all(e.get("focused", True) for e in interval if e["type"] == "input"),
+                    "Invalid input marked trainable")
+            require(row["valid"] or row["bootstrap_mask"] == 0, "Invalid bootstrap target")
+        require(len(self.metadata["rgb_sha256"]) == self.metadata["frame_count"], "Missing RGB checksums")
         for index, expected in enumerate(self.metadata["rgb_sha256"]):
             require(sha(np.asarray(self.rgb[index]).tobytes()) == expected, "Compiled RGB checksum mismatch")
 
@@ -229,4 +303,8 @@ class Dataset:
 
 
 def open_dataset(path):
-    return Dataset(path)
+    try:
+        return Dataset(path)
+    except (KeyError, TypeError, IndexError) as error:
+        from .contract import InvalidRecording
+        raise InvalidRecording(f"Missing or invalid dataset field: {error}") from error

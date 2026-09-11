@@ -38,7 +38,7 @@ def test_timeout_final_observation_and_retry_keep_source_identity(tmp_path):
     assert dataset[0]["source"]["attempt_id"] != dataset[3]["source"]["attempt_id"]
     assert dataset[0]["source"]["split_group_id"] == dataset[3]["source"]["split_group_id"]
     assert dataset.sequence_starts(2) == [0]
-    assert dataset.metadata["schema"] == "dsp-transitions/3"
+    assert dataset.metadata["schema"] == "dsp-transitions/4"
     metadata_path = tmp_path / "dataset" / "dataset.json"
     old = dict(dataset.metadata, schema="dsp-transitions/1")
     metadata_path.write_text(json.dumps(old), encoding="utf-8")

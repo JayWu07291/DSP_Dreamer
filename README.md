@@ -64,7 +64,7 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
 
-資料集格式為 `dsp-transitions/3`，catalog 為 `action_catalog_v3`。舊 `/1`、`/2` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄。raw evidence v2／v3 皆可驗證，重編譯從原始輸入產生新版動作並保存 `source_catalog`。缺 lifecycle 的舊 evidence 不推測終止結果，bootstrap mask 為 0；缺進度事實時 `progress_available=false`，不推測任務或 reward。
+資料集格式為 `dsp-transitions/4`，catalog 為 `action_catalog_v3`。舊 `/1`、`/2`、`/3` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄。raw evidence v2／v3 皆可驗證，重編譯從原始輸入產生新版動作並保存 `source_catalog`。缺 lifecycle 的舊 evidence 不推測終止結果，bootstrap mask 為 0；缺進度事實時 `progress_available=false`，不推測任務或 reward。
 
 ```python
 from dsp_dreamer import open_dataset
@@ -80,7 +80,25 @@ legal_starts = dataset.sequence_starts(64)
 
 轉移包含 `episode_outcome`、`validity_status`、原因、`is_terminal`、`truncation` 與 `bootstrap_mask`。success／death／unrecoverable 的終止轉移不 bootstrap；timeout 可 bootstrap；無效或 incomplete 尾端不 bootstrap。缺 next observation 的動作不產生轉移。`sequence_starts` 只回傳不跨回合、gap 或無效範圍的固定長度起點；未知控制之後的同回合範圍不納入訓練。
 
-進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。新版 `progress_version=3` 依目前供電、固定配方、採礦機／傳送帶／分揀器連接與各機器實際產出判定完整產線。允許保留或補入人工材料；只有人工餵料、缺少可自行運作的上游連接不算成功。舊版 1、2 保留各自原有重播語意。完整契約、已測範圍與實機驗收結果見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。10 Hz 模型視圖、長程記憶體與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
+進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。新版 `progress_version=3` 依目前供電、固定配方、採礦機／傳送帶／分揀器連接與各機器實際產出判定完整產線。允許保留或補入人工材料；只有人工餵料、缺少可自行運作的上游連接不算成功。舊版 1、2 保留各自原有重播語意。完整契約、已測範圍與實機驗收結果見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。長程記憶體與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
+
+## 10 Hz 模型視圖
+
+```python
+from dsp_dreamer import open_model_view
+
+view = open_model_view("runs/example.source.dataset")
+window = view[0]
+batch = view.sequence(start=0, length=64, burn_in=8)
+inputs = batch["inputs"]
+valid_mask, loss_mask = batch["valid_mask"], batch["loss_mask"]
+```
+
+loader 合併同回合的兩個相鄰 capture 區間，沿用原始 request ticks 與半開區間規則。它從原始 samples 重算 held、fraction、down/up、delta 與雙向 wheel，再將合計滑鼠 delta 各軸乘 20.0，以 mu-law 量化為 121 類。mouse 類別為 `x_bin*11+y_bin`，wheel 負／零／正對應 0／1／2；全零 binary、mouse=60、wheel=1 是唯一 no-op。共用 `dsp_dreamer.actions` 提供編解碼與 catalog／checkpoint 契約驗證。
+
+`inputs` 只包含完整 RGB float32 CHW、17 維任務條件和模型動作；reward、next observation 與 bootstrap 放在 `targets`。逐窗結果另外保存原始動作、sample／event 引用、區間內 task 切換與來源索引。合併 reward_vector 保存所有完成，scalar reward 只取視窗起始 task。`view.metadata` 保存 loader、codec、來源 COMPLETED checksum 與可重現的模型視圖 ID，可隨訓練紀錄保存。
+
+重複 click 或非法組合可能在合併後才出現，這些視窗保留證據但不供 BC／dynamics。不足兩個區間的尾段同樣不供訓練，保留 final observation 的來源。`sequence_starts` 只列出完整合法起點；`sequence` 遇無效區間或回合邊界便停止並補零。`valid_mask` 區分實際樣本與 padding，`loss_mask` 另排除 burn-in。不要將逐窗的無效資料直接送入模型，其 `inputs.action` 為 null。驗證範圍見 [#18 報告](docs/validation/issue-18.md)。
 
 ## 驗證
 

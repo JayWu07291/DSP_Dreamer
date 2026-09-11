@@ -353,7 +353,7 @@ def test_missing_capture_preserves_scheduler_boundary_and_validates_loader(tmp_p
     import pyarrow.parquet as pq
     rows = pq.read_table(dataset_path / "transitions.parquet").to_pylist()
     rows[1]["reward"] = 1
-    pq.write_table(pa.Table.from_pylist(rows), dataset_path / "transitions.parquet")
+    pq.write_table(pa.Table.from_pylist(rows), dataset_path / "transitions.parquet", compression="zstd")
     completed = json.loads((dataset_path / "COMPLETED").read_text())
     completed["files"]["transitions.parquet"] = file_info(dataset_path / "transitions.parquet")
     (dataset_path / "COMPLETED").write_text(json.dumps(completed))

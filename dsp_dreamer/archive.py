@@ -59,6 +59,13 @@ def validate_indices(frames, events):
         require(segment == f"segment-{ordinal // 200:06}.mkv", "Invalid cross-segment index")
         require(frame["segment_ordinal"] == ordinal % 200, "Invalid segment ordinal")
         identities.append(frame["sequence_number"])
+    validate_events(events)
+    identities.extend(event["sequence_number"] for event in events)
+    require(len(set(identities)) == len(identities) and all(x >= 0 for x in identities), "Duplicate sequence identity")
+
+
+def validate_events(events):
+    identities = []
     for event in events:
         for name in ("ticks", "sequence_number"):
             require(type(event.get(name)) is int and event[name] >= 0, f"Invalid event {name}")
