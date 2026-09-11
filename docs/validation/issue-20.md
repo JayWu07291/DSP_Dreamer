@@ -143,6 +143,14 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 介入後 release 成功送出 26／26，首筆 input 在 22.0454 ms 後 held 清空，無後續模型要求，final capture 65 存在。逐筆依據與來源 checksum 見[人工介入證據](issue-20-intervention-live.json)。重試 Shift+F10 時應快速連按兩鍵，避免提前長按 Shift 被探針釋放；這是目前快捷鍵操作的限制。
 
+## 注入失敗重測通過
+
+錄製 `9fd90d90-c43d-4d8b-865f-140d5fe9e810` 已由正式 dataset loader 讀回。sequence 3916 明確標記 `diagnostic_fault`／`injection_failure`／`simulated=true`，episode 以 `injection_failure` 結束。3918 模擬首次 release 失敗（0／28），3919 實際重試成功（28／28、`simulated=false`）。
+
+故障前 held 為 F10／LeftShift；結束後 20.1035 ms 的 sequence 3922 讀到兩鍵 up 且 held 清空。後續 425 筆 input 中僅最後發布用的 F8 另有 held，沒有後續模型要求。final capture 65 存在，episode 保留 `invalid`／`injection_failure`；完整校正 gate 為 false 符合故障案例。這證明受控失敗後的實際釋放重試，不代表重現了 Windows 原生注入失敗。逐筆依據與來源 checksum 見[注入失敗證據](issue-20-injection-failure-live.json)。
+
+下一個人工案例：F6 開始探針，自動操作開始後按一次 F7，放開按鍵、等一秒，再按 F8 完成發布，核對受控 readback 例外、`recorder_fault`、釋放與 final observation／incomplete 狀態。Config 不必修改。
+
 ## 規範審查
 
 無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。
