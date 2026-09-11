@@ -90,6 +90,14 @@ Case = focus_hold
 
 首筆空 held 距 episode 結束 204.1987 ms，距 OnDestroy 完成 13.2345 ms；兩回呼之間沒有 input 樣本，不能把 204.1987 ms 當作 Windows 實際釋放延遲。未取得 final observation，episode 保留 `incomplete`／`stopped`。結果與 journal checksum 見[插件銷毀證據](issue-20-destroy-live.json)。四種新增專用診斷均已有通過證據；最後仍須重啟 DSP、設定 `Case = full` 並完整 F6 重錄，確認銷毀後重啟恢復正常。
 
+## 銷毀後重啟驗證通過
+
+2026-09-12：錄製 `b19a7531-6dfb-4489-a8ee-2b3c15bcb178` 已通過正式 dataset 讀回與完整控制核對，`gate_passed=true`，44／44 模型要求及 45／45 必要釋放確認。延遲 11.0517–17.9896 ms，MouseLeft held 217.5196 ms，NumPad1 讀為 End 並通過區分。發布 406 張影像，final capture 405 存在。
+
+DLL SHA-256 與新版校正相同，runtime fingerprint 仍為 `592974525a9245d33c0f813e4cab69d08358fd819afb382726565610c9fdb8c0`。不需替換 `issue20-2a05b2a4-calibration.json` 或更新其核准 SHA。來源 checksum 與完整逐筆結果見[銷毀後重啟證據](issue-20-destroy-restart-live.json)。本輪補驗的 focus_hold、final_readback、disable、destroy 與重啟恢復均已通過；專用入口的實機驗證完成。
+
+恢復正常人工錄製時設定 `[Diagnostics] Enabled = false`、`Case = full`，保留已核准指紋與校正，之後 F8 為人工錄製開始／停止。上述 F6 證據皆為診斷，不代表 policy runner、代理微任務成果或 #31 的 gate；沒有據此自動更新或關閉 GitHub issue。
+
 ## 離線驗證與審查
 
 2026-09-11：完整 pytest 136 項通過，139.44 秒，JUnit 存於本機 `tmp/issue20-diagnostic-tests-final.xml`。其中 8 項診斷核對測試涵蓋 checksum／錄製身分、缺失回呼與釋放、零封包或缺 down、失焦清空與回焦殘留、final capture 故障位置及錯誤收錄。mypy 16 檔通過，Release 建置 0 warnings／0 errors。這些離線結果不取代新版實機操作。
