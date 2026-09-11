@@ -60,6 +60,7 @@ namespace DSPDreamer.Recorder
             python = Config.Bind("Recording", "Python", "", "Python with dsp-dreamer dependencies.");
             repository = Config.Bind("Recording", "Repository", "", "Production dsp_dreamer package directory.");
             ConfigureEpisodes();
+            ConfigureControl();
             harmony = new Harmony("tw.jaywu.dspdreamer.recorder");
             harmony.PatchAll(typeof(RecorderPlugin).Assembly);
             StartCoroutine(CaptureLoop());
@@ -69,7 +70,7 @@ namespace DSPDreamer.Recorder
         {
             var hashes = Json.Fields();
             foreach (var assembly in new[] { typeof(GameMain).Assembly, typeof(BaseUnityPlugin).Assembly,
-                     typeof(Harmony).Assembly, typeof(RecorderPlugin).Assembly, typeof(Input).Assembly,
+                     typeof(Harmony).Assembly, typeof(RecorderPlugin).Assembly, typeof(Input).Assembly, typeof(JsonUtility).Assembly,
                      typeof(ScreenCapture).Assembly, typeof(RenderTexture).Assembly })
             {
                 string name = assembly.GetName().Name;
@@ -80,6 +81,7 @@ namespace DSPDreamer.Recorder
             }
             hashes["UnityPlayer"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "UnityPlayer.dll"));
             hashes["DSPGAME"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "DSPGAME.exe"));
+            hashes["globalgamemanagers"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "DSPGAME_Data", "globalgamemanagers"));
             if ((string)hashes["Assembly-CSharp"] != "ae0ba95f75bd879a62aa4ce253b2ab78eaa4fb3c7c595f5e1fee75ebe0e0ef85")
                 throw new InvalidOperationException("Unknown game binary fingerprint");
             if (typeof(BaseUnityPlugin).Assembly.GetName().Version.ToString() != "5.4.23.5" ||
@@ -91,11 +93,13 @@ namespace DSPDreamer.Recorder
                 "game_version", GameConfig.gameVersion + "." + GameConfig.build, "unity_version", Application.unityVersion,
                 "plugin_version", "0.1.0", "binary_hashes", hashes,
                 "input_settings_sha256", SegmentWriter.HashFile(GameConfig.gameXMLOptionPath),
+                "windows_mouse_settings", MouseSettings(),
+                "native_mouse_scale", NativeScale(),
                 "screen_width", Screen.width, "screen_height", Screen.height,
                 "graphics_device", SystemInfo.graphicsDeviceType.ToString());
         }
 
-        private void StartRecording()
+        private void StartRecording(string mode = "human")
         {
             if (writer != null || failed || !GameMain.isRunning || !Application.isFocused) return;
             Config.Reload();
@@ -108,6 +112,14 @@ namespace DSPDreamer.Recorder
                 throw new InvalidOperationException("Unknown fingerprint. Review runtime-candidate.json; SHA-256=" + digest);
             runtime["fingerprint_verified"] = true;
             runtime["approved_fingerprint"] = digest;
+            if (mode != "calibration") CheckCalibration(digest);
+            controlMode = mode;
+            frozenSettings = InputSettingsIdentity();
+            lastAction = requestId = nextProbe = 0;
+            policyStarted = false;
+            pendingAction = null;
+            probe = -1;
+            probeRelease = false;
             trial = TrialManifest();
             CheckWorld();
             source = Path.Combine(output.Value, Guid.NewGuid().ToString() + ".source");
@@ -121,8 +133,10 @@ namespace DSPDreamer.Recorder
             metadata["trial_manifest"] = trial;
             metadata["episodes"] = episodes;
             metadata["capture_rate_hz"] = 20;
-            diagnosticMode = diagnostics.Value;
+            diagnosticMode = diagnostics.Value || mode == "calibration";
             metadata["diagnostic_mode"] = diagnosticMode;
+            metadata["control_mode"] = mode;
+            metadata["calibration_sha256"] = mode == "calibration" ? null : calibrationApproval.Value;
             failNextRelease = failNextReadback = false;
             slots = Enumerable.Range(0, 12).Select(_ => new Slot {
                 Full = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB),
@@ -377,6 +391,11 @@ namespace DSPDreamer.Recorder
 
         private void Update()
         {
+            if (!active && !stopping && Input.GetKeyDown(KeyCode.F6))
+            {
+                try { StartRecording("calibration"); }
+                catch (Exception ex) { Logger.LogError(ex); }
+            }
             if (Input.GetKeyDown(KeyCode.F8))
             {
                 try
@@ -391,6 +410,7 @@ namespace DSPDreamer.Recorder
                 DiagnosticUpdate();
                 if (active && Input.GetKeyDown(KeyCode.F9)) { resetPending = true; EndEpisode(reason: "reset"); }
                 EpisodeUpdate();
+                ControlUpdate();
             }
             catch (Exception ex) { failed = true; Logger.LogError(ex); }
             if (failed && !stopping && writer != null) StopRecording();
@@ -429,7 +449,8 @@ namespace DSPDreamer.Recorder
             try
             {
                 var expected = (Dictionary<string, object>)metadata["runtime"];
-                if (SegmentWriter.HashFile(GameConfig.gameXMLOptionPath) != (string)expected["input_settings_sha256"] ||
+                if (InputSettingsIdentity() != frozenSettings ||
+                    SegmentWriter.HashFile(GameConfig.gameXMLOptionPath) != (string)expected["input_settings_sha256"] ||
                     Screen.width != (int)expected["screen_width"] || Screen.height != (int)expected["screen_height"])
                     failed = true;
             }
@@ -480,6 +501,7 @@ namespace DSPDreamer.Recorder
         {
             EndEpisode(reason: "stopped");
             StopRecording();
+            ReleaseControls();
             if (pending != 0) AsyncGPUReadback.WaitAllRequests();
             drained = true;
             harmony?.UnpatchSelf(); Current = null;

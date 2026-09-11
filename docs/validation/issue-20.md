@@ -1,0 +1,96 @@
+# Issue #20 控制路徑與人工實機驗證
+
+目前已實作 v3／20 維模型動作注入、校正探針與正式資料讀回核對。實機驗收尚未執行，不宣稱本票已通過。依使用者要求，由使用者操作遊戲，不使用 Computer Use。
+
+## 契約與前置證據
+
+沿用 #12 與 #10，並採用 #14 追加 Space／E、#18 已驗收的 `action_catalog_v3`。已核對 [#18 驗收報告](issue-18.md)及其完整流程、重試資料，沒有以 issue 關閉狀態代替品質證據。
+
+鍵盤使用 set-1 scan code，Digit1／Digit2 分別是 `0x02`／`0x03`。NumPad1 的 `0x4F` 只用於診斷，不能成為模型控制。MouseLeft／Right／Middle、相對移動與垂直 wheel 使用原生封包。每次注入和釋放記錄 requested／sent count、request ticks；實際動作仍來自 `VFInput.OnUpdate` 後的 `input`，不以成功送出數取代 DSP 觀察。
+
+原生 API 依 Microsoft 的 [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)、[KEYBDINPUT](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-keybdinput)及 [MOUSEINPUT](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput) 定義。SendInput 的回傳數表示已插入 Windows 輸入串流，不代表遊戲已接收；UIPI 阻擋也不能只靠 error code 辨認。
+
+## 由你操作
+
+以下指令在 `E:\GitHub\DSP_Dreamer` 的 PowerShell 執行。先關閉 DSP。
+
+```powershell
+.\tools\deploy-recorder.ps1 -Diagnostics
+```
+
+部署腳本先備份既有 DLL／設定，再編譯部署。它會清空 `ApprovedFingerprint`，不自動核准環境或校正。
+
+1. 啟動 DSP，載入已存在的 `Starting Save` 基準存檔。開啟 Num Lock，確認沒有其他錄製或控制工具正在送鍵鼠。
+2. 按一次 **F6**。第一次會因環境尚未核准而拒絕，並寫出 `runs/live/runtime-candidate.json`。
+3. 檢查候選中的遊戲、Unity、插件與 `globalgamemanagers` 雜湊、DSP 設定、畫面尺寸及 `windows_mouse_settings`。陣列順序為 sensitivity、threshold1、threshold2、acceleration。用下列指令取得 SHA-256，再把值填入 `E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\config\tw.jaywu.dspdreamer.recorder.cfg` 的 `[Recording] ApprovedFingerprint`。
+
+```powershell
+(Get-FileHash .\runs\live\runtime-candidate.json -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+4. 回到 DSP，將游標放在不會點到按鈕的空白位置，再按 **F6**。錄製器重新載入基準，第一張有效 RGB 後等待一秒，依序測 20 個控制、兩軸各 11 個 mouse bins、正負 wheel 與 NumPad1。每次按住及放開各等 200 ms，探針本身約 18 秒，載入和發布另計。Escape 排在按鍵探針最後，避免後續左鍵點擊暫停選單。
+5. 期間不要操作鍵鼠或切換視窗。要中止可按 **F8**；失焦也會終止並釋放。這類中止錄製保留供失敗核對，不可當作完整校正。
+6. 自動停止後等待 `BepInEx/LogOutput.log` 出現 `Recording, compilation, and readback completed`。記下該行的 `.source` 路徑。其旁應有 `.source.evidence` 與 `.source.dataset`。
+7. 將下列 `<錄製ID>` 換成實際目錄名稱。先輸出完整核對報告，再嘗試發布校正。輸出檔不可覆寫，重跑請使用新檔名。
+
+```powershell
+.\.venv\Scripts\python.exe tools\verify-control.py --dataset "runs\live\<錄製ID>.source.dataset" --out "runs\issue20-control-report.json"
+.\.venv\Scripts\python.exe tools\verify-control.py --dataset "runs\live\<錄製ID>.source.dataset" --out "runs\issue20-calibration.json" --calibration
+```
+
+8. 校正發布必須通過全部控制、NumPad1 區分、兩軸 bins、wheel、實際 down／held、放開、左鍵至少 100 ms 及 requested-to-observed ≤100 ms。Synthetic recording 永遠不能核准實機校正。請將報告或路徑提供給我核對；失敗時保留四檔 evidence，不修改原始輸入或把 `gate_passed` 手改為 true。
+9. 校正核對後，在 `[Control]` 填入下列設定。SHA-256 使用實際校正檔的值。關閉 `[Diagnostics] Enabled` 後，**F8** 才是正常人工錄製入口。
+
+```ini
+[Control]
+CalibrationFile = E:\GitHub\DSP_Dreamer\runs\issue20-calibration.json
+ApprovedCalibration = <校正檔的SHA-256>
+NativeScaleX = 1
+NativeScaleY = -1
+```
+
+```powershell
+(Get-FileHash .\runs\issue20-calibration.json -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+遊戲或插件重建、DSP／Windows 滑鼠設定、畫面尺寸、NativeScaleX／Y 改變後，舊指紋或校正會被拒絕，須重新執行以上步驟。NativeScaleX／Y 保留原生位移調整入口；模型的 observed-to-pixel 比例仍固定為 20.0，不能藉由更改模型 codec 讓不合格校正過關。
+
+## 另存故障案例
+
+保留一份完整探針後，再另開 F6 錄製分別測試下列情境。每次都等發布完成再開始下一次，並記下案例與 `.source` ID。這些報告預期不通過完整校正。
+
+| 操作 | 應核對的證據 |
+| --- | --- |
+| 測試中按 F8 | `stopped`、release count、之後沒有 held |
+| 測試中切到其他視窗 | `focus_loss`、立即釋放；回到 DSP 不再繼續送模型動作 |
+| 測試中按 F9 | `reset`、釋放、相同 trial manifest、新 attempt／episode |
+| 啟用 Diagnostics，測試中按 Shift+F10 | `simulated=true` 的 injection failure、實際 release 重試及 episode 原因 |
+| 啟用 Diagnostics，測試中按 F7 | 受控 readback 例外、`recorder_fault`、釋放與 final observation／incomplete 狀態 |
+| 測試中退出至主選單 | `world_unloaded`、釋放；使用新錄製檢查重載後仍可正常測試 |
+
+插件卸載路徑已有 `OnDisable`／`OnDestroy` 釋放，但仍需專用實機測試；直接殺掉程序不能證明 managed 卸載回呼有執行。不要在錄製期間替換 DLL。人工中止只算故障證據，不能算代理完成微任務。
+
+## 程式介面與驗收界線
+
+`StartPolicyRecording()` 與 `SubmitAction(catalog, binary, mouse, wheel, captureTicks, inferenceTicks)` 供 Unity 主執行緒呼叫。Policy 與 human mode 在工作階段開始時固定，不能於人工錄製中切換注入。第一動作必須為 no-op；佇列容量一筆，不覆寫未送出的動作。相鄰提交原生控制至少間隔 100 ms，超過 capture deadline 或缺少下一動作時釋放並終止該次嘗試，保留 `deadline_miss`。安全停止不受最短按住限制。
+
+後續推理 runner 尚未實作。本票不宣稱完成 #31 的完整閉迴路 deadline、30 分鐘資源量測或任何模型品質 gate。F6 是受控校正，不是 policy 成果；其 `diagnostic_mode=true`，正式 compiler 不把這些轉移納入訓練。
+
+離線測試從 synthetic evidence 經四檔發布、正式 compiler、dataset loader 核對要求與實際輸入不同、partial SendInput、缺 down、殘留 held、過早放開及禁止 synthetic 校正。C# 執行檔另核對完整控制順序、scan codes、mouse bins 與全部兩鍵組合，拒絕舊 catalog。它們不能代替上述實機案例。
+
+2026-09-11：最終完整 pytest 共 124 項通過，耗時 142.97 秒，包含 10 項控制測試。JUnit 存於本機 `tmp/issue20-tests-final.xml`。mypy 15 個原始碼檔案通過，Release 建置 0 errors／0 warnings。這些數字均為離線檢查，尚無 #20 新實機錄製、校正核准或實機故障驗收結果。
+
+```powershell
+dotnet restore tests/ControlReplay/ControlReplay.csproj
+.\.venv\Scripts\python.exe -m pytest tests/test_control.py -q
+.\.venv\Scripts\python.exe -m mypy dsp_dreamer
+dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore --configuration Release
+```
+
+## 規範審查
+
+無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。
+
+## 規格審查
+
+三項程式缺口已修復：SubmitAction 的過期 capture 明確記 `deadline_miss`；停止發布前重驗完整輸入設定身分；核對區間以 `[start,end)` 包含同 tick 的起點輸入。起點案例回歸通過。實機全控制、故障／卸載釋放與實際注入延遲仍待上述人工驗證，不以離線測試替代。

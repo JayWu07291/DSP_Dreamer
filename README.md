@@ -18,6 +18,8 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 ## 錄製短回合
 
+目前錄製器要求先完成 #20 控制校正。首次部署請先依[人工實機操作步驟](docs/validation/issue-20.md)執行 F6 探針、正式編譯讀回及校正核准，再使用以下 F8 人工錄製流程。尚未執行的實機測試不視為通過。
+
 1. 結束 DSP，執行 `tools/deploy-recorder.ps1`。腳本會建置 Release、備份此錄製器既有的 DLL 與設定檔，再部署專案 DLL；執行環境指紋的核准欄位保持空白。
 2. 啟動 DSP、載入預定的基準場景，再按 **F8**。錄製器會寫出 `runs/live/runtime-candidate.json`，並在指紋核准前拒絕錄製。請核對遊戲與 Unity 版本、二進位雜湊、輸入設定雜湊、畫面尺寸與 graphics API。插件與驗證器皆固定檢查支援的 Assembly-CSharp 雜湊。
 3. 將 `BepInEx/config/tw.jaywu.dspdreamer.recorder.cfg` 中的 `ApprovedFingerprint` 設為已核對候選檔案的 SHA-256。插件會在下次開始錄製時重讀設定，不必重啟遊戲。若重建插件後雜湊改變，必須重新核對指紋。
@@ -135,6 +137,7 @@ for sample in samples:
 ```powershell
 dotnet restore tests/ProgressReplay/ProgressReplay.csproj
 dotnet restore tests/ArchiveRecovery/ArchiveRecovery.csproj
+dotnet restore tests/ControlReplay/ControlReplay.csproj
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m mypy dsp_dreamer
 dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore

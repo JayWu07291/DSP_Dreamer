@@ -83,6 +83,8 @@ namespace DSPDreamer.Recorder
 
         private void ReloadBaseline()
         {
+            policyStarted = false;
+            pendingAction = null;
             string name = (string)trial["baseline_save"];
             if (SegmentWriter.HashFile(BaselinePath(name)) != (string)trial["baseline_sha256"])
                 throw new InvalidOperationException("Baseline save changed; retry refused");
@@ -150,7 +152,7 @@ namespace DSPDreamer.Recorder
             if (reason != null && !reasons.Contains(reason)) reasons.Add(reason);
             Emit("game_event", Json.Fields("name", "episode_ended", "episode_id", episode["episode_id"],
                 "outcome", outcome, "reason", reason));
-            if (!ReleaseControls()) ReleaseControls();
+            ReleaseControls();
             finalPending = (episode["start_ticks"] != null || firstPending) && GameMain.isRunning && !GameMain.isLoading;
             finalDeadline = now + 2 * Stopwatch.Frequency;
             nextDue = now;
@@ -221,9 +223,14 @@ namespace DSPDreamer.Recorder
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int key);
 
-        private bool ReleaseControls()
+        private bool ReleaseControls(bool retry = true)
         {
+            pendingAction = null;
             var inputs = new List<NativeInput>();
+            // Always release the complete injected catalog, including a partially accepted SendInput batch.
+            for (int index = 0; index < 20; index++) inputs.Add(Button(index, false));
+            if (controlMode == "calibration") inputs.Add(new NativeInput { Type = 1, Data = new InputUnion {
+                Keyboard = new KeyboardInput { Scan = 0x4F, Flags = 8 | 2 } } });
             for (ushort key = 8; key < 255; key++)
                 if ((GetAsyncKeyState(key) & 0x8000) != 0)
                     inputs.Add(new NativeInput { Type = 1, Data = new InputUnion {
@@ -233,8 +240,13 @@ namespace DSPDreamer.Recorder
             inputs.Add(new NativeInput { Type = 0, Data = new InputUnion { Mouse = new MouseInput { Flags = 256, Data = 2 } } });
             bool simulated = failNextRelease;
             failNextRelease = false;
-            bool ok = !simulated && SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput))) == inputs.Count;
-            Emit("control_request", Json.Fields("operation", "release_all", "succeeded", ok, "simulated", simulated));
+            long requested = Stopwatch.GetTimestamp();
+            uint sent = simulated ? 0 : SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput)));
+            int error = sent == inputs.Count ? 0 : Marshal.GetLastWin32Error();
+            bool ok = !simulated && sent == inputs.Count;
+            if (ok) { injected = new int[20]; lastAction = 0; }
+            Emit("control_request", Json.Fields("operation", "release_all", "succeeded", ok, "simulated", simulated,
+                "requested_ticks", requested, "requested_count", inputs.Count, "sent_count", sent, "win32_error", error));
             if (!ok)
             {
                 if (episode != null)
@@ -244,6 +256,7 @@ namespace DSPDreamer.Recorder
                     if (episode["final_capture_id"] != null) episode["validity_status"] = "invalid";
                 }
                 Logger.LogError(simulated ? "Controlled injection failure; retrying release" : "Control release failed: " + Marshal.GetLastWin32Error());
+                if (retry) return ReleaseControls(false);
             }
             return ok;
         }

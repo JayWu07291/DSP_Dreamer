@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>$(DSPRoot)\DSPGAME_Data\Managed\UnityEngine.JSONSerializeModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="0Harmony">
       <HintPath>$(DSPRoot)\BepInEx\core\0Harmony.dll</HintPath>
       <Private>false</Private>
