@@ -29,6 +29,10 @@ Config 路徑：`E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\config\t
 
 ## 每次只執行一種案例
 
+新版完整校正已由錄製 `2a05b2a4-6291-4f10-a12c-407ddb670ad4` 通過正式 dataset 讀回及校正發布：44／44 模型要求、45／45 必要釋放，延遲 12.6841–17.4198 ms，MouseLeft held 217.5703 ms，NumPad1 讀為 End 並通過區分。DLL SHA-256 為 `17043a1ca5b2832df4f3541a7716bb2e6ba03d6ad9f1f4ec9f6ccfab571cf3e2`，與本機 Release 建置一致；runtime fingerprint 為 `592974525a9245d33c0f813e4cab69d08358fd819afb382726565610c9fdb8c0`。
+
+本機校正檔為 `E:\GitHub\DSP_Dreamer\runs\issue20-2a05b2a4-calibration.json`，SHA-256 為 `384f3b698ae205338d0b37b936f6fd9e1d72b8d1ba60ef7a83eaea58fa213608`。來源 checksum 與逐筆 sample refs 見[新版校正證據](issue-20-diagnostics-calibration-live.json)。使用者須將路徑與 SHA 填入 Config；四項專用診斷尚待實機驗證。
+
 錄製停止並發布完成後才改 Config。F6 開始時會重新讀取 Config；Case 不改變環境指紋，不需要每切換一次就重新校正。F6 的專用案例會自動停止，**不需要 F7、F8 或 Shift+F10**。
 
 ```ini
