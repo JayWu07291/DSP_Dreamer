@@ -151,6 +151,14 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 下一個人工案例：F6 開始探針，自動操作開始後按一次 F7，放開按鍵、等一秒，再按 F8 完成發布，核對受控 readback 例外、`recorder_fault`、釋放與 final observation／incomplete 狀態。Config 不必修改。
 
+## 讀回故障測試通過
+
+錄製 `c668d245-25c5-4588-83fb-7129537116c4` 已由正式 dataset loader 讀回。sequence 4861 標記 `gpu_readback_error`／`simulated=true`，遊戲日誌另有 `System.IO.IOException: Controlled GPU readback failure`。episode 以 `recorder_fault` 結束，4866 實際 release 成功送出 26／26。
+
+故障前 R／F7 held；釋放後第一筆 4867 尚有 held，4870 在結束後 19.3862 ms 讀到兩鍵 up 且 held 清空。後續除發布用的 F8 外無 held，也沒有模型要求。失敗 capture 55 未進入 frames，final capture 56 成功保存為 ordinal 55；episode 為 `invalid`／`recorder_fault`，資料發布 verified。完整校正 gate 為 false 符合故障案例。本次未涵蓋 final observation 本身讀回失敗的 incomplete 情境。逐筆依據與來源 checksum 見[讀回故障證據](issue-20-readback-failure-live.json)。
+
+下一個人工案例：F6 開始探針，自動操作開始後使用遊戲選單退回主選單，留在遊戲內，再按 F8 完成發布，核對 `world_unloaded`、釋放與 final observation 狀態。不要先按 F8 停止，也不要直接關閉程序。
+
 ## 規範審查
 
 無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。

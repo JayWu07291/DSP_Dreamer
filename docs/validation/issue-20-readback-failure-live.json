@@ -1,0 +1,112 @@
+{
+  "recording_id": "c668d245-25c5-4588-83fb-7129537116c4",
+  "case": "simulated GPU readback failure",
+  "episode": {
+    "attempt_id": "7d5b5139-439e-4474-a8ff-69aed2e703a3",
+    "end_ticks": 10153247222,
+    "episode_id": "63c9670c-ed99-4610-8235-8d38691bf5a3",
+    "episode_outcome": null,
+    "final_capture_id": 56,
+    "start_ticks": 10125302178,
+    "validity_reasons": [
+      "recorder_fault"
+    ],
+    "validity_status": "invalid"
+  },
+  "source_manifest_sha256": "81dac61b4451890728bfba9549a17f31f5719e43213047c327d8029528af118a",
+  "dataset_completed_sha256": "db25f3d43434f882a1bacd766bf81b666e99d5c8aa0d84b0e337308e930871a3",
+  "fault": {
+    "attempt_id": "7d5b5139-439e-4474-a8ff-69aed2e703a3",
+    "case": "gpu_readback_error",
+    "episode_id": "63c9670c-ed99-4610-8235-8d38691bf5a3",
+    "game_tick": 381,
+    "operation": "diagnostic_fault",
+    "sequence_number": 4861,
+    "simulated": true,
+    "ticks": 10152940475,
+    "type": "control_request",
+    "unity_frame": 60181,
+    "world_binding": 8
+  },
+  "releases": [
+    {
+      "sequence_number": 4866,
+      "ticks": 10153338339,
+      "requested_count": 26,
+      "sent_count": 26,
+      "succeeded": true,
+      "simulated": false
+    },
+    {
+      "sequence_number": 5143,
+      "ticks": 10199208963,
+      "requested_count": 25,
+      "sent_count": 25,
+      "succeeded": true,
+      "simulated": false
+    }
+  ],
+  "input_refs": [
+    {
+      "sequence_number": 4864,
+      "ticks": 10153097963,
+      "held": [
+        "R",
+        "F7"
+      ],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 4867,
+      "ticks": 10153386033,
+      "held": [
+        "R",
+        "F7"
+      ],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 4870,
+      "ticks": 10153441142,
+      "held": [],
+      "down": [],
+      "up": [
+        "R",
+        "F7"
+      ]
+    },
+    {
+      "sequence_number": 4871,
+      "ticks": 10153604401,
+      "held": [],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 5142,
+      "ticks": 10199112905,
+      "held": [
+        "F8"
+      ],
+      "down": [
+        "F8"
+      ],
+      "up": []
+    }
+  ],
+  "first_empty_ms": 19.3862,
+  "later_model_requests": 0,
+  "failed_capture_id": 55,
+  "failed_capture_in_frames": 0,
+  "final_frame": {
+    "capture_id": 56,
+    "ordinal": 55,
+    "sequence_number": 4869,
+    "requested_ticks": 10153417559,
+    "rgba_sha256": "e4dae0fe2e9b9c4ee41abd811cf23c53842578db1b1353ed8672abf77595823e"
+  },
+  "log_exception": "System.IO.IOException: Controlled GPU readback failure",
+  "limitation": "單次受控 readback 失敗後仍成功取得 final observation，未涵蓋 final observation 本身讀回失敗的 incomplete 情境。"
+}
