@@ -223,7 +223,7 @@ namespace DSPDreamer.Recorder
                     long requested = Stopwatch.GetTimestamp();
                     uint sent = SendInput(1, new[] { input }, Marshal.SizeOf(typeof(NativeInput)));
                     Emit("control_request", Json.Fields("operation", "identity_probe", "scan_code", 0x4F,
-                        "expected_held", "Keypad1", "requested_ticks", requested, "requested_count", 1,
+                        "allowed_held", new[] { "Keypad1", "End" }, "requested_ticks", requested, "requested_count", 1,
                         "sent_count", sent, "succeeded", sent == 1, "mode", controlMode));
                     if (sent != 1) { EndEpisode(reason: "injection_failure"); return; }
                     probeRelease = true;

@@ -20,7 +20,7 @@
 
 部署腳本先備份既有 DLL／設定，再編譯部署。它會清空 `ApprovedFingerprint`，不自動核准環境或校正。
 
-1. 啟動 DSP，載入已存在的 `Starting Save` 基準存檔。開啟 Num Lock，確認沒有其他錄製或控制工具正在送鍵鼠。
+1. 啟動 DSP，載入已存在的 `Starting Save` 基準存檔。確認沒有其他錄製或控制工具正在送鍵鼠。不需要數字鍵盤或 Num Lock 鍵，87 配列也能執行；NumPad1 探針由程式注入。
 2. 按一次 **F6**。第一次會因環境尚未核准而拒絕，並寫出 `runs/live/runtime-candidate.json`。
 3. 檢查候選中的遊戲、Unity、插件與 `globalgamemanagers` 雜湊、DSP 設定、畫面尺寸及 `windows_mouse_settings`。陣列順序為 sensitivity、threshold1、threshold2、acceleration。用下列指令取得 SHA-256，再把值填入 `E:\Steam\steamapps\common\Dyson Sphere Program\BepInEx\config\tw.jaywu.dspdreamer.recorder.cfg` 的 `[Recording] ApprovedFingerprint`。
 
@@ -38,7 +38,7 @@
 .\.venv\Scripts\python.exe tools\verify-control.py --dataset "runs\live\<錄製ID>.source.dataset" --out "runs\issue20-calibration.json" --calibration
 ```
 
-8. 校正發布必須通過全部控制、NumPad1 區分、兩軸 bins、wheel、實際 down／held、放開、左鍵至少 100 ms 及 requested-to-observed ≤100 ms。Synthetic recording 永遠不能核准實機校正。請將報告或路徑提供給我核對；失敗時保留四檔 evidence，不修改原始輸入或把 `gate_passed` 手改為 true。
+8. 校正發布必須通過全部控制、NumPad1 區分、兩軸 bins、wheel、實際 down／held、放開、左鍵至少 100 ms 及 requested-to-observed ≤100 ms。NumPad1 的 scan code `0x4F` 可讀成 `Keypad1` 或 `End`，但不能讀成 `Digit1`。科技面板等會呼叫 `VFInput.ResetAllAxes`，新版會保存 `game_input_reset`；只有已觀察到正確按下，且後續清空能對上重設紀錄，才接受遊戲消耗了按壓。原始 action 的 ambiguity 不會被修掉，左鍵最短時間也不放寬。Synthetic recording 永遠不能核准實機校正。請將報告或路徑提供給我核對；失敗時保留四檔 evidence，不修改原始輸入或把 `gate_passed` 手改為 true。
 9. 校正核對後，在 `[Control]` 填入下列設定。SHA-256 使用實際校正檔的值。關閉 `[Diagnostics] Enabled` 後，**F8** 才是正常人工錄製入口。
 
 ```ini
@@ -86,6 +86,16 @@ dotnet restore tests/ControlReplay/ControlReplay.csproj
 .\.venv\Scripts\python.exe -m mypy dsp_dreamer
 dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore --configuration Release
 ```
+
+## 首次實機探針追查
+
+錄製 `c14ac7c4-cba9-4fe5-88e9-39fa987f0579` 的 44 筆模型要求通過 43 筆，45 次必要釋放全部通過。失敗要求為 T，sequence 555 已有 down／held，但 559 起變成空 held 且沒有 up。安裝版 `UITechTree._OnOpen` 呼叫 `VFInput.ResetAllAxes`，舊錄製未保存該呼叫，故保留不合格，不推定為正常。
+
+NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 讀到 End up，沒有混成 Digit1。修正核對器後此區分已通過；新報告另存 `runs/issue20-control-report-v2.json`，原報告及 evidence 不變。整份錄製仍因缺少 T 的重設證據而不發布校正。87 配列鍵盤不必手動按 Num Lock。
+
+新版本須重新部署、核准新的 runtime fingerprint，再以 F6 重錄。補上的整合測試確認已記錄的 reset 可核對、未記錄的狀態消失仍拒絕、End／Keypad1 均與 Digit1 區分，且不改寫實際動作與訓練有效性。
+
+本次修正後完整 pytest 128 項通過，耗時 138.81 秒，結果存於本機 `tmp/issue20-reset-tests.xml`。mypy 15 檔及 Release 建置通過，規格複核無阻擋問題。新增 reset 掛點的實機驗收仍須使用新錄製完成。
 
 ## 規範審查
 

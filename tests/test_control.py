@@ -89,3 +89,34 @@ def test_control_confirmation_and_release_from_compiled_evidence(tmp_path, fault
     with pytest.raises(InvalidRecording, match="live diagnostic"):
         publish_calibration(dataset, tmp_path / "calibration.json")
     assert not (tmp_path / "calibration.json").exists()
+
+
+@pytest.mark.parametrize("reset_logged,keypad", [(True, "End"), (True, "Keypad1"), (False, "End"), (True, "Digit1")])
+def test_game_reset_and_numpad_identity_keep_actual_inputs(tmp_path, reset_logged, keypad):
+    with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
+        recording.metadata["diagnostic_mode"] = True
+        recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        recording.events.append(dict(recording.identity(55), type="control_request", operation="model_action",
+            request_id=1, catalog="action_catalog_v3", binary=[int(i == 6) for i in range(20)], mouse=60, wheel=1,
+            requested_ticks=55, sent_count=1, requested_count=1, succeeded=True))
+        recording.input(65, held=["T"], down=["T"], up=[], delta=[0, 0], wheel=0)
+        if reset_logged:
+            recording.events.append(dict(recording.identity(80), type="control_request", operation="game_input_reset",
+                                         source="VFInput.ResetAllAxes"))
+        recording.input(85, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        recording.events.append(dict(recording.identity(175), type="control_request", operation="release_all",
+            requested_ticks=175, sent_count=20, requested_count=20, succeeded=True))
+        recording.input(185, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        recording.events.append(dict(recording.identity(195), type="control_request", operation="identity_probe",
+            scan_code=0x4F, requested_ticks=195, sent_count=1, requested_count=1, succeeded=True))
+        recording.input(205, held=[keypad], down=[keypad], up=[], delta=[0, 0], wheel=0)
+        recording.events.append(dict(recording.identity(215), type="control_request", operation="release_all",
+            requested_ticks=215, sent_count=20, requested_count=20, succeeded=True))
+        recording.input(225, held=[], down=[], up=[keypad], delta=[0, 0], wheel=0)
+        for ticks in (50, 100, 150, 200, 250):
+            frame = recording.request(ticks, 1, 1)
+            recording.complete(frame, np.zeros((360, 640, 4), dtype=np.uint8))
+    dataset = open_dataset(compile_recording(recording.publish(tmp_path / "evidence"), tmp_path / "dataset", FFMPEG))
+    report = inspect_control(dataset)
+    assert report["gate_passed"] is (reset_logged and keypad != "Digit1")
+    assert dataset[0]["action"]["ambiguous"]  # A reset never invents a key-up training label.

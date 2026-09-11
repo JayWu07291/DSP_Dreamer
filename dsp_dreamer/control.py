@@ -47,10 +47,12 @@ def inspect_control(dataset):
             continue
         needs_release = True
         if command["operation"] == "identity_probe":
+            names = {key for s in samples for key in (*s["held"], *s["down"])}
+            distinct_numpad = names in ({"Keypad1"}, {"End"})
             identity_probes.append(dict(sequence_number=command["sequence_number"],
-                observed=bool(submitted and command.get("scan_code") == 0x4F
-                              and any("Keypad1" in s["held"] and "Keypad1" in s["down"] for s in samples)
-                              and all("Digit1" not in s["held"] and "Digit1" not in s["down"] for s in samples)),
+                observed=bool(submitted and command.get("requested_count") == 1 and command.get("scan_code") == 0x4F
+                              and distinct_numpad and any(set(s["held"]) & set(s["down"]) == names for s in samples)),
+                observed_names=sorted(names),
                 sample_refs=[s["sequence_number"] for s in samples]))
             continue
         require(command.get("catalog") == CATALOG, "Incompatible control request catalog")
@@ -66,6 +68,21 @@ def inspect_control(dataset):
         ups = {key for s in samples for key in s["up"]}
         hold_end = next((s["ticks"] for s in samples if matching is not None
                         and s["ticks"] > matching["ticks"] and set(s["held"]) != set(decoded["held"])), end)
+        # A game reset may consume a confirmed press. It never repairs the training action.
+        reset_refs = []
+        if matching is not None and decoded["held"] and hold_end < end:
+            for reset in events:
+                if (reset["type"] != "control_request" or reset.get("operation") != "game_input_reset"
+                        or reset.get("source") != "VFInput.ResetAllAxes"
+                        or not matching["ticks"] < reset["ticks"] <= hold_end):
+                    continue
+                prefix = [s for s in samples if s["ticks"] < reset["ticks"]]
+                suffix = [s for s in samples if s["ticks"] >= reset["ticks"]]
+                if (not aggregate(prefix, start, reset["ticks"], sorted(before))["ambiguous"]
+                        and all(set(s["held"]) == set(decoded["held"]) for s in prefix if s["ticks"] >= matching["ticks"])
+                        and suffix and all(not s["held"] and not s["down"] and not s["up"] for s in suffix)):
+                    reset_refs.append(reset["sequence_number"])
+                    break
         held_ms = (hold_end - matching["ticks"]) * 1000 / frequency if matching is not None else 0
         if command["binary"][15] and matching is not None:
             left_up = next((e for e in inputs[bisect_right(input_ticks, matching["ticks"]):]
@@ -80,14 +97,15 @@ def inspect_control(dataset):
         checks = dict(incomplete_send=submitted, observed_state_missing=matching is not None,
             mouse_bin_mismatch=actual["mouse"] == command["mouse"], wheel_class_mismatch=actual["wheel"] == command["wheel"],
             missing_down=set(decoded["held"]) - before <= downs, missing_up=before - set(decoded["held"]) <= ups,
-            unsupported_input=not action["unsupported"], ambiguous_input=not action["ambiguous"],
-            held_state_changed=matching is not None and hold_end == end,
+            unsupported_input=not action["unsupported"], ambiguous_input=not action["ambiguous"] or bool(reset_refs),
+            held_state_changed=matching is not None and (hold_end == end or bool(reset_refs)),
             ui_hold_too_short=not command["binary"][15] or held_ms >= 100,
             observation_late=observed_ticks is not None and (observed_ticks - start) * 1000 / frequency <= 100)
         reasons = [name for name, passed in checks.items() if not passed]
         observed = not reasons
         requests.append(dict(request_id=command["request_id"], binary=command["binary"], mouse=command["mouse"],
-            wheel=command["wheel"], submitted=submitted, observed=observed, failure_reasons=reasons, observed_delta=delta,
+            wheel=command["wheel"], submitted=submitted, observed=observed, failure_reasons=reasons,
+            game_reset_refs=reset_refs, observed_delta=delta,
             observed_wheel=wheel, sample_refs=[s["sequence_number"] for s in samples],
             latency_ms=(observed_ticks - start) * 1000 / frequency if observed and observed_ticks is not None else None,
             held_ms=held_ms))

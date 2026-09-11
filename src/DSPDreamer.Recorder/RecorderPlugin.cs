@@ -192,6 +192,9 @@ namespace DSPDreamer.Recorder
                 "in_screen", VFInput.inScreen, "fullscreen_ui", VFInput.inFullscreenGUI));
         }
 
+        internal void RecordInputReset() => Emit("control_request", Json.Fields(
+            "operation", "game_input_reset", "source", "VFInput.ResetAllAxes"));
+
         private IEnumerator CaptureLoop()
         {
             var end = new WaitForEndOfFrame();
@@ -510,6 +513,8 @@ namespace DSPDreamer.Recorder
 
     [HarmonyPatch(typeof(VFInput), nameof(VFInput.OnUpdate))]
     internal static class InputPatch { private static void Postfix() { RecorderPlugin.Current?.RecordInput(); } }
+    [HarmonyPatch(typeof(VFInput), nameof(VFInput.ResetAllAxes))]
+    internal static class InputResetPatch { private static void Postfix() { RecorderPlugin.Current?.RecordInputReset(); } }
     [HarmonyPatch(typeof(GameMain), nameof(GameMain.Begin))]
     internal static class BeginPatch { private static void Postfix() { RecorderPlugin.Current?.BindWorld(); } }
     [HarmonyPatch(typeof(GameMain), nameof(GameMain.End))]
