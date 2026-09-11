@@ -115,6 +115,14 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 校正檔 SHA-256 為 `c6daeaab53ecef6e3cfaf5d1b8ec38c3cc3978a91ced7f9361ab4a803b52822d`，綁定 runtime fingerprint `b42526a710b82d2dae98140cd36d333664b7aef9c063a29cf14ba2b942ce0848`。尚未替使用者寫入遊戲設定；須填入 CalibrationFile／ApprovedCalibration 才會啟用。此錄製是診斷校正，不是代理成果。失焦、停止、重設、故障、卸載的另存案例仍待完成。
 
+## F8 停止案例
+
+錄製 `37392605-2ec5-4d63-a7bd-1cbf2977fff5` 已由正式 dataset loader 讀回。結束原因為 `stopped`，兩次停止後 release 分別送出 25／25、24／24 個封包。結束後 16.7971 ms 的首筆 input 已無 held，之後另外兩筆也保持空 held；沒有後續模型要求，final capture 130 存在。`validity_status=invalid`、reason `stopped` 符合人工中止的定義。
+
+本次確認停止流程及觀察範圍內無殘留。停止前模型控制已放開，當下僅有 F8，尚未證明模型按鍵仍 held 時被強制釋放。完整校正報告為 false，不代表此停止流程失敗。來源 checksum 與逐筆依據見 [F8 停止證據](issue-20-stop-live.json)。
+
+下一個人工案例：F6 開始探針，開始自動操作後切換到其他視窗，約一秒後回 DSP，再按 F8 完成發布，核對 `focus_loss`、release、回到遊戲後無模型要求及 final observation。
+
 ## 規範審查
 
 無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。
