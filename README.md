@@ -100,6 +100,35 @@ loader 合併同回合的兩個相鄰 capture 區間，沿用原始 request tick
 
 重複 click 或非法組合可能在合併後才出現，這些視窗保留證據但不供 BC／dynamics。不足兩個區間的尾段同樣不供訓練，保留 final observation 的來源。`sequence_starts` 只列出完整合法起點；`sequence` 遇無效區間或回合邊界便停止並補零。`valid_mask` 區分實際樣本與 padding，`loss_mask` 另排除 burn-in。不要將逐窗的無效資料直接送入模型，其 `inputs.action` 為 null。驗證範圍見 [#18 報告](docs/validation/issue-18.md)。
 
+## 固定 split、片段與覆蓋
+
+用途登錄檔採 `dsp-split-registry/1`，每列指定 `manifest_id`、`split_group_id`、`purpose`，用途限 `demonstration`、`development`、`final`。範例見 [#19 登錄檔](docs/validation/issue-19-registry.json)。錄製前先登錄並凍結用途，納入全部保留 manifests；沒有登錄或身分不符的資料會拒收。現有錄製沒有用途欄位，因此由登錄檔補上，不修改原始 evidence。
+
+```powershell
+.\.venv\Scripts\python.exe -m dsp_dreamer index --source runs/live/issue18-full-flow-v4 runs/live/issue18-retry-v4 --registry docs/validation/issue-19-registry.json --length 64 --out runs/training-index.json
+```
+
+`split_group_id` 的 UTF-8 SHA-256 以無號整數取模 100，0–79 為 train、80–89 為 validation、90–99 為 offline-test。同 manifest 重試與衍生資料不重抽；任一 development／final 登錄會排除整組。每份錄製只選一個正式衍生 dataset，重複錄製或回合會拒收，避免重複計數。更換 sequence 長度不改 split。抽樣 seed 只決定起點抽樣，不影響 split。
+
+輸出包含三個 split 的統計、16 個微任務各自的 20／3／3 門檻與缺口，以及逐來源的 `uniform`、`relevant`、`progress` 全部起點。`uniform` 是完整合法 sequence 的全集，`relevant` 含至少一個節點完成；`progress` 含原始 `progress_fact` 且沒有完成，不包含單純 `progress_observation` 擷取快照。progress 只供分析，不自動解讀為 reward 或採用另一套進度判定器。
+
+完整回合時數取已驗證的回合起訖時間；`legal_hours` 只加總可訓練的 10 Hz 視窗，`legal_prefix_hours` 是其中無效／不完整回合的合法部分，遇 gap 分開計算，不重複加總重疊 sequence。active 啟用及非 active 完成按有效模型視窗計數，背景里程碑另併入 split 的非 active 完成總數。`active_reward_episodes` 只計至少一個合法 sequence 能包含的 scalar reward 正例，按不同回合去重；`live_active_reward_episodes` 再限實機來源，合成 fixtures 不補足正式門檻。非 active 完成與等待都不增加 scalar reward 正例。
+
+```python
+from dsp_dreamer.training_index import TrainingIndex
+
+index = TrainingIndex.open("runs/training-index.json", dataset_paths)
+samples = index.sample_stage_two("train", 2, seed=19)
+for sample in samples:
+    batch = index.sequence(sample, burn_in=1)
+    # 分別供 dynamics、policy、reward loss 使用。
+    masks = [batch[f"{name}_loss_mask"] for name in ("dynamics", "policy", "reward")]
+```
+
+偶數 batch 精確一半從全部合法起點均勻、有放回抽樣，另一半從 relevant 起點均勻、有放回抽樣。兩個抽樣池可抽到同一起點，loss 用途仍各自獨立。空抽樣池直接拒絕，不改成其他比例。三種 loss masks 都排除 burn-in；索引只容許完整 sequence，padding 不會進入抽樣。回傳資料仍含模型視圖既有的通用 `loss_mask`，訓練器必須使用對應的三種專用 mask。索引工具可在覆蓋不足時執行以規劃補錄，後續訓練仍須檢查 `coverage_gate_passed`。
+
+輸出原子發布且不覆寫，`artifact_id` 是除該欄位外、依 key 排序 JSON 的 SHA-256；來源包含 dataset、recording、模型視圖版本及 COMPLETED／manifest checksum。`TrainingIndex.open` 重新核對來源並重建比對全部內容，拒絕損壞或與來源不符的索引。索引與完整模型視窗 metadata 目前放在記憶體；完整十小時資料的資源量測仍由 #21 驗證。
+
 ## 驗證
 
 ```powershell

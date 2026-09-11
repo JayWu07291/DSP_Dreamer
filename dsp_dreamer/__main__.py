@@ -4,7 +4,8 @@ from pathlib import Path
 
 from . import publish, verify_recording, compile_recording, open_dataset
 from . import recover
-from .contract import file_info, require
+from .contract import file_info, load, require
+from .training_index import TrainingIndex
 
 
 def main():
@@ -17,8 +18,18 @@ def main():
             sub.add_argument("--ffmpeg", type=Path, required=True)
         if command in ("compile", "recover"):
             sub.add_argument("--out", type=Path, required=True)
+    index = commands.add_parser("index", help="產生固定 split、合法片段與覆蓋報告")
+    index.add_argument("--source", type=Path, nargs="+", required=True)
+    index.add_argument("--registry", type=Path, required=True)
+    index.add_argument("--length", type=int, default=64)
+    index.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    if args.command == "finish":
+    if args.command == "index":
+        result = TrainingIndex(args.source, load(args.registry), length=args.length)
+        result.save(args.out)
+        print(json.dumps(dict(artifact_id=result.report["artifact_id"],
+                              coverage_gate_passed=result.report["coverage_gate_passed"], out=str(args.out))))
+    elif args.command == "finish":
         evidence = args.source.with_name(args.source.name + ".evidence")
         dataset = args.source.with_name(args.source.name + ".dataset")
         publish(args.source, evidence, args.ffmpeg, cleanup=True)

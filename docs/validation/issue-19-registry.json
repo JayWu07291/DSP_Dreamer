@@ -1,0 +1,10 @@
+{
+  "schema": "dsp-split-registry/1",
+  "manifests": [
+    {
+      "manifest_id": "bec428373a7da8bf99c5a69cb730c84a3e5aa88ea62d693ce857793aa652f824",
+      "split_group_id": "bec428373a7da8bf99c5a69cb730c84a3e5aa88ea62d693ce857793aa652f824",
+      "purpose": "demonstration"
+    }
+  ]
+}
