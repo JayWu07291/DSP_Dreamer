@@ -80,6 +80,10 @@ Case = focus_hold
 
 `final_readback` 錄製 `b660e433-3f69-454e-a6a8-458a302d7940` 已通過正式 dataset 與獨立 journal 核對，8／8 checks 為 true。受控故障對上結束後 requested ticks 7030246392 的 capture 41，該影像未收錄。episode 正確保留 `incomplete`、`final_capture_id=null`、原因 `stopped`／`recorder_fault`。W 的 down／held 已確認，釋放為 25／25、24／24，13.2879 ms 後 held 清空，無後續模型要求，資料成功發布。結果與 journal checksum 見[最後觀察讀回失敗證據](issue-20-final-readback-live.json)。下一項為 `Case = disable`，F6 後等待獨立診斷完成，再重啟遊戲。
 
+## 插件停用實機結果
+
+`disable` 錄製 `53cfed21-0d4b-499f-aa22-a13d1f8458bd` 已通過正式 dataset 與獨立 journal 核對，7／7 checks 為 true。獨立觀察記錄 OnDisable 於 index 393 開始、399 完成，回呼內三次釋放分別為 25／25、24／24、24／24。W 注入與 down／held 已確認，結束後 30.5342 ms 的空 held 觀察位於回呼完成之後，無後續模型要求，獨立完成紀錄確認 published=true。停用未取得 final observation，episode 保留 `incomplete`／`stopped`，符合本案例。結果與 journal checksum 見[插件停用證據](issue-20-disable-live.json)。下一項須重啟 DSP 並設定 `Case = destroy`，核對實際銷毀回呼。
+
 ## 離線驗證與審查
 
 2026-09-11：完整 pytest 136 項通過，139.44 秒，JUnit 存於本機 `tmp/issue20-diagnostic-tests-final.xml`。其中 8 項診斷核對測試涵蓋 checksum／錄製身分、缺失回呼與釋放、零封包或缺 down、失焦清空與回焦殘留、final capture 故障位置及錯誤收錄。mypy 16 檔通過，Release 建置 0 warnings／0 errors。這些離線結果不取代新版實機操作。
