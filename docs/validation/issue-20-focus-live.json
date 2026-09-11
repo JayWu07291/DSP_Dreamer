@@ -1,0 +1,62 @@
+{
+  "recording_id": "552926a4-5c94-4021-a4bd-ca64c6f185d4",
+  "case": "focus loss",
+  "end_reason": "focus_loss",
+  "episode": {
+    "attempt_id": "4a3031b5-0b2e-4dcb-be94-3eea0f775fb9",
+    "end_ticks": 553184033,
+    "episode_id": "3b2cf354-6bb3-404e-a7b5-06f3c6c85e4f",
+    "episode_outcome": null,
+    "final_capture_id": 56,
+    "start_ticks": 525263380,
+    "validity_reasons": [
+      "focus_loss"
+    ],
+    "validity_status": "invalid"
+  },
+  "source_manifest_sha256": "43a1b9c3df844e45ef5b4f7a7144e4fb98a812935fb2f33c0f62370375046170",
+  "dataset_completed_sha256": "8d4084faeb7c21776d0b45dd2a7a4cffa7c05dd84520dc90c967d1804f9ca6b7",
+  "post_focus_loss_releases": [
+    {
+      "sequence_number": 514,
+      "requested_count": 28,
+      "sent_count": 28,
+      "succeeded": true
+    },
+    {
+      "sequence_number": 515,
+      "requested_count": 24,
+      "sent_count": 24,
+      "succeeded": true
+    },
+    {
+      "sequence_number": 1068,
+      "requested_count": 25,
+      "sent_count": 25,
+      "succeeded": true
+    }
+  ],
+  "first_post_end_input": {
+    "sequence_number": 517,
+    "focused": false,
+    "held": [],
+    "down": [],
+    "up": []
+  },
+  "first_empty_ms": 34.8048,
+  "first_refocused_input": {
+    "sequence_number": 896,
+    "focused": true,
+    "held": [],
+    "down": [],
+    "up": []
+  },
+  "post_end_input_count": 548,
+  "later_model_requests": 0,
+  "subsequent_click": [
+    973,
+    979
+  ],
+  "publication_stop_input": 1067,
+  "limitation": "失焦前最後要求為 R，但失焦前 input 僅觀察到 LeftAlt，未證明當時模型按鍵仍 held。回焦後 sequence 973/979 是新的左鍵 down/up；不是失焦後持續殘留。"
+}

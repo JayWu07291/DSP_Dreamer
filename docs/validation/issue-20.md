@@ -121,7 +121,13 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 本次確認停止流程及觀察範圍內無殘留。停止前模型控制已放開，當下僅有 F8，尚未證明模型按鍵仍 held 時被強制釋放。完整校正報告為 false，不代表此停止流程失敗。來源 checksum 與逐筆依據見 [F8 停止證據](issue-20-stop-live.json)。
 
-下一個人工案例：F6 開始探針，開始自動操作後切換到其他視窗，約一秒後回 DSP，再按 F8 完成發布，核對 `focus_loss`、release、回到遊戲後無模型要求及 final observation。
+## 失焦案例
+
+錄製 `552926a4-5c94-4021-a4bd-ca64c6f185d4` 已由正式 dataset loader 讀回。sequence 513 以 `focus_loss` 結束 episode，隨後兩次 release 送出 28／28、24／24 個封包；34.8048 ms 後首筆 input 的 held／down／up 全空。回焦首筆 sequence 896 也全空，episode 結束後沒有任何模型要求。最後 F8 發布另送出 25／25 個釋放封包，final capture 56 存在，episode 保留 `invalid`／`focus_loss`。
+
+回焦後 sequence 973／979 另有一次新的 MouseLeft down／up，並非持續殘留。失焦前最後送出的模型要求是 R，但當時 input 只觀察到 LeftAlt，因此尚未證明模型按鍵仍 held 時的強制釋放。這次確認失焦終止、釋放呼叫及回焦不恢復模型注入；完整校正 gate 為 false 符合中途停止的案例。來源 checksum 與逐筆依據見[失焦證據](issue-20-focus-live.json)。
+
+下一個人工案例：F6 開始探針，自動操作開始後按一次 F9，等待基準重載並恢復探針，再按 F8 完成發布，核對 `reset`、釋放、相同 trial manifest 與新的 attempt／episode。
 
 ## 規範審查
 
