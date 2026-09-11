@@ -164,6 +164,28 @@ def test_changed_source_before_cleanup_refuses_all_deletion(tmp_path):
     assert (source / "segment-000000.mkv").exists()
 
 
+def test_junction_cannot_redirect_evidence_verification_or_cleanup(tmp_path):
+    source = make_source(tmp_path / "source")
+    destination = publish(source, tmp_path / "evidence", FFMPEG)
+    alias = tmp_path / "alias"
+    if os.name == "nt":
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(destination)], check=True, capture_output=True)
+    else:
+        alias.symlink_to(destination, target_is_directory=True)
+    try:
+        with pytest.raises(InvalidRecording, match="Aliased"):
+            verify_recording(alias, FFMPEG)
+        with pytest.raises(InvalidRecording, match="Aliased"):
+            publish(source, alias, FFMPEG, cleanup=True)
+        assert (source / "SOURCE.json").exists()
+    finally:
+        assert alias.parent == tmp_path and alias.resolve() == destination.resolve()
+        if os.name == "nt":
+            alias.rmdir()
+        else:
+            alias.unlink()
+
+
 def test_unsealed_or_corrupted_first_segment_cannot_recover(tmp_path):
     from dsp_dreamer import recover
     source = make_source(tmp_path / "source", 200)
@@ -268,3 +290,22 @@ publish(sys.argv[1], sys.argv[2], sys.argv[4], cleanup=True)
     assert not (destination / "manifest.json").exists()
     publish(source, destination, FFMPEG, cleanup=True)
     assert verify_recording(destination, FFMPEG)[0]["frame_count"] == 3
+
+
+def test_recovery_rejects_invalid_lifecycle_before_trimming(tmp_path):
+    from dsp_dreamer import recover
+    source = tmp_path / "source"
+    with Recording.synthetic(source, FFMPEG) as recording:
+        recording.begin_attempt(dict(manifest_id="trial", split_group_id="split", mecha_seed=1, camera_seed=2, policy_seed=3))
+        for i in range(200):
+            frame = recording.request((i + 1) * 50, i, i)
+            recording.complete(frame, np.zeros((360, 640, 4), dtype=np.uint8))
+        recording.end_episode(10001, reason="stopped")
+    (source / "SOURCE.json").unlink()
+    checkpoint = source / "checkpoint-000000.json"
+    metadata = json.loads(checkpoint.read_text())
+    metadata["episodes"][0]["episode_outcome"] = "not-a-real-outcome"
+    checkpoint.write_text(json.dumps(metadata))
+    with pytest.raises(InvalidRecording, match="Unknown outcome"):
+        recover(source, tmp_path / "recovered", FFMPEG)
+    assert not (tmp_path / "recovered").exists()

@@ -10,7 +10,7 @@ REASONS = ("stopped", "focus_loss", "human_intervention", "injection_failure", "
            "schema_error", "unknown_control", "fingerprint_mismatch", "reset", "world_unloaded")
 
 
-def validate_lifecycle(metadata, frames):
+def validate_lifecycle(metadata, frames, prefix=False):
     if "lifecycle_version" not in metadata:
         return
     require(metadata["lifecycle_version"] == 1, "Unknown lifecycle version")
@@ -45,18 +45,26 @@ def validate_lifecycle(metadata, frames):
         selected = [f for f in frames if f.get("episode_id") == eid]
         require(all(f.get("attempt_id") == aid for f in selected), "Frame attempt mismatch")
         start, end = episode["start_ticks"], episode["end_ticks"]
+        open_end = end is None
+        if open_end:
+            require(prefix and episode is episodes[-1] and episode["episode_outcome"] is None
+                    and episode["final_capture_id"] is None, "Unclosed episode")
+            end = selected[-1]["requested_ticks"] if selected else max(0, previous_end)
         require(type(end) is int and end >= 0, "Unclosed episode")
         require(start is None or type(start) is int and previous_end < start <= end, "Overlapping episode")
         previous_end = max(end, selected[-1]["requested_ticks"] if selected else end)
         require((not selected and start is None) or bool(selected) and start == selected[0]["requested_ticks"],
                 "Episode must start at its first valid observation")
         final = episode["final_capture_id"]
-        require(final is None or bool(selected) and final == selected[-1]["capture_id"] and
-                selected[-1]["requested_ticks"] >= end, "Invalid final observation")
+        require(final is None or type(final) is int and bool(selected) and (
+                final == selected[-1]["capture_id"] and selected[-1]["requested_ticks"] >= end or
+                prefix and episode is episodes[-1] and final > selected[-1]["capture_id"]
+                and end >= selected[-1]["requested_ticks"]),
+                "Invalid final observation")
         require(all(f["requested_ticks"] <= end or f["capture_id"] == final for f in selected), "Frame after episode end")
         expected = "incomplete" if final is None else "invalid" if reasons else "valid"
         require(episode["validity_status"] == expected, "Inconsistent validity status")
-        require(episode["episode_outcome"] is not None or bool(reasons), "Missing end reason")
+        require(episode["episode_outcome"] is not None or bool(reasons) or open_end, "Missing end reason")
     require(all(f.get("episode_id") in ids for f in frames), "Unknown frame episode")
 
 

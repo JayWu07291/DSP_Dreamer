@@ -97,7 +97,9 @@ def verify_video(ffmpeg, path, frames):
 
 
 def verify_recording(path, ffmpeg):
-    path = Path(path)
+    path = Path(path).absolute()
+    require(path == path.resolve() and not (path / "manifest.json").is_symlink()
+            and (path / "manifest.json").resolve().parent == path, "Aliased evidence directory or manifest")
     check_ffmpeg(ffmpeg)
     manifest = load(path / "manifest.json")
     require({p.name for p in path.iterdir()} == {"manifest.json", "recording.mkv", "frames.ndjson", "events.ndjson"},
@@ -116,7 +118,7 @@ def verify_payload(path, manifest, ffmpeg):
             "Unknown encoding contract")
     require(set(manifest["files"]) == {"recording.mkv", "events.ndjson", "frames.ndjson"}, "Invalid four-file manifest")
     for name, info in manifest["files"].items():
-        require(file_info(path / name) == info, f"File checksum mismatch: {name}")
+        require(file_info(checked_path(path, name)) == info, f"File checksum mismatch: {name}")
     frames, events = list(records(path / "frames.ndjson")), list(records(path / "events.ndjson"))
     validate_indices(frames, events)
     validate_lifecycle(manifest, frames)
@@ -127,7 +129,7 @@ def verify_payload(path, manifest, ffmpeg):
 
 
 def checked_path(root, name):
-    root = Path(root)
+    root = Path(root).absolute()
     require(root.absolute() == root.resolve(), "Aliased work directory")
     require(isinstance(name, str) and bool(re.fullmatch(
         r"SOURCE\.json|frames\.ndjson|events\.ndjson|segment-\d{6}\.mkv|checkpoint-\d{6}\.json|"
@@ -148,6 +150,7 @@ def check_files(root, files, missing=False):
 def capacity_preflight(destination, source_bytes, copies=2):
     parent = Path(destination)
     while not parent.exists():
+        require(parent.parent != parent, "No existing destination volume")
         parent = parent.parent
     # Source already occupies disk; allow a segment copy, merged copy and 1 GiB reserve.
     require(shutil.disk_usage(parent).free >= copies * source_bytes + 1024 ** 3, "Insufficient free space; source retained")
@@ -187,6 +190,7 @@ def publish(source, destination, ffmpeg, cleanup=False):
             cleanup_recording(source, destination, ffmpeg)
         return destination
     receipt = destination.with_name(destination.name + ".publish.json")
+    require(not receipt.is_symlink() and receipt.resolve().parent == destination.parent, "Aliased publication receipt")
     if receipt.exists():
         manifest = load(receipt)
         require(manifest["publication"]["source_root"] == str(source), "Different source directory")

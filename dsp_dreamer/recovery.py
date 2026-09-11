@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import uuid
 
-from .archive import (capacity_preflight, checked_path, publish, validate_indices,
+from .archive import (capacity_preflight, checked_path, check_files, publish, validate_indices,
                       validate_metadata, verify_video)
 from .contract import InvalidRecording, atomic_save, file_info, load, require, write_records
 from .lifecycle import validate_lifecycle
@@ -56,6 +56,7 @@ def recover(source, destination, ffmpeg):
             frames = read_prefix(checked_path(source, "frames.ndjson"), sealed["frames.ndjson"])
             events = read_prefix(checked_path(source, "events.ndjson"), sealed["events.ndjson"])
             validate_indices(frames, events)
+            validate_lifecycle(metadata, frames, prefix=True)
             segments = list(dict.fromkeys(f["segment"] for f in frames))
             require(set(sealed) == {"frames.ndjson", "events.ndjson", *segments}, "Invalid checkpoint inventory")
             for segment in segments:
@@ -71,7 +72,6 @@ def recover(source, destination, ffmpeg):
                 events = [e for e in events if e.get("episode_id") is None or e["episode_id"] in ids]
                 for episode in metadata["episodes"]:
                     selected = [f for f in frames if f["episode_id"] == episode["episode_id"]]
-                    episode["start_ticks"] = selected[0]["requested_ticks"]
                     if episode["final_capture_id"] != selected[-1]["capture_id"]:
                         episode.update(end_ticks=selected[-1]["requested_ticks"], final_capture_id=None,
                             episode_outcome=None, validity_status="incomplete",
@@ -94,6 +94,7 @@ def recover(source, destination, ffmpeg):
     # Recheck sidecar prefixes as well as the original checkpoint after copying.
     for name in ("frames.ndjson", "events.ndjson"):
         read_prefix(checked_path(source, name), sealed[name])
+    check_files(source, {name: sealed[name] for name in segments})
     require(file_info(candidate) == checkpoint_info, "Checkpoint changed during recovery")
     write_records(recovered / "frames.ndjson", frames)
     write_records(recovered / "events.ndjson", events)

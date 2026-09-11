@@ -20,11 +20,21 @@ dotnet restore tests/ArchiveRecovery/ArchiveRecovery.csproj
 dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore
 ```
 
-封存專用測試目前 14 項通過。涵蓋截斷 MKV 尾段、截斷 NDJSON 尾端、來源 seal 不符、合併期間來源變更、低空間、合併失敗、三檔部分發布、manifest 發布前中斷、清理中斷、路徑穿越、清理前來源變更、首段損毀拒絕與完成後重試。
+封存專用測試涵蓋截斷 MKV 尾段、截斷 NDJSON 尾端、來源 seal 不符、合併期間來源變更、低空間、合併失敗、三檔部分發布、manifest 發布前中斷、清理中斷、路徑穿越、Windows junction、清理前來源變更、首段損毀拒絕、非法 lifecycle 拒絕與完成後重試。
+
+完整測試 69 項通過，其中封存專用測試 16 項，耗時 108.02 秒；mypy 檢查 11 個 Python 原始碼檔案無問題；net472 插件建置零警告、零錯誤。
 
 兩項程序終止測試實際終止專用子程序。C# 測試直接使用正式 SegmentWriter，完成第一段後被終止，沒有 `SOURCE.json`；恢復取得 200 幀，正式 compiler 讀回 199 筆轉移。Python archiver 在三個資料檔已發布、manifest 尚未發布時被終止；重試完成四檔核對與清理。原始 partial 目錄缺 manifest 時，compiler 會拒絕。
 
 另以 lifecycle 與 progress v3 資料核對恢復結果，保留原 trial／split、任務進度與 reward，受影響回合標為 `incomplete`，最後轉移不供訓練且 bootstrap mask 為 0。
+
+## 程式規範審查
+
+獨立 Standards 審查未發現書面規範違反或需要修改的 code smell。審查另提到既有 dataset 入口接受 junction；本次不刪除 dataset，也不覆寫既有 dataset 目錄，因此沒有擴大成所有 artifact 的路徑別名禁令。來源清理與 evidence 的路徑檢查已有獨立測試。
+
+## 規格審查
+
+獨立 Spec 審查發現，原恢復流程會在裁切前綴時將非法 episode outcome 覆寫成 `None/incomplete`，使應拒絕的 metadata 通過。已先用回歸測試重現，再讓共用 lifecycle 驗證器先核對原始 outcome、reasons、start、status 與 final ID。檢查點僅允許最後回合仍開啟或 final observation 位於前綴之後；裁切後再次執行普通驗證。複查確認這項缺陷已修正，沒有其他已確認的規格 finding。
 
 ## 限制
 

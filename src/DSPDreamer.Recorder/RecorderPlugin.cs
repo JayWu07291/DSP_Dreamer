@@ -367,7 +367,7 @@ namespace DSPDreamer.Recorder
                     worker.OutputDataReceived += (_, args) => { if (args.Data != null) Logger.LogInfo(args.Data); };
                     worker.ErrorDataReceived += (_, args) => { if (args.Data != null) Logger.LogError(args.Data); };
                     worker.BeginOutputReadLine(); worker.BeginErrorReadLine(); worker.WaitForExit();
-                    if (worker.ExitCode != 0) throw new IOException("Finalize worker failed; source retained");
+                    if (worker.ExitCode != 0) throw new IOException("Finalize worker failed; inspect evidence and retained work files");
                 }
                 Logger.LogInfo("Recording, compilation, and readback completed: " + source);
             }
@@ -397,7 +397,8 @@ namespace DSPDreamer.Recorder
             if (stopping && pending == 0) drained = true;
             if (stopping && pending == 0 && writer != null && !writer.IsAlive)
             {
-                if (failed && !File.Exists(Path.Combine(source, "SOURCE.json")))
+                if (failed && !File.Exists(Path.Combine(source, "SOURCE.json")) &&
+                    !File.Exists(Path.Combine(source + ".evidence", "manifest.json")))
                 {
                     // Diagnostic metadata only; it cannot authorize publication or recovery.
                     try { File.WriteAllText(Path.Combine(source, "INCOMPLETE.json"), Json.Encode(metadata), new UTF8Encoding(false)); }
@@ -405,7 +406,7 @@ namespace DSPDreamer.Recorder
                 }
                 foreach (var slot in slots) { slot.Full.Release(); slot.Small.Release(); Destroy(slot.Full); Destroy(slot.Small); }
                 writer = null; stopping = false;
-                Logger.LogInfo(failed ? "Recording failed; source retained" : "Ready for next recording");
+                Logger.LogInfo(failed ? "Recording/finalization failed; inspect evidence and retained work files" : "Ready for next recording");
             }
         }
 
