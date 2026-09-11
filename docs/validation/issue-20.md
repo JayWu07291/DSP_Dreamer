@@ -159,6 +159,14 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 下一個人工案例：F6 開始探針，自動操作開始後使用遊戲選單退回主選單，留在遊戲內，再按 F8 完成發布，核對 `world_unloaded`、釋放與 final observation 狀態。不要先按 F8 停止，也不要直接關閉程序。
 
+## 世界卸載測試
+
+錄製 `7163dd93-2ef8-42d7-aa70-37a4e9458af9` 已由正式 dataset loader 讀回。sequence 5788 以 `world_unloaded` 結束，5789／5790 兩次 release 均成功送出 24／24。卸載前 5787 的 held 已清空，卸載後首筆 input 5791 也全空，但間隔 204.6206 ms，不能用來量測實際釋放延遲。後續 416 筆 input 僅最後發布用的 F8 另有 held，無後續模型要求。
+
+最後影像是卸載前 capture 79；沒有 final observation，故 `final_capture_id=null`、`validity_status=incomplete`，原因保留 `world_unloaded`。證據發布為 verified，完整校正 gate 為 false，符合故障案例。6014 雖有新 world binding 10 的 `world_ready`，但沒有新 episode，尚不能當作重新錄製成功的證據。逐筆依據與來源 checksum 見[世界卸載證據](issue-20-world-unload-live.json)。
+
+下一步由使用者載入 Starting Save，另按 F6 跑完完整探針，自動停止發布後核對新錄製。不要中途操作、切換視窗或按 F8。這項世界卸載測試不涵蓋插件 `OnDisable`／`OnDestroy`，插件卸載仍待專用驗證。
+
 ## 規範審查
 
 無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。

@@ -1,0 +1,102 @@
+{
+  "recording_id": "7163dd93-2ef8-42d7-aa70-37a4e9458af9",
+  "case": "world unloaded",
+  "episode": {
+    "attempt_id": "a5dd8e8f-0223-4149-95d8-8283f5d63ca0",
+    "end_ticks": 11758723721,
+    "episode_id": "3545e7b5-d8a7-47d6-a90e-8b3296460077",
+    "episode_outcome": null,
+    "final_capture_id": null,
+    "start_ticks": 11718729464,
+    "validity_reasons": [
+      "world_unloaded"
+    ],
+    "validity_status": "incomplete"
+  },
+  "source_manifest_sha256": "f0c8655a408e49721afbe17d38d1c3ff6df0458c9065ac2c86c025212e435b9a",
+  "dataset_completed_sha256": "5f441b87d08875568c5e557943788a10ea8d604216fd5ce24289d7b6b6a6e53a",
+  "releases": [
+    {
+      "sequence_number": 5789,
+      "ticks": 11758807879,
+      "requested_count": 24,
+      "sent_count": 24,
+      "succeeded": true,
+      "simulated": false
+    },
+    {
+      "sequence_number": 5790,
+      "ticks": 11758880527,
+      "requested_count": 24,
+      "sent_count": 24,
+      "succeeded": true,
+      "simulated": false
+    },
+    {
+      "sequence_number": 6208,
+      "ticks": 11808618533,
+      "requested_count": 25,
+      "sent_count": 25,
+      "succeeded": true,
+      "simulated": false
+    }
+  ],
+  "input_refs": [
+    {
+      "sequence_number": 5787,
+      "ticks": 11758720273,
+      "held": [],
+      "down": [],
+      "up": [
+        "MouseLeft"
+      ]
+    },
+    {
+      "sequence_number": 5791,
+      "ticks": 11760769967,
+      "held": [],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 5792,
+      "ticks": 11760901736,
+      "held": [],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 6207,
+      "ticks": 11808536373,
+      "held": [
+        "F8"
+      ],
+      "down": [
+        "F8"
+      ],
+      "up": []
+    }
+  ],
+  "first_post_end_input_ms": 204.6206,
+  "later_model_requests": 0,
+  "post_end_input_count": 416,
+  "last_frame": {
+    "capture_id": 79,
+    "ordinal": 79,
+    "requested_ticks": 11758249196,
+    "sequence_number": 5784
+  },
+  "later_world_ready": {
+    "attempt_id": "a5dd8e8f-0223-4149-95d8-8283f5d63ca0",
+    "episode_id": "3545e7b5-d8a7-47d6-a90e-8b3296460077",
+    "game_tick": 215498,
+    "name": "world_ready",
+    "sequence_number": 6014,
+    "ticks": 11778120126,
+    "type": "game_event",
+    "unity_frame": 70082,
+    "world_binding": 10
+  },
+  "later_episode_starts": 0,
+  "limitation": "卸載前 held 已清空，卸載後首筆 input 延遲 204.6206 ms，不能據此量測實際釋放延遲。world_ready 不代表已驗證新錄製可用；須另開探針。世界卸載不等於插件 OnDisable／OnDestroy 測試。"
+}
