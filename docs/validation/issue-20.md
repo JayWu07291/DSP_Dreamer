@@ -1,6 +1,6 @@
 # Issue #20 控制路徑與人工實機驗證
 
-目前已實作 v3／20 維模型動作注入、校正探針與正式資料讀回核對。實機驗收尚未執行，不宣稱本票已通過。依使用者要求，由使用者操作遊戲，不使用 Computer Use。
+目前已實作 v3／20 維模型動作注入、校正探針與正式資料讀回核對。實機完整校正已通過，故障／卸載案例仍待驗收，不宣稱本票全部通過。依使用者要求，由使用者操作遊戲，不使用 Computer Use。
 
 ## 契約與前置證據
 
@@ -96,6 +96,24 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 新版本須重新部署、核准新的 runtime fingerprint，再以 F6 重錄。補上的整合測試確認已記錄的 reset 可核對、未記錄的狀態消失仍拒絕、End／Keypad1 均與 Digit1 區分，且不改寫實際動作與訓練有效性。
 
 本次修正後完整 pytest 128 項通過，耗時 138.81 秒，結果存於本機 `tmp/issue20-reset-tests.xml`。mypy 15 檔及 Release 建置通過，規格複核無阻擋問題。新增 reset 掛點的實機驗收仍須使用新錄製完成。
+
+## 新版實機校正通過
+
+使用者操作的新錄製為 `a22f366b-4b69-4a1a-a4bf-8c4d122fd72b`。正式 dataset loader 完整核對編譯產物，再執行 `inspect_control` 及 `publish_calibration`，兩者 `gate_passed=true`。
+
+| 核對項目 | 結果 |
+| --- | --- |
+| 模型要求 | 44／44 確認，含全 20 控制、兩軸各 11 bins 與正負 wheel |
+| 必要釋放 | 45／45 確認 |
+| requested-to-observed | 最小 10.7556 ms，最大 17.8047 ms |
+| MouseLeft 實際 held | 217.1833 ms |
+| T | request 6 對上 game reset sequence 551 |
+| NumPad1 | probe sequence 2297，DSP 讀為 End，與 Digit1 區分通過 |
+| observed-to-pixel | 兩軸固定 20.0 校正核對通過 |
+
+原始四檔位於 `runs/live/a22f366b-4b69-4a1a-a4bf-8c4d122fd72b.source.evidence`；正式編譯資料為同名 `.source.dataset`。完整報告為 `runs/issue20-a22f366b-report.json`，校正檔為 `runs/issue20-a22f366b-calibration.json`。來源身分、checksum 及逐筆 sample refs 保存於[校正證據](issue-20-calibration-live.json)。
+
+校正檔 SHA-256 為 `c6daeaab53ecef6e3cfaf5d1b8ec38c3cc3978a91ced7f9361ab4a803b52822d`，綁定 runtime fingerprint `b42526a710b82d2dae98140cd36d333664b7aef9c063a29cf14ba2b942ce0848`。尚未替使用者寫入遊戲設定；須填入 CalibrationFile／ApprovedCalibration 才會啟用。此錄製是診斷校正，不是代理成果。失焦、停止、重設、故障、卸載的另存案例仍待完成。
 
 ## 規範審查
 
