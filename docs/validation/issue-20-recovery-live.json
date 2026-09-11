@@ -1,0 +1,52 @@
+{
+  "recording_id": "823a6ca1-992e-453a-a2fd-51d2e5d05b45",
+  "case": "full calibration probes after world unload",
+  "episode": {
+    "attempt_id": "e604816c-08bc-4822-8a29-9d35fb4479b1",
+    "end_ticks": 13770214217,
+    "episode_id": "aa553c4d-e09a-4018-b0ce-7cd4d88fe396",
+    "episode_outcome": null,
+    "final_capture_id": 406,
+    "start_ticks": 13566647292,
+    "validity_reasons": [
+      "stopped"
+    ],
+    "validity_status": "invalid"
+  },
+  "source_manifest_sha256": "9cdcac4457619859c38d37888aeb5700512276b8f903262f18d409acef368fe6",
+  "dataset_completed_sha256": "30d141377c8b7f7cfb5ff221abf51718e520c443ad5d857534c347da9fc5468e",
+  "report_sha256": "4a0f43747bd64e94e8103a8cbfa23f700e818aef33290bf522e534f2f60a6425",
+  "approved_fingerprint": "b42526a710b82d2dae98140cd36d333664b7aef9c063a29cf14ba2b942ce0848",
+  "gate_passed": true,
+  "confirmed_requests": 44,
+  "required_releases": 45,
+  "confirmed_releases": 45,
+  "latency_min_ms": 11.7961,
+  "latency_max_ms": 18.2551,
+  "left_held_ms": 217.8644,
+  "identity_probes": [
+    {
+      "observed": true,
+      "observed_names": [
+        "End"
+      ],
+      "sample_refs": [
+        8518,
+        8519,
+        8522,
+        8523,
+        8524,
+        8527,
+        8528,
+        8529,
+        8532,
+        8533,
+        8534,
+        8537,
+        8538
+      ],
+      "sequence_number": 8517
+    }
+  ],
+  "failures": []
+}

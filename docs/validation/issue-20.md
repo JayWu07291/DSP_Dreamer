@@ -167,6 +167,14 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 下一步由使用者載入 Starting Save，另按 F6 跑完完整探針，自動停止發布後核對新錄製。不要中途操作、切換視窗或按 F8。這項世界卸載測試不涵蓋插件 `OnDisable`／`OnDestroy`，插件卸載仍待專用驗證。
 
+## 世界卸載後完整重錄通過
+
+錄製 `823a6ca1-992e-453a-a2fd-51d2e5d05b45` 已由正式 dataset loader 讀回，完整探針 `gate_passed=true`：44／44 模型要求、45／45 必要釋放確認，延遲範圍 11.7961–18.2551 ms，MouseLeft held 217.8644 ms，NumPad1 探針讀為 End 並通過區分。final capture 406 存在，共發布 407 張影像。
+
+runtime fingerprint 與已核准校正相同，無須更新 Config 或替換原校正檔。本次確認卸載後能重新載入基準、執行完整控制探針並發布資料；診斷 episode 的 `invalid`／`stopped` 不代表控制核對失敗，也不能算代理成果。完整本機報告為 `runs/issue20-823a6ca1-recovery-report.json`，來源與報告 checksum 見[卸載後重錄證據](issue-20-recovery-live.json)。
+
+目前完整校正、F8 持續按鍵釋放、F9 重設、失焦終止、受控注入失敗重試、受控讀回故障、世界卸載及卸載後重錄均已有實機證據。仍未涵蓋插件 `OnDisable`／`OnDestroy` 的專用實機測試；失焦瞬間模型按鍵仍 held、final observation 本身讀回失敗也未由本輪實機案例覆蓋。不宣稱 issue #20 全部驗收完成。
+
 ## 規範審查
 
 無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。
