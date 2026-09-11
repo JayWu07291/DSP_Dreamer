@@ -127,7 +127,15 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 回焦後 sequence 973／979 另有一次新的 MouseLeft down／up，並非持續殘留。失焦前最後送出的模型要求是 R，但當時 input 只觀察到 LeftAlt，因此尚未證明模型按鍵仍 held 時的強制釋放。這次確認失焦終止、釋放呼叫及回焦不恢復模型注入；完整校正 gate 為 false 符合中途停止的案例。來源 checksum 與逐筆依據見[失焦證據](issue-20-focus-live.json)。
 
-下一個人工案例：F6 開始探針，自動操作開始後按一次 F9，等待基準重載並恢復探針，再按 F8 完成發布，核對 `reset`、釋放、相同 trial manifest 與新的 attempt／episode。
+## F9 重設與持續按鍵釋放案例
+
+錄製 `567f2e12-cd30-4a6f-9a4d-0cc6a6404f75` 已由正式 dataset loader 讀回。第一個 episode 以 `reset` 結束，final capture 58 存在；sequence 1594 仍讀到 R／F9 held，1596 成功釋放 26／26 個封包，1599 讀到 R／F9 up 且 held 清空。重載前另兩次釋放皆為 24／24。
+
+同一份 trial manifest 下建立新的 attempt／episode，world binding 由 4 變成 5，兩次 `perturbation_applied` 的 camera／mecha yaw 相同。重設至新 episode 開始之間沒有模型要求，sequence 1832 才在新 episode 恢復探針。
+
+第二個 episode 最後由 F8 以 `stopped` 結束，final capture 176 存在。sequence 2441 仍讀到 E／F8 held，2443 成功釋放 26／26 個封包，2446 讀到 E／F8 up 且 held 清空，後續兩筆保持空 held，沒有後續模型要求。本次補足 F8 在模型按鍵仍 held 時的釋放證據；失焦的相同情境仍未涵蓋。兩個 episode 均保留 invalid 與各自原因，不作完整校正或代理成果。來源 checksum 與逐筆依據見 [F9 重設證據](issue-20-reset-live.json)。
+
+下一個人工案例：F6 開始探針，自動操作開始後按 Shift+F10，放開按鍵、等一秒，再按 F8 完成發布，核對模擬注入失敗與實際 release 重試。F6 已啟用診斷模式，不必修改 Config。
 
 ## 規範審查
 

@@ -1,0 +1,179 @@
+{
+  "recording_id": "567f2e12-cd30-4a6f-9a4d-0cc6a6404f75",
+  "case": "F9 reset followed by F8 stop",
+  "episodes": [
+    {
+      "attempt_id": "0235ba5e-3fb1-4983-9ab2-247caefcd129",
+      "end_ticks": 3759804426,
+      "episode_id": "fef79e6b-2d55-4ac1-8f8d-d783f2c2095b",
+      "episode_outcome": null,
+      "final_capture_id": 58,
+      "start_ticks": 3730848856,
+      "validity_reasons": [
+        "reset"
+      ],
+      "validity_status": "invalid"
+    },
+    {
+      "attempt_id": "a4b352fe-400e-4499-9d67-488d976152b2",
+      "end_ticks": 3839110592,
+      "episode_id": "a5ebac87-b599-4a3e-af93-3400479d6746",
+      "episode_outcome": null,
+      "final_capture_id": 176,
+      "start_ticks": 3780055130,
+      "validity_reasons": [
+        "stopped"
+      ],
+      "validity_status": "invalid"
+    }
+  ],
+  "trial_manifest": {
+    "baseline_save": "Starting Save",
+    "baseline_sha256": "df9ef534e5dc8e5537f5c1870cd17aacc77259491b770559ef59b4489ab1610f",
+    "camera_seed": 29,
+    "camera_yaw": 11.2973214435844,
+    "input_settings_sha256": "f993919fe80b1de22a462800b7a08170042aa39652a59e21435c65518e0a731d",
+    "manifest_id": "46b40d4fec6017c000c7d76bbdd56a1f631ebd20ac4b42b76bef6d802f4d8695",
+    "mecha_seed": 17,
+    "mecha_yaw": 3.22420833549658,
+    "peace_mode": true,
+    "policy_seed": 41,
+    "resource_multiplier": 1,
+    "rng": "System.Random/net472",
+    "sandbox_mode": false,
+    "screen_height": 720,
+    "screen_width": 1280,
+    "speed": 1,
+    "split_group_id": "46b40d4fec6017c000c7d76bbdd56a1f631ebd20ac4b42b76bef6d802f4d8695",
+    "world_seed": 97807908
+  },
+  "source_manifest_sha256": "4706b3d9d08cbb4ead5299f1ff4ac62bb6933413ae620b94630987b899e01dba",
+  "dataset_completed_sha256": "89e532326775330cb155f84ac009f684f47e258671b41a8119182dbc7315d599",
+  "perturbations": [
+    {
+      "sequence_number": 1269,
+      "attempt_id": "0235ba5e-3fb1-4983-9ab2-247caefcd129",
+      "episode_id": "fef79e6b-2d55-4ac1-8f8d-d783f2c2095b",
+      "world_binding": 4,
+      "camera_yaw": 11.2973214435844,
+      "mecha_yaw": 3.22420833549658
+    },
+    {
+      "sequence_number": 1801,
+      "attempt_id": "a4b352fe-400e-4499-9d67-488d976152b2",
+      "episode_id": "a5ebac87-b599-4a3e-af93-3400479d6746",
+      "world_binding": 5,
+      "camera_yaw": 11.2973214435844,
+      "mecha_yaw": 3.22420833549658
+    }
+  ],
+  "releases": [
+    {
+      "sequence_number": 1596,
+      "requested_count": 26,
+      "sent_count": 26,
+      "succeeded": true
+    },
+    {
+      "sequence_number": 1602,
+      "requested_count": 24,
+      "sent_count": 24,
+      "succeeded": true
+    },
+    {
+      "sequence_number": 1603,
+      "requested_count": 24,
+      "sent_count": 24,
+      "succeeded": true
+    },
+    {
+      "sequence_number": 2443,
+      "requested_count": 26,
+      "sent_count": 26,
+      "succeeded": true
+    },
+    {
+      "sequence_number": 2449,
+      "requested_count": 24,
+      "sent_count": 24,
+      "succeeded": true
+    }
+  ],
+  "input_refs": [
+    {
+      "sequence_number": 1594,
+      "ticks": 3759801368,
+      "held": [
+        "R",
+        "F9"
+      ],
+      "down": [
+        "F9"
+      ],
+      "up": []
+    },
+    {
+      "sequence_number": 1599,
+      "ticks": 3759973908,
+      "held": [],
+      "down": [],
+      "up": [
+        "R",
+        "F9"
+      ]
+    },
+    {
+      "sequence_number": 1600,
+      "ticks": 3760131472,
+      "held": [],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 2441,
+      "ticks": 3839104968,
+      "held": [
+        "E",
+        "F8"
+      ],
+      "down": [
+        "F8"
+      ],
+      "up": []
+    },
+    {
+      "sequence_number": 2446,
+      "ticks": 3839284584,
+      "held": [],
+      "down": [],
+      "up": [
+        "E",
+        "F8"
+      ]
+    },
+    {
+      "sequence_number": 2447,
+      "ticks": 3839445874,
+      "held": [],
+      "down": [],
+      "up": []
+    },
+    {
+      "sequence_number": 2448,
+      "ticks": 3839619220,
+      "held": [],
+      "down": [],
+      "up": []
+    }
+  ],
+  "reset_first_empty_ms": 16.9431,
+  "stop_first_empty_ms": 17.3956,
+  "model_requests_between_attempts": 0,
+  "first_resumed_model_request": {
+    "sequence_number": 1832,
+    "attempt_id": "a4b352fe-400e-4499-9d67-488d976152b2",
+    "episode_id": "a5ebac87-b599-4a3e-af93-3400479d6746",
+    "request_id": 6
+  },
+  "model_requests_after_stop": 0
+}
