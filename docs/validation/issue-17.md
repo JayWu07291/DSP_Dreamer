@@ -42,4 +42,18 @@ dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore
 
 舊錄製沒有 seal 時可依既有完整驗證流程封存，但不能使用未核對的 `INCOMPLETE.json` 恢復。未完成段、未通過檢查點的尾端及先前失敗的工作副本保留。最終 evidence 固定四檔，來源與工作目錄可留下空目錄或無關檔案。
 
-本次未部署新 DLL，也未用新版插件執行 DSP 內的長時間錄製。C# 測試證明正式 writer 的檢查點格式與 Python 恢復相容，不取代遊戲內長程吞吐驗收。sidecar 前綴目前在每段結束重新計算 checksum；若長錄製造成 writer 停頓，應改為增量雜湊。
+初次自動化驗證時尚未部署新版 DLL；後續短實機結果見下節。尚未執行新版插件的遊戲內長程吞吐驗收。sidecar 前綴目前在每段結束重新計算 checksum；若長錄製造成 writer 停頓，應改為增量雜湊。
+
+## 2026-09-11：短實機驗收通過
+
+使用者操作遊戲，agent 僅部署、核對指紋及讀取產物。新版 Release DLL SHA-256 為 `dfea94f52890a8b090ad1f83eddec0668113c63bac0ad8fb58285f759114f2f2`，部署備份位於 `runs/deployment-20260911-144332`。九個二進位、已部署版本與實際輸入設定雜湊全部相符，正式驗證器接受核准指紋 `e6aa872e79838f2c8d51c2e3ce49854beef9b717d009d9929f26b135fe58c1a1`。
+
+本次來源為 `runs/live/c79d2c8e-e3ff-4f17-94bd-f0ce98a0f3c7.source`，evidence artifact ID 為 `d47417da-fed3-4735-a7e4-a18c85a270b8`。完整數值與 checksum 見[機器可讀結果](issue-17-live.json)。
+
+- 首末觀測相距 34.8990445 秒，共 697 幀與 3,963 筆事件。段長為 200／200／200／97，manifest 保存三份 sealed checkpoint 的來源 checksum。
+- F8 停止後自動完成四檔封存、來源清理與 compiler 讀回，遊戲紀錄包含完成訊息及 `Ready for next recording`。來源及本次工作目錄只剩空目錄，清單內來源檔案全部已清理。
+- 獨立核對最終四檔 checksum、全片 RGBA 解碼、逐幀雜湊及八個首尾／段邊界 seek，全部通過。正式 loader 讀回 696 筆轉移，所有 697 幀 compiled RGB 與 evidence 精確相同。
+- 691 筆轉移有效。五筆無效轉移分別為索引 283 的 scheduler gap、284 的輸入歧義、652／653 的 A+D 禁止組合，以及 695 的 F8 停止尾端。回合記錄 `stopped`，final observation 存在，尾端保留不支援的 F8 且 bootstrap mask 為 0。這些有效性標記不代表封存失敗。
+- 再次執行相同 `finish` 指令成功，evidence 四檔與 dataset 全部檔案的 checksum 均與重試前相同。重試前後，其他九份既有 evidence 的 manifest checksum 也保持不變。
+
+本次獨立複核時來源段已由自動流程清理，因此不宣稱重新解碼了已刪除的來源段。新實機資料驗證正常封存、清理與重試；故障恢復與程序終止證據沿用前述專用測試。遊戲紀錄中的 `numcodecs` 訊息是已知棄用警告，不影響這次完整產物核對。

@@ -1,0 +1,133 @@
+{
+  "status": "passed_live_archive_flow",
+  "verified_at": "2026-09-11T07:43:08.849802+00:00",
+  "implementation_commit": "d60ba37",
+  "source": "E:\\GitHub\\DSP_Dreamer\\runs\\live\\c79d2c8e-e3ff-4f17-94bd-f0ce98a0f3c7.source",
+  "evidence": "E:\\GitHub\\DSP_Dreamer\\runs\\live\\c79d2c8e-e3ff-4f17-94bd-f0ce98a0f3c7.source.evidence",
+  "dataset": "E:\\GitHub\\DSP_Dreamer\\runs\\live\\c79d2c8e-e3ff-4f17-94bd-f0ce98a0f3c7.source.dataset",
+  "artifact_id": "d47417da-fed3-4735-a7e4-a18c85a270b8",
+  "frame_count": 697,
+  "transitions": 696,
+  "event_count": 3963,
+  "valid_transitions": 691,
+  "duration_seconds": 34.8990445,
+  "segments": {
+    "segment-000000.mkv": 200,
+    "segment-000001.mkv": 200,
+    "segment-000002.mkv": 200,
+    "segment-000003.mkv": 97
+  },
+  "sealed_checkpoints": [
+    "checkpoint-000000.json",
+    "checkpoint-000001.json",
+    "checkpoint-000002.json"
+  ],
+  "seek_ordinals": [
+    0,
+    199,
+    200,
+    399,
+    400,
+    599,
+    600,
+    696
+  ],
+  "gaps": {
+    "scheduler": 1
+  },
+  "episodes": [
+    {
+      "attempt_id": "a1c3ddc1-de21-484c-b4d1-91e972c99781",
+      "end_ticks": 3913456467,
+      "episode_id": "c56d1af1-d7f2-41ca-aaf8-b76f960d0858",
+      "episode_outcome": null,
+      "final_capture_id": 696,
+      "start_ticks": 3564704816,
+      "validity_reasons": [
+        "stopped"
+      ],
+      "validity_status": "invalid"
+    }
+  ],
+  "final_transition": {
+    "valid": false,
+    "bootstrap_mask": 0,
+    "episode_outcome": null,
+    "validity_status": "invalid"
+  },
+  "runtime_fingerprint": "e6aa872e79838f2c8d51c2e3ce49854beef9b717d009d9929f26b135fe58c1a1",
+  "plugin_sha256": "dfea94f52890a8b090ad1f83eddec0668113c63bac0ad8fb58285f759114f2f2",
+  "automatic_completion_log_verified": true,
+  "source_cleanup_verified": true,
+  "full_evidence_rgba_decode_verified": true,
+  "all_compiled_rgb_equal_evidence": true,
+  "finish_retry_byte_identical": true,
+  "other_evidence_manifests_unchanged_during_retry": 9,
+  "evidence_files": {
+    "events.ndjson": {
+      "bytes": 1540290,
+      "sha256": "cb3fd64f931e6b9ed56a3356f71e11103f24bf7ed0e19ccdfc7fc9ee167f4cba"
+    },
+    "frames.ndjson": {
+      "bytes": 355648,
+      "sha256": "a92fff880fbf3b8c135b74d96e1c388a92613d58355fb262a7649e8134ca3b98"
+    },
+    "manifest.json": {
+      "bytes": 6743,
+      "sha256": "10d131b8057d4c50edceb76a835bc98be37aeb3639c95c1725c10a2017e6c4c1"
+    },
+    "recording.mkv": {
+      "bytes": 145790321,
+      "sha256": "23581f7156774f4517ce18798311b6e1978e14b33aca2071186d60c52f9d21c0"
+    }
+  },
+  "dataset_completion": {
+    "bytes": 93927,
+    "sha256": "f2867519a711d4ae949636e5050236ba4b42fec4680f9f4112959297cdb7d1f7"
+  },
+  "dataset_manifest": {
+    "bytes": 50027,
+    "sha256": "8170c87369c5c9841c65aa3a8a8bbecdb7db31a35790d40a308b5534a5eed3db"
+  },
+  "limitations": [
+    "來源段已由自動流程清理；本次獨立複核解碼最終 evidence，不宣稱重新解碼已刪來源段。",
+    "本次為正常短實機錄製；故障恢復與程序終止證據沿用專用自動化測試。"
+  ],
+  "invalid_transitions": [
+    {
+      "index": 283,
+      "gap": true,
+      "ambiguous": false,
+      "forbidden": false,
+      "unsupported": false
+    },
+    {
+      "index": 284,
+      "gap": false,
+      "ambiguous": true,
+      "forbidden": false,
+      "unsupported": false
+    },
+    {
+      "index": 652,
+      "gap": false,
+      "ambiguous": false,
+      "forbidden": true,
+      "unsupported": false
+    },
+    {
+      "index": 653,
+      "gap": false,
+      "ambiguous": false,
+      "forbidden": true,
+      "unsupported": false
+    },
+    {
+      "index": 695,
+      "gap": false,
+      "ambiguous": false,
+      "forbidden": false,
+      "unsupported": true
+    }
+  ]
+}
