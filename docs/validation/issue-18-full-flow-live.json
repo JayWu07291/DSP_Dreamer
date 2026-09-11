@@ -1,0 +1,441 @@
+{
+  "status": "passed",
+  "evidence": "runs\\live\\0eec2f28-174d-4f1a-88d4-c2819e3b01c7.source.evidence",
+  "dataset": "runs/live/issue18-full-flow-v4",
+  "evidence_files": {
+    "events.ndjson": {
+      "bytes": 13170868,
+      "sha256": "36eda8c6d28917c7a53734a487e3d5a5067f19f9f2883214712423226d4e35ef"
+    },
+    "frames.ndjson": {
+      "bytes": 3702819,
+      "sha256": "d004474aab307310b409c87a502cf77128a733c172f241116eadbd891ac7bb8f"
+    },
+    "manifest.json": {
+      "bytes": 8819,
+      "sha256": "84bf101f29f94a5a8b09e561ce31843efd1c0bc3afe2227cd6f0c1436bcc64e0"
+    },
+    "recording.mkv": {
+      "bytes": 1998340977,
+      "sha256": "6852e6e537a3503acb57c4d89744b2e827f1d073ba164c81c394129a3b6cba32"
+    }
+  },
+  "dataset_manifest": {
+    "bytes": 525285,
+    "sha256": "30a9c17d38c7318faeff905266fc03f607a635e8cef031f447e819d01e0b2f48"
+  },
+  "completed": {
+    "bytes": 972072,
+    "sha256": "439bd55e945b04de26f9808645cdb88f42fbdc9ca5e7e11e3358e3684808b02c"
+  },
+  "model_view": {
+    "schema": "dsp-model-view/1",
+    "loader_version": "0.1.0",
+    "model_hz": 10,
+    "source_artifact_id": "4e8e2764-5fa8-42cd-b4e0-704949384c6a",
+    "source_completed": {
+      "bytes": 972072,
+      "sha256": "439bd55e945b04de26f9808645cdb88f42fbdc9ca5e7e11e3358e3684808b02c"
+    },
+    "action_codec": {
+      "version": "dsp-action/1",
+      "catalog": "action_catalog_v3",
+      "controls": [
+        "Escape",
+        "Digit1",
+        "Digit2",
+        "Tab",
+        "W",
+        "R",
+        "T",
+        "LeftControl",
+        "A",
+        "S",
+        "D",
+        "F",
+        "LeftShift",
+        "X",
+        "C",
+        "MouseLeft",
+        "MouseRight",
+        "MouseMiddle",
+        "Space",
+        "E"
+      ],
+      "binary_width": 20,
+      "scan_codes": [
+        1,
+        2,
+        3,
+        15,
+        17,
+        19,
+        20,
+        29,
+        30,
+        31,
+        32,
+        33,
+        42,
+        45,
+        46,
+        null,
+        null,
+        null,
+        57,
+        18
+      ],
+      "unity_names": [
+        "Escape",
+        "Alpha1",
+        "Alpha2",
+        "Tab",
+        "W",
+        "R",
+        "T",
+        "LeftControl",
+        "A",
+        "S",
+        "D",
+        "F",
+        "LeftShift",
+        "X",
+        "C",
+        "MouseLeft",
+        "MouseRight",
+        "MouseMiddle",
+        "Space",
+        "E"
+      ],
+      "observed_to_pixel_scale": [
+        20.0,
+        20.0
+      ],
+      "maxval": 10,
+      "binsize": 2,
+      "mu": 5,
+      "mouse_classes": 121,
+      "mouse_order": "x*11+y",
+      "wheel_classes": [
+        -1,
+        0,
+        1
+      ],
+      "rounding": "numpy.rint",
+      "noop": {
+        "binary": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "mouse": 60,
+        "wheel": 1
+      }
+    },
+    "observation": {
+      "dtype": "float32",
+      "shape": [
+        3,
+        360,
+        640
+      ],
+      "color_space": "sRGB",
+      "range": [
+        0,
+        1
+      ]
+    },
+    "pairing": "two adjacent captures within episode; incomplete tails masked",
+    "artifact_id": "a8a3ddbbe8a592f0711e5b0e1aa1f9eabf9d63c7ebf01a4f4b51e7b747d8e377"
+  },
+  "original_artifacts_unchanged": true,
+  "legacy_dataset_rejected": true,
+  "frames": 7204,
+  "events": 31605,
+  "transitions": 7203,
+  "windows": 3602,
+  "valid_windows": 3597,
+  "exclusion_counts": {
+    "ambiguous": 2,
+    "gap": 2,
+    "invalid_source": 4,
+    "incomplete_window": 1
+  },
+  "raw_down_counts": {
+    "MouseRight": 42,
+    "T": 1,
+    "MouseLeft": 225,
+    "Escape": 39,
+    "LeftShift": 3,
+    "F": 30,
+    "C": 1,
+    "LeftControl": 17,
+    "MouseMiddle": 9,
+    "A": 25,
+    "Digit2": 2,
+    "W": 23,
+    "S": 23,
+    "D": 24,
+    "Digit1": 2,
+    "R": 5,
+    "Tab": 1,
+    "X": 1
+  },
+  "active_window_counts": {
+    "MouseRight": 58,
+    "T": 1,
+    "MouseLeft": 350,
+    "Escape": 58,
+    "LeftShift": 63,
+    "F": 48,
+    "C": 1,
+    "LeftControl": 180,
+    "MouseMiddle": 69,
+    "A": 206,
+    "Digit2": 4,
+    "W": 147,
+    "S": 128,
+    "D": 123,
+    "Digit1": 3,
+    "R": 9,
+    "Tab": 13,
+    "X": 2
+  },
+  "completion_counts": {
+    "0": 1,
+    "1": 1,
+    "16": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "17": 1,
+    "6": 1,
+    "7": 1,
+    "5": 1,
+    "18": 1,
+    "9": 1,
+    "8": 1,
+    "19": 1,
+    "11": 1,
+    "10": 1,
+    "12": 1,
+    "20": 1,
+    "21": 1,
+    "13": 1,
+    "14": 1,
+    "15": 1,
+    "22": 1
+  },
+  "task_switches": [
+    {
+      "window": 34,
+      "ticks": 2074740964,
+      "task_id": 1
+    },
+    {
+      "window": 112,
+      "ticks": 2153691479,
+      "task_id": 16
+    },
+    {
+      "window": 184,
+      "ticks": 2225202348,
+      "task_id": 2
+    },
+    {
+      "window": 230,
+      "ticks": 2271181155,
+      "task_id": 3
+    },
+    {
+      "window": 244,
+      "ticks": 2285248355,
+      "task_id": 4
+    },
+    {
+      "window": 258,
+      "ticks": 2299295110,
+      "task_id": 16
+    },
+    {
+      "window": 418,
+      "ticks": 2459887403,
+      "task_id": 5
+    },
+    {
+      "window": 1346,
+      "ticks": 3387813712,
+      "task_id": 16
+    },
+    {
+      "window": 1576,
+      "ticks": 3617234662,
+      "task_id": 8
+    },
+    {
+      "window": 1855,
+      "ticks": 3896171202,
+      "task_id": 16
+    },
+    {
+      "window": 2115,
+      "ticks": 4156201691,
+      "task_id": 10
+    },
+    {
+      "window": 2530,
+      "ticks": 4571254561,
+      "task_id": 16
+    },
+    {
+      "window": 2790,
+      "ticks": 4831262009,
+      "task_id": 13
+    },
+    {
+      "window": 3451,
+      "ticks": 5492710471,
+      "task_id": 14
+    },
+    {
+      "window": 3459,
+      "ticks": 5500704398,
+      "task_id": 15
+    },
+    {
+      "window": 3514,
+      "ticks": 5555738455,
+      "task_id": 16
+    }
+  ],
+  "sequence_starts_64": 3303,
+  "padding_boundaries_checked": [
+    41,
+    540,
+    802,
+    2892,
+    3600
+  ],
+  "rgb_windows_checked": [
+    0,
+    34,
+    42,
+    112,
+    184,
+    230,
+    244,
+    258,
+    418,
+    514,
+    541,
+    803,
+    1028,
+    1346,
+    1543,
+    1576,
+    1855,
+    2057,
+    2115,
+    2530,
+    2572,
+    2790,
+    2893,
+    3086,
+    3451,
+    3459,
+    3514,
+    3601
+  ],
+  "rgb_frames_checked": [
+    0,
+    2,
+    68,
+    70,
+    84,
+    86,
+    224,
+    226,
+    368,
+    370,
+    460,
+    462,
+    488,
+    490,
+    516,
+    518,
+    836,
+    838,
+    1028,
+    1030,
+    1082,
+    1084,
+    1606,
+    1608,
+    2056,
+    2058,
+    2692,
+    2694,
+    3086,
+    3088,
+    3152,
+    3154,
+    3710,
+    3712,
+    4114,
+    4116,
+    4230,
+    4232,
+    5060,
+    5062,
+    5144,
+    5146,
+    5580,
+    5582,
+    5786,
+    5788,
+    6172,
+    6174,
+    6902,
+    6904,
+    6918,
+    6920,
+    7028,
+    7030,
+    7202,
+    7203
+  ],
+  "episodes": [
+    {
+      "attempt_id": "e7d09d17-863c-446e-b72e-54ceb0ef1cfa",
+      "end_ticks": 5642696021,
+      "episode_id": "d113ce73-c87e-423b-bd10-0f6e2a65c7cd",
+      "episode_outcome": "success",
+      "final_capture_id": 7203,
+      "start_ticks": 2039698402,
+      "validity_reasons": [],
+      "validity_status": "valid"
+    }
+  ],
+  "implementation_commit": "9006db3d1b90fdb133ff7c889706fb4aceb853b4",
+  "verification_script": {
+    "bytes": 8604,
+    "sha256": "811e4ae5ac0055c6cc08f6932a486192db1e0ff93401c3a67c49c7ee51e118b7"
+  }
+}
