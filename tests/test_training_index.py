@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 import copy
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -60,6 +62,12 @@ def test_retry_indices_coverage_and_determinism(tmp_path):
     assert not report["coverage_gate_passed"]
     assert len(stats["tasks"]) == 16
     assert TrainingIndex([path], registry(("trial", "demonstration")), length=2).report == report
+    output, verification = tmp_path / "index.json", tmp_path / "verification.json"
+    index.save(output)
+    subprocess.run([sys.executable, "tools/verify-training-index.py", "--source", str(path),
+                    "--index", str(output), "--report", str(verification)], check=True)
+    # The switch at the last row's next observation also crosses a prompt boundary.
+    assert json.loads(verification.read_text())["checks"][0]["cross_task_starts"] == 4
 
 
 def test_stage_two_uses_exact_halves_and_loader_masks(tmp_path):

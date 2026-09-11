@@ -41,7 +41,7 @@ def main():
                 "Index differs from exhaustive window verification")
         checks.append(dict(artifact_id=source["artifact_id"], legal_starts=len(expected),
                            relevant_starts=len(relevant), progress_starts=len(progress),
-                           cross_task_starts=sum(len({r["task_id"] for r in view.rows[s:s + length]}) > 1 for s in expected)))
+                           cross_task_starts=sum(any(r["task_switches"] for r in view.rows[s:s + length]) for s in expected)))
     loaded = 0
     for split, stats in index.report["splits"].items():
         if not stats["relevant_sequences"]:

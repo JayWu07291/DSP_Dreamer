@@ -11,7 +11,7 @@ from .model_view import open_model_view
 from .progress import TASKS
 
 
-SPLITS = {"train": 20, "validation": 3, "offline-test": 3}
+COVERAGE_REQUIREMENTS = {"train": 20, "validation": 3, "offline-test": 3}
 
 
 class TrainingIndex:
@@ -28,6 +28,7 @@ class TrainingIndex:
             manifests[entry["manifest_id"]] = entry
             if entry["purpose"] != "demonstration":
                 reserved.add(entry["split_group_id"])
+        # ponytail: O(windows) metadata in RAM; use a disk index if the #21 resource gate fails.
         self.views = {}
         sources = []
         seen_episodes: set[str] = set()
@@ -37,7 +38,7 @@ class TrainingIndex:
                             waiting_windows=0, non_active_completions=0, tasks=[dict(task_id=i, task=name,
                             active_activations=0, active_reward_episodes=0, live_active_reward_episodes=0,
                             non_active_completions=0, required=threshold, deficit=threshold, passed=False)
-                            for i, name in enumerate(TASKS[:16])]) for split, threshold in SPLITS.items()}
+                            for i, name in enumerate(TASKS[:16])]) for split, threshold in COVERAGE_REQUIREMENTS.items()}
         views = sorted((open_model_view(path) for path in paths), key=lambda v: v.metadata["source_artifact_id"])
         for view in views:
             metadata = view.dataset.metadata
@@ -134,10 +135,10 @@ class TrainingIndex:
         self.report["artifact_id"] = sha(json.dumps(self.report, sort_keys=True, allow_nan=False).encode())
         self._pools = {(split, pool): [(s["artifact_id"], start) for s in self.report["sources"]
                        if s["split"] == split for start in s[pool]]
-                       for split in SPLITS for pool in ("uniform", "relevant")}
+                       for split in COVERAGE_REQUIREMENTS for pool in ("uniform", "relevant")}
 
     def sample_stage_two(self, split, batch_size, *, seed):
-        require(split in SPLITS and type(batch_size) is int and batch_size > 0 and batch_size % 2 == 0
+        require(split in COVERAGE_REQUIREMENTS and type(batch_size) is int and batch_size > 0 and batch_size % 2 == 0
                 and type(seed) is int, "Invalid stage-two split/batch size/seed")
         rng = random.Random(seed)
         samples = []
@@ -150,7 +151,7 @@ class TrainingIndex:
         return samples
 
     def sequence(self, sample, *, burn_in=0):
-        require(isinstance(sample, dict) and sample.get("split") in SPLITS
+        require(isinstance(sample, dict) and sample.get("split") in COVERAGE_REQUIREMENTS
                 and sample.get("pool") in ("uniform", "relevant")
                 and type(sample.get("start")) is int and isinstance(sample.get("artifact_id"), str),
                 "Invalid sequence sample")

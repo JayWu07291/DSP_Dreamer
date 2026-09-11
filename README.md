@@ -117,8 +117,9 @@ loader 合併同回合的兩個相鄰 capture 區間，沿用原始 request tick
 ```python
 from dsp_dreamer.training_index import TrainingIndex
 
+dataset_paths = ["runs/live/issue18-full-flow-v4", "runs/live/issue18-retry-v4"]
 index = TrainingIndex.open("runs/training-index.json", dataset_paths)
-samples = index.sample_stage_two("train", 2, seed=19)
+samples = index.sample_stage_two("validation", 2, seed=19)  # 檢查現有資料；正式訓練使用通過 gate 的 train。
 for sample in samples:
     batch = index.sequence(sample, burn_in=1)
     # 分別供 dynamics、policy、reward loss 使用。
