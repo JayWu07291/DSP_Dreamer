@@ -3,27 +3,33 @@ import json
 from pathlib import Path
 
 from . import publish, verify_recording, compile_recording, open_dataset
+from . import recover
+from .contract import file_info, require
 
 
 def main():
     parser = argparse.ArgumentParser(description="DSP single-episode recording integration")
     commands = parser.add_subparsers(dest="command", required=True)
-    for command in ("finish", "verify", "compile", "inspect"):
+    for command in ("finish", "recover", "verify", "compile", "inspect"):
         sub = commands.add_parser(command)
         sub.add_argument("--source", type=Path, required=True)
         if command != "inspect":
             sub.add_argument("--ffmpeg", type=Path, required=True)
-        if command == "compile":
+        if command in ("compile", "recover"):
             sub.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "finish":
         evidence = args.source.with_name(args.source.name + ".evidence")
         dataset = args.source.with_name(args.source.name + ".dataset")
-        publish(args.source, evidence, args.ffmpeg)
-        compile_recording(evidence, dataset, args.ffmpeg)
+        publish(args.source, evidence, args.ffmpeg, cleanup=True)
+        if not dataset.exists():
+            compile_recording(evidence, dataset, args.ffmpeg)
         result = open_dataset(dataset)
+        require(result.metadata["source_manifest"] == file_info(evidence / "manifest.json"), "Different dataset source")
         print(json.dumps(dict(evidence=str(evidence), dataset=str(dataset), transitions=len(result),
                               source_kind=result.metadata["source_kind"])))
+    elif args.command == "recover":
+        print(recover(args.source, args.out, args.ffmpeg))
     elif args.command == "verify":
         manifest, _, _ = verify_recording(args.source, args.ffmpeg)
         print(json.dumps(manifest, indent=2))

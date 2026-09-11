@@ -48,6 +48,7 @@ namespace DSPDreamer.Recorder
             internal int Busy;
             internal Dictionary<string, object> Identity;
             internal bool Dropped;
+            internal string MetadataSnapshot;
         }
 
         private void Awake()
@@ -240,6 +241,7 @@ namespace DSPDreamer.Recorder
                             request.GetData<byte>().CopyTo(slot.Pixels);
                             cursor.Item2(slot.Pixels);
                             CaptureCompleted(slot.Identity);
+                            slot.MetadataSnapshot = Json.Encode(metadata);
                             if (!frames.TryAdd(slot)) throw new IOException("Writer queue full");
                         }
                         catch (Exception ex)
@@ -320,7 +322,8 @@ namespace DSPDreamer.Recorder
             long next = 0;
             try
             {
-                using (var stream = new StreamWriter(new FileStream(Path.Combine(source, "events.ndjson"), FileMode.CreateNew), new UTF8Encoding(false)))
+                using (var stream = new StreamWriter(new FileStream(Path.Combine(source, "events.ndjson"), FileMode.CreateNew,
+                    FileAccess.Write, FileShare.Read), new UTF8Encoding(false)))
                 {
                     while (!drained || frames.Count > 0 || events.Count > 0)
                     {
@@ -328,13 +331,22 @@ namespace DSPDreamer.Recorder
                         if (frames.TryTake(out Slot frame, 5)) ordered.Add((long)frame.Identity["capture_id"], frame);
                         while (ordered.TryGetValue(next, out Slot slot))
                         {
-                            if (!slot.Dropped) storage.Write(slot.Pixels, slot.Identity);
+                            if (!slot.Dropped)
+                            {
+                                storage.Write(slot.Pixels, slot.Identity);
+                                if (storage.AtBoundary)
+                                {
+                                    while (events.TryTake(out string row)) stream.WriteLine(row);
+                                    storage.Checkpoint(stream, slot.MetadataSnapshot);
+                                }
+                            }
                             ordered.Remove(next++);
                             Interlocked.Exchange(ref slot.Busy, 0);
                         }
                     }
                     if (failed || ordered.Count != 0) throw new IOException("Incomplete capture; no SOURCE marker published");
                     storage.Finish();
+                    metadata["sealed_files"] = storage.Seal(stream);
                     stream.Flush();
                     ((FileStream)stream.BaseStream).Flush(true);
                 }
@@ -345,6 +357,7 @@ namespace DSPDreamer.Recorder
                     file.Write(bytes, 0, bytes.Length); file.Flush(true);
                 }
                 File.Move(partial, Path.Combine(source, "SOURCE.json"));
+                storage.Dispose();
                 var process = new ProcessStartInfo(python.Value, "-m dsp_dreamer finish --source \"" + source + "\" --ffmpeg \"" + ffmpeg.Value + "\"")
                 { WorkingDirectory = repository.Value, UseShellExecute = false, CreateNoWindow = true,
                   RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };

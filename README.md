@@ -30,7 +30,7 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 回合從擾動後第一張可控制且有效的 RGB 要求時間起算，30 分鐘使用單調時鐘，包含 UI 與暫停，不把載入時間算入。死亡與超時自動結束回合；任務模組可呼叫 `EndEpisode("success")` 或 `EndEpisode("unrecoverable")`，控制模組可傳入 `reason: "human_intervention"` 等有效性原因。人工示範本身不被當成人工介入故障，也沒有新增卡住提前終止規則。
 
-停止、重設、失焦、世界卸載及故障會釋放鍵鼠控制。回合結束時最多等待兩秒取得 final observation；缺失則標為 `incomplete`。回合結束後按 F9 重試或 F8 發布工作階段。GPU 擷取故障可保留已驗證的合法前綴；writer／佇列致命故障不發布成功標記，並盡力留下 `INCOMPLETE.json` 診斷，之後須重啟 DSP。診斷檔不能當作可編譯來源，故障檔案恢復與來源清理仍屬後續工作。
+停止、重設、失焦、世界卸載及故障會釋放鍵鼠控制。回合結束時最多等待兩秒取得 final observation；缺失則標為 `incomplete`。回合結束後按 F9 重試或 F8 發布工作階段。GPU 擷取故障可保留已驗證的合法前綴；writer／佇列致命故障不發布成功標記，並盡力留下 `INCOMPLETE.json` 診斷，之後須重啟 DSP。每完成 200 幀會保存帶 checksum 的檢查點；恢復只使用完整核對的檢查點，`INCOMPLETE.json` 不能授權恢復或編譯。
 
 ## 驗證、編譯與讀回
 
@@ -43,7 +43,20 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 .\.venv\Scripts\python.exe -m dsp_dreamer inspect --source runs/example.source.dataset
 ```
 
-發布流程先產生 `recording.mkv`、`frames.ndjson`、`events.ndjson`，最後原子發布 `manifest.json`。流程會完整解碼來源各段與合併影片，比較每幀 RGBA SHA-256 與 ordinal，以 seek 檢查每個段邊界兩側，並核對事件位元組；發布後再次檢查檔案。輸出目錄必須是新目錄，重試不能覆寫既有產物。
+發布流程先產生 `recording.mkv`、`frames.ndjson`、`events.ndjson`，最後原子發布 `manifest.json`。流程會完整解碼來源各段與合併影片，比較每幀 RGBA SHA-256 與 ordinal，以 seek 檢查每個段邊界兩側，並核對事件位元組；發布後再次檢查檔案。`finish` 預設完成核對及來源清理後才編譯。來源與 evidence 必須位於同一磁碟區，資料檔與 manifest 皆以不覆寫的 rename 發布。
+
+發布收據保存本次來源、工作目錄、清單與 checksum。部分發布可用原本的 `finish` 指令重試；已完成 evidence 與 dataset 會先驗證再沿用。清理中斷可重試，僅刪除解析後仍位於本次工作目錄且 checksum 相符的檔案。其他錄製、無關檔案和失敗嘗試留下的未核對工作目錄都保留。Python `publish` 預設保留來源，可明確傳入 `cleanup=True` 啟用清理。若 compiler 中斷留下未完成 dataset，請用 `compile --out` 指向新目錄。
+
+來源受損或程序被終止時，使用新的 evidence 路徑恢復：
+
+```powershell
+.\.venv\Scripts\python.exe -m dsp_dreamer recover --source runs/example.source --out runs/recovered.evidence --ffmpeg 'PATH\ffmpeg.exe'
+.\.venv\Scripts\python.exe -m dsp_dreamer compile --source runs/recovered.evidence --out runs/recovered.dataset --ffmpeg 'PATH\ffmpeg.exe'
+```
+
+恢復從最新可驗證檢查點取連續前綴，完整核對 sidecar 位元組前綴、來源段 checksum、RGBA 解碼、索引與進度重播，再產生新 artifact ID。原始來源與故障尾端保留；manifest 和 dataset 的 `recovery.recording_complete=false` 明示它不是完整錄製，記錄排除起點與無法確定的尾端。缺 final observation 的回合標為 `incomplete`，尾端不提供 bootstrap。相同恢復指令可重試已發布產物。舊來源若沒有 sealed 檢查點，不能憑診斷檔推測恢復。
+
+容量預檢在已有來源之外，預留兩份本次檔案容量及 1 GiB 餘裕；恢復另多預留一份副本。compiler 以未壓縮 RGB、每 capture 小時 2 GiB 表格及 1 GiB scratch 估算。空間不足或來源變更會停止流程。受控程序終止測試不代表斷電、OS 或磁碟故障保證，詳細結果見[封存恢復驗證](docs/validation/issue-17.md)。
 
 編譯器只接受已驗證的四檔錄製證據。動作區間為 `[requested_ticks_t, requested_ticks_next)`，事件依 `(ticks, sequence_number)` 排序。資料保留按住狀態、按住時間比例、按下與放開次數、observed delta／wheel 總和及原始取樣引用。不支援、有歧義、禁止的動作，以及漏幀區間，皆標為無效。2026-09-10 使用者新增 Space（跳躍）及 E（單獨開關背包），動作契約升為 `action_catalog_v3`，共 20 維。原本 18 個 index 保持不變，Space 追加在 index 18、E 在 index 19，Digit1 仍在 index 1；不使用 Unity enum 數值代替硬體 scan code。
 
@@ -67,12 +80,13 @@ legal_starts = dataset.sequence_starts(64)
 
 轉移包含 `episode_outcome`、`validity_status`、原因、`is_terminal`、`truncation` 與 `bootstrap_mask`。success／death／unrecoverable 的終止轉移不 bootstrap；timeout 可 bootstrap；無效或 incomplete 尾端不 bootstrap。缺 next observation 的動作不產生轉移。`sequence_starts` 只回傳不跨回合、gap 或無效範圍的固定長度起點；未知控制之後的同回合範圍不納入訓練。
 
-進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。新版 `progress_version=3` 依目前供電、固定配方、採礦機／傳送帶／分揀器連接與各機器實際產出判定完整產線。允許保留或補入人工材料；只有人工餵料、缺少可自行運作的上游連接不算成功。舊版 1、2 保留各自原有重播語意。完整契約、已測範圍與實機驗收結果見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。10 Hz 模型視圖、長程記憶體、完整恢復與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
+進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。新版 `progress_version=3` 依目前供電、固定配方、採礦機／傳送帶／分揀器連接與各機器實際產出判定完整產線。允許保留或補入人工材料；只有人工餵料、缺少可自行運作的上游連接不算成功。舊版 1、2 保留各自原有重播語意。完整契約、已測範圍與實機驗收結果見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。10 Hz 模型視圖、長程記憶體與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
 
 ## 驗證
 
 ```powershell
 dotnet restore tests/ProgressReplay/ProgressReplay.csproj
+dotnet restore tests/ArchiveRecovery/ArchiveRecovery.csproj
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m mypy dsp_dreamer
 dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj --no-restore

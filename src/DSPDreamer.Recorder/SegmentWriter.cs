@@ -18,6 +18,8 @@ namespace DSPDreamer.Recorder
         private Timer watchdog;
         private int ordinal;
         private string partial;
+        private readonly Dictionary<string, object> sealedSegments = new Dictionary<string, object>();
+        internal bool AtBoundary => ordinal > 0 && ordinal % 200 == 0;
 
         internal static string HashFile(string path)
         {
@@ -44,7 +46,8 @@ namespace DSPDreamer.Recorder
             if (HashFile(executable) != FfmpegHash) throw new InvalidOperationException("Unknown FFmpeg executable");
             this.root = root;
             this.executable = executable;
-            index = new StreamWriter(new FileStream(Path.Combine(root, "frames.ndjson"), FileMode.CreateNew), new UTF8Encoding(false));
+            index = new StreamWriter(new FileStream(Path.Combine(root, "frames.ndjson"), FileMode.CreateNew,
+                FileAccess.Write, FileShare.Read), new UTF8Encoding(false));
             Open(); // Prepare the first encoder before the capture clock begins.
         }
 
@@ -91,6 +94,40 @@ namespace DSPDreamer.Recorder
             encoder = null;
             using (var file = new FileStream(partial, FileMode.Open, FileAccess.ReadWrite)) file.Flush(true);
             File.Move(partial, partial.Substring(0, partial.Length - ".partial".Length));
+            string name = Path.GetFileName(partial.Substring(0, partial.Length - ".partial".Length));
+            sealedSegments[name] = FileInfo(name);
+        }
+
+        private Dictionary<string, object> FileInfo(string name)
+        {
+            using (var file = new FileStream(Path.Combine(root, name), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var hash = SHA256.Create())
+                return Json.Fields("bytes", file.Length, "sha256", Hex(hash.ComputeHash(file)));
+        }
+
+        internal Dictionary<string, object> Seal(StreamWriter events)
+        {
+            index.Flush(); events.Flush();
+            ((FileStream)index.BaseStream).Flush(true);
+            ((FileStream)events.BaseStream).Flush(true);
+            var files = new Dictionary<string, object>(sealedSegments);
+            // ponytail: sidecar prefix hashing is quadratic across segments; use incremental hashes if it stalls the writer.
+            files["frames.ndjson"] = FileInfo("frames.ndjson");
+            files["events.ndjson"] = FileInfo("events.ndjson");
+            return files;
+        }
+
+        internal void Checkpoint(StreamWriter events, string metadataSnapshot)
+        {
+            var files = Seal(events);
+            string json = metadataSnapshot.Substring(0, metadataSnapshot.Length - 1) + ",\"sealed_files\":" + Json.Encode(files) + "}";
+            string path = Path.Combine(root, "checkpoint-" + (ordinal / 200 - 1).ToString("D6") + ".json");
+            using (var file = new FileStream(path + ".partial", FileMode.CreateNew))
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(json);
+                file.Write(bytes, 0, bytes.Length); file.Flush(true);
+            }
+            File.Move(path + ".partial", path);
         }
 
         internal void Finish()
@@ -99,7 +136,6 @@ namespace DSPDreamer.Recorder
             CloseSegment();
             index.Flush();
             ((FileStream)index.BaseStream).Flush(true);
-            index.Dispose();
         }
 
         public void Dispose()

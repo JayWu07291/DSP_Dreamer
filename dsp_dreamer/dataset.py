@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 import zarr
 from zarr.codecs.blosc import BloscCodec
 
-from .archive import verify_recording
+from .archive import capacity_preflight, verify_recording
 from .contract import CATALOG, CONTROLS, atomic_save, file_info, load, require, save, sha
 from .video import decode
 from .lifecycle import transition_lifecycle
@@ -65,6 +65,8 @@ def aggregate(samples, start, end, initial):
 def compile_recording(source, destination, ffmpeg):
     source, destination = Path(source), Path(destination)
     manifest, frames, events = verify_recording(source, ffmpeg)
+    # Uncompressed RGB plus the agreed 2 GiB/hour table allowance and 1 GiB scratch reserve.
+    capacity_preflight(destination, len(frames) * (640 * 360 * 3 + (2 * 1024 ** 3 // 72000)), copies=1)
     events.sort(key=lambda event: (event["ticks"], event["sequence_number"]))
     progress = replay_progress(manifest, frames, events)
     scheduler_gaps = [e for e in events if e["type"] == "gap" and e["reason"] == "scheduler"]
@@ -147,6 +149,7 @@ def compile_recording(source, destination, ffmpeg):
                     source_catalog=manifest["catalog"], controls=CONTROLS,
                     diagnostic_mode=manifest.get("diagnostic_mode", False))
     metadata.update(progress_version=manifest.get("progress_version"), tasks=TASKS, milestones=MILESTONES)
+    metadata["recovery"] = manifest.get("recovery")
     save(destination / "dataset.json", metadata)
     # Reopen actual stored chunks and tables before publication.
     for index in range(len(frames)):

@@ -7,8 +7,8 @@ import json
 import re
 import math
 
-from .contract import (CATALOG, ENCODE, FFMPEG_SHA, SCHEMA, atomic_save, file_info,
-                       load, records, require, sha)
+from .contract import (CATALOG, ENCODE, FFMPEG_SHA, SCHEMA, file_info,
+                       load, records, require, save, sha)
 from .video import check_ffmpeg, decode, run
 from .lifecycle import validate_lifecycle
 from .progress import validate_fact, replay_progress
@@ -100,8 +100,18 @@ def verify_recording(path, ffmpeg):
     path = Path(path)
     check_ffmpeg(ffmpeg)
     manifest = load(path / "manifest.json")
+    require({p.name for p in path.iterdir()} == {"manifest.json", "recording.mkv", "frames.ndjson", "events.ndjson"},
+            "Unexpected evidence files")
+    return verify_payload(path, manifest, ffmpeg)
+
+
+def verify_payload(path, manifest, ffmpeg):
     validate_metadata(manifest)
     require(manifest["state"] == "verified", "Recording is not complete")
+    if "recovery" in manifest:
+        recovery = manifest["recovery"]
+        require(recovery["recording_complete"] is False and recovery["excluded_from_ordinal"] == manifest["frame_count"],
+                "Invalid recovered prefix marker")
     require(manifest["ffmpeg_sha256"] == FFMPEG_SHA and manifest["encoder_parameters"] == ENCODE,
             "Unknown encoding contract")
     require(set(manifest["files"]) == {"recording.mkv", "events.ndjson", "frames.ndjson"}, "Invalid four-file manifest")
@@ -116,45 +126,148 @@ def verify_recording(path, ffmpeg):
     return manifest, frames, events
 
 
-def publish(source, destination, ffmpeg):
-    source, destination = Path(source), Path(destination)
+def checked_path(root, name):
+    root = Path(root)
+    require(root.absolute() == root.resolve(), "Aliased work directory")
+    require(isinstance(name, str) and bool(re.fullmatch(
+        r"SOURCE\.json|frames\.ndjson|events\.ndjson|segment-\d{6}\.mkv|checkpoint-\d{6}\.json|"
+        r"segment-\d{6}\.encoder\.log|recording\.mkv|concat\.partial", name)), "Unsafe cleanup filename")
+    path = root / name
+    require(path.resolve().parent == root and not path.is_symlink(), "Path escapes work directory")
+    return path
+
+
+def check_files(root, files, missing=False):
+    for name, info in files.items():
+        path = checked_path(root, name)
+        if missing and not path.exists():
+            continue
+        require(file_info(path) == info, f"Source changed: {name}")
+
+
+def capacity_preflight(destination, source_bytes, copies=2):
+    parent = Path(destination)
+    while not parent.exists():
+        parent = parent.parent
+    # Source already occupies disk; allow a segment copy, merged copy and 1 GiB reserve.
+    require(shutil.disk_usage(parent).free >= copies * source_bytes + 1024 ** 3, "Insufficient free space; source retained")
+
+
+def cleanup_recording(source, destination, ffmpeg):
+    source = Path(source).absolute()
+    manifest, _, _ = verify_recording(destination, ffmpeg)
+    publication = manifest["publication"]
+    require(publication["source_root"] == str(source), "Different source directory")
+    work = Path(publication["work_root"])
+    require(work.parent == source and re.fullmatch(r"archive-[0-9a-f-]{36}", work.name), "Unsafe work directory")
+    groups = [(source, manifest["source_files"]), (work, publication["work_files"])]
+    # Check every remaining file before the first deletion, then recheck at unlink.
+    for root, files in groups:
+        check_files(root, files, missing=True)
+    for root, files in groups:
+        for name, info in files.items():
+            path = checked_path(root, name)
+            if path.exists():
+                require(file_info(path) == info, f"Source changed before cleanup: {name}")
+                path.unlink()
+
+
+def publish(source, destination, ffmpeg, cleanup=False):
+    source, destination = Path(source).absolute(), Path(destination).absolute()
+    require(source == source.resolve() and destination == destination.resolve(), "Aliased publication directory")
+    require(source.drive == destination.drive, "Publication requires source and evidence on the same volume")
+    require(source != destination and source not in destination.parents and destination not in source.parents,
+            "Overlapping source and evidence directories")
     check_ffmpeg(ffmpeg)
+    if (destination / "manifest.json").exists():
+        manifest, _, _ = verify_recording(destination, ffmpeg)
+        require(manifest.get("publication", {}).get("source_root") == str(source), "Different source directory")
+        check_files(source, manifest["source_files"], missing=True)
+        if cleanup:
+            cleanup_recording(source, destination, ffmpeg)
+        return destination
+    receipt = destination.with_name(destination.name + ".publish.json")
+    if receipt.exists():
+        manifest = load(receipt)
+        require(manifest["publication"]["source_root"] == str(source), "Different source directory")
+        check_files(source, manifest["source_files"])
+        return finish_publication(source, destination, manifest, ffmpeg, cleanup)
+    require(not destination.exists(), "Unowned partial destination; recover into a new artifact")
+    # Snapshot before parsing, then recheck before making any publication visible.
+    metadata_info = file_info(source / "SOURCE.json")
     metadata = load(source / "SOURCE.json")
     validate_metadata(metadata)
+    sidecars = {name: file_info(source / name) for name in ("frames.ndjson", "events.ndjson")}
     frames, events = list(records(source / "frames.ndjson")), list(records(source / "events.ndjson"))
     validate_indices(frames, events)
     validate_lifecycle(metadata, frames)
     replay_progress(metadata, frames, events)
     segments = list(dict.fromkeys(frame["segment"] for frame in frames))
-    source_files = {name: file_info(source / name) for name in ["SOURCE.json", "frames.ndjson", "events.ndjson", *segments]}
+    source_files = dict(sidecars, **{"SOURCE.json": metadata_info})
+    source_files.update({name: file_info(checked_path(source, name)) for name in segments})
+    if "sealed_files" in metadata:
+        require(metadata["sealed_files"] == {name: source_files[name] for name in [*sidecars, *segments]},
+                "Source differs from recording seal")
+    for path in source.iterdir():
+        if re.fullmatch(r"checkpoint-\d{6}\.json|segment-\d{6}\.encoder\.log", path.name):
+            source_files[path.name] = file_info(checked_path(source, path.name))
+    check_files(source, source_files)
+    source_bytes = sum(info["bytes"] for info in source_files.values())
+    capacity_preflight(source, source_bytes)
     for segment in segments:
         verify_video(ffmpeg, source / segment, [f for f in frames if f["segment"] == segment])
-    destination.mkdir(parents=True, exist_ok=False)
+    work = source / ("archive-" + str(uuid.uuid4()))
+    work.mkdir()
     # Only generated simple filenames enter the concat list. Source paths are never shell code.
-    concat = destination / "concat.partial"
+    concat = work / "concat.partial"
     for segment in segments:
-        shutil.copyfile(source / segment, destination / segment)
+        shutil.copyfile(source / segment, work / segment)
     concat.write_text("".join(f"file '{name}'\n" for name in segments), encoding="utf-8")
     run(ffmpeg, ["-n", "-f", "concat", "-safe", "1", "-i", str(concat), "-map", "0:v:0", "-c", "copy",
-                 str(destination / "recording.mkv")])
-    verify_video(ffmpeg, destination / "recording.mkv", frames)
+                 str(work / "recording.mkv")])
+    verify_video(ffmpeg, work / "recording.mkv", frames)
     seek_points = sorted({0, len(frames) - 1} | {i for boundary in range(200, len(frames), 200)
                                                 for i in (boundary - 1, boundary)})
     for ordinal in seek_points:
-        decoded = list(decode(ffmpeg, destination / "recording.mkv", ordinal))
+        decoded = list(decode(ffmpeg, work / "recording.mkv", ordinal))
         require(len(decoded) == 1 and sha(decoded[0]) == frames[ordinal]["rgba_sha256"], "Segment boundary seek mismatch")
     for name in ("frames.ndjson", "events.ndjson"):
-        shutil.copyfile(source / name, destination / name)
-        require(file_info(destination / name) == source_files[name], "Metadata changed during copy")
-    require(all(file_info(source / name) == info for name, info in source_files.items()), "Source changed during publication")
+        shutil.copyfile(source / name, work / name)
+        require(file_info(work / name) == source_files[name], "Metadata changed during copy")
+    check_files(source, source_files)
     manifest = dict(metadata, state="verified", artifact_id=str(uuid.uuid4()), ffmpeg_sha256=FFMPEG_SHA,
                     encoder_parameters=ENCODE, frame_count=len(frames), event_count=len(events),
                     source_files=source_files, validation={"full_rgba_decode": True, "seek_ordinals": seek_points},
-                    files={name: file_info(destination / name) for name in ("recording.mkv", "frames.ndjson", "events.ndjson")})
-    # Delete only copies created above; original source evidence is retained for later lifecycle tickets.
-    for name in segments:
-        (destination / name).unlink()
-    concat.unlink()
-    atomic_save(destination / "manifest.json", manifest)
+                    files={name: file_info(work / name) for name in ("recording.mkv", "frames.ndjson", "events.ndjson")},
+                    publication=dict(source_root=str(source), work_root=str(work),
+                        work_files={p.name: file_info(p) for p in work.iterdir()}))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    save(work / "ready.json", manifest)
+    (work / "ready.json").rename(receipt)
+    return finish_publication(source, destination, manifest, ffmpeg, cleanup)
+
+
+def finish_publication(source, destination, manifest, ffmpeg, cleanup):
+    work = Path(manifest["publication"]["work_root"])
+    require(work.parent == source and re.fullmatch(r"archive-[0-9a-f-]{36}", work.name), "Unsafe work directory")
+    require(set(manifest["files"]) == {"recording.mkv", "frames.ndjson", "events.ndjson"}, "Invalid publication inventory")
+    check_files(work, manifest["publication"]["work_files"], missing=True)
+    destination.mkdir(exist_ok=True)
+    require(set(p.name for p in destination.iterdir()) <= set(manifest["files"]),
+            "Unexpected partial publication files")
+    for name, info in manifest["files"].items():
+        target = checked_path(destination, name)
+        if target.exists():
+            require(file_info(target) == info, "Partial publication changed")
+        else:
+            (work / name).rename(target)
+            require(file_info(target) == info, "Published data checksum mismatch")
+    verify_payload(destination, manifest, ffmpeg)
+    check_files(source, manifest["source_files"])
+    receipt = destination.with_name(destination.name + ".publish.json")
+    require(load(receipt) == manifest, "Publication receipt changed")
+    receipt.rename(destination / "manifest.json")
     verify_recording(destination, ffmpeg)
+    if cleanup:
+        cleanup_recording(source, destination, ffmpeg)
     return destination

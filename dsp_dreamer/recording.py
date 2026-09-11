@@ -1,11 +1,13 @@
 """Synthetic capture adapter; live Unity capture writes the same source format."""
 import uuid
+import os
 from pathlib import Path
 
 import numpy as np
 
-from .contract import CATALOG, SCHEMA, atomic_save, require, sha, write_records
+from .contract import CATALOG, SCHEMA, atomic_save, require, sha
 from .video import Encoder, check_ffmpeg
+from .recovery import seal_files
 
 
 class Recording:
@@ -26,6 +28,22 @@ class Recording:
         self.encoder: Encoder | None = Encoder(ffmpeg, self.path / "segment-000000.mkv")
         self.closed = False
         self.episode = None
+        self.frame_stream = (self.path / "frames.ndjson").open("xb")
+        self.event_stream = (self.path / "events.ndjson").open("xb")
+        self.saved_frames = self.saved_events = 0
+
+    def checkpoint(self, final=False):
+        import json
+        for stream, rows, start in ((self.frame_stream, self.frames, self.saved_frames),
+                                    (self.event_stream, self.events, self.saved_events)):
+            for row in rows[start:]:
+                stream.write((json.dumps(row, sort_keys=True, allow_nan=False) + "\n").encode())
+            stream.flush()
+            os.fsync(stream.fileno())
+        self.saved_frames, self.saved_events = len(self.frames), len(self.events)
+        segments = list(dict.fromkeys(f["segment"] for f in self.frames))
+        metadata = dict(self.metadata, sealed_files=seal_files(self.path, segments))
+        atomic_save(self.path / ("SOURCE.json" if final else f"checkpoint-{len(self.frames) // 200 - 1:06}.json"), metadata)
 
     def begin_attempt(self, manifest):
         require(not self.pending, "Pending observations from previous attempt")
@@ -97,6 +115,7 @@ class Recording:
                 self.encoder.close()
                 self.encoder = None
                 self.segment += 1
+                self.checkpoint()
 
     def __enter__(self):
         return self
@@ -107,9 +126,9 @@ class Recording:
         self.closed = True
         if kind is None:
             require(not self.pending and len(self.frames) >= 2, "Incomplete recording")
-            write_records(self.path / "frames.ndjson", self.frames)
-            write_records(self.path / "events.ndjson", self.events)
-            atomic_save(self.path / "SOURCE.json", self.metadata)
+            self.checkpoint(final=True)
+        self.frame_stream.close()
+        self.event_stream.close()
 
     def publish(self, destination):
         from .archive import publish
