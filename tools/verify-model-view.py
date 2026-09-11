@@ -15,6 +15,8 @@ from dsp_dreamer.video import decode
 
 
 def verify(source, destination, ffmpeg):
+    if not __debug__:
+        raise RuntimeError("Verification requires assertions; run Python without -O")
     source = Path(source)
     before = {p.name: file_info(p) for p in source.iterdir() if p.is_file()}
     old_dataset = source.with_name(source.name.removesuffix(".evidence") + ".dataset")

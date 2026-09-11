@@ -62,7 +62,7 @@
 
 所有 4,759 個合法 64-step 起點均核對不跨 episode／attempt 或無效範圍。另實際載入每份資料首尾的 64-step batch，確認 burn-in masks；9 個有效區間結尾的 batch 均在邊界停止並 padding。task 切換及無效邊界周邊共 99 個 RGB 幀由原影片獨立解碼，與模型 float32 CHW 全尺寸逐像素相等，inputs 沒有具特權狀態。
 
-來源、衍生 artifact ID、檔案 checksums、排除計數、節點與切換时间、抽查索引均保存於 [完整流程結果](issue-18-full-flow-live.json)及[重試結果](issue-18-retry-live.json)。大型影片與 dataset 保留於本機 `runs/live/`，沒有上傳 GitHub。Space／E 在這兩份錄製沒有 down，相關順序與投影由本票整合 fixtures 及 #14 既有實機證據支持，不宣稱此次實機重播新增了這兩鍵的正例。
+來源、衍生 artifact ID、檔案 checksums、排除計數、節點與切換時間、抽查索引均保存於 [完整流程結果](issue-18-full-flow-live.json)及[重試結果](issue-18-retry-live.json)。大型影片與 dataset 保留於本機 `runs/live/`，沒有上傳 GitHub。Space／E 在這兩份錄製沒有 down，相關順序與投影由本票整合 fixtures 及 #14 既有實機證據支持，不宣稱此次實機重播新增了這兩鍵的正例。
 
 可重跑指令，dataset 與 report 必須指定尚不存在的新路徑：
 
@@ -74,6 +74,8 @@
 
 兩次執行均回報 `status=passed`，含驗證腳本的 mypy 共 14 檔通過。此次只新增驗證工具及證據，正式 runtime 維持 `9006db3`，沿用該版 109 項完整測試結果。
 
+兩份 JSON 的 `verification_script` checksum 對應 `e3dad54` 的腳本。後續 Standards 複核發現 Python `-O` 會移除 assert，已新增入口硬性拒絕，確認拒絕時不建立 dataset 或報告。本次兩次實機驗證均使用正常模式，原結果保留，不因新增防誤用檢查而重編來源。
+
 ## Standards
 
 以 `ec83811a824450d5ca2c80edbb783c688fbe7000` 為基準，由獨立 agent 審查 AGENTS.md、domain 規則、CONTEXT.md、Ponytail 及 code-review smell baseline，沒有需修改的問題。
@@ -83,3 +85,5 @@
 獨立 agent 發現一項缺口：loader 沒有重算 lifecycle validity、terminal／truncation／bootstrap，重新封存後可能接受偽標為有效的無效尾段。現已保存 next episode／attempt 身分，重用 `transition_lifecycle` 驗證回合身分、邊界與 targets，並新增 human_intervention 尾段偽造後必須拒載的整合測試。未發現範圍擴張。
 
 原審查 agent 已複核確認修正。Standards 共 0 項，Spec 共 1 項已解決，兩軸均無未解決問題。
+
+結案追加的 `9006db3...e3dad54` 另做雙軸審查。Standards 共 1 項，驗證腳本的 `-O` 防誤用已修正；Spec 共 0 項，實機數據與主張一致。
