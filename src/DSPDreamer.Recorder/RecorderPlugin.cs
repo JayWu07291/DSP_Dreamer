@@ -38,7 +38,7 @@ namespace DSPDreamer.Recorder
         private GameHistoryData history;
         private readonly string session = Guid.NewGuid().ToString();
         private readonly Dictionary<string, int> dismantles = new Dictionary<string, int>();
-        private static readonly KeyCode[] Keys = Enum.GetValues(typeof(KeyCode)).Cast<KeyCode>()
+        internal static readonly KeyCode[] Keys = Enum.GetValues(typeof(KeyCode)).Cast<KeyCode>()
             .Where(k => (int)k > 0 && (int)k < (int)KeyCode.JoystickButton0).Distinct().ToArray();
 
         private sealed class Slot
@@ -102,7 +102,10 @@ namespace DSPDreamer.Recorder
         private void StartRecording(string mode = "human")
         {
             if (writer != null || failed || !GameMain.isRunning || !Application.isFocused) return;
+            if (diagnosticObserver != null && diagnosticObserver.Running)
+                throw new InvalidOperationException("Wait for DSP diagnostic evidence completed before starting another recording");
             Config.Reload();
+            ValidateDiagnosticCase(mode);
             var runtime = Runtime();
             string candidate = Json.Encode(runtime);
             string digest = SegmentWriter.Hash(Encoding.UTF8.GetBytes(candidate));
@@ -138,6 +141,10 @@ namespace DSPDreamer.Recorder
             metadata["control_mode"] = mode;
             metadata["calibration_sha256"] = mode == "calibration" ? null : calibrationApproval.Value;
             failNextRelease = failNextReadback = false;
+            resetPending = stopPending = false;
+            failFinalReadback = false;
+            diagnosticSent = false;
+            diagnosticStarted = 0;
             slots = Enumerable.Range(0, 12).Select(_ => new Slot {
                 Full = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB),
                 Small = new RenderTexture(640, 360, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
@@ -151,7 +158,11 @@ namespace DSPDreamer.Recorder
             writer = new Thread(Write) { IsBackground = true, Name = "DSP recording writer" };
             writer.Start();
             active = true;
-            try { ReloadBaseline(); }
+            try
+            {
+                if (selectedDiagnostic != "full") StartDiagnosticObserver();
+                ReloadBaseline();
+            }
             catch { failed = true; StopRecording(); throw; }
             Logger.LogInfo("Recording started: " + source);
         }
@@ -163,6 +174,7 @@ namespace DSPDreamer.Recorder
 
         private void Emit(string type, Dictionary<string, object> fields)
         {
+            if (type != "input") diagnosticObserver?.Record(type, fields);
             if (!active) return;
             var row = Identity(Stopwatch.GetTimestamp());
             row["type"] = type;
@@ -249,9 +261,13 @@ namespace DSPDreamer.Recorder
                     {
                         try
                         {
-                            if (failNextReadback)
+                            if (failNextReadback || (failFinalReadback && episode["end_ticks"] != null &&
+                                (long)slot.Identity["requested_ticks"] >= (long)episode["end_ticks"]))
                             {
                                 failNextReadback = false;
+                                failFinalReadback = false;
+                                Emit("control_request", Json.Fields("operation", "readback_fault_triggered",
+                                    "capture_id", slot.Identity["capture_id"], "requested_ticks", slot.Identity["requested_ticks"], "simulated", true));
                                 throw new IOException("Controlled GPU readback failure");
                             }
                             if (request.hasError) throw new IOException("GPU readback failed");
@@ -416,6 +432,11 @@ namespace DSPDreamer.Recorder
                 ControlUpdate();
             }
             catch (Exception ex) { failed = true; Logger.LogError(ex); }
+            PumpFinalization();
+        }
+
+        internal void PumpFinalization()
+        {
             if (failed && !stopping && writer != null) StopRecording();
             if (stopping && pending == 0) drained = true;
             if (stopping && pending == 0 && writer != null && !writer.IsAlive)
@@ -502,12 +523,14 @@ namespace DSPDreamer.Recorder
         }
         private void OnDestroy()
         {
+            diagnosticObserver?.Record("callback", Json.Fields("name", "OnDestroy"));
             EndEpisode(reason: "stopped");
             StopRecording();
             ReleaseControls();
             if (pending != 0) AsyncGPUReadback.WaitAllRequests();
             drained = true;
             harmony?.UnpatchSelf(); Current = null;
+            diagnosticObserver?.Record("callback_completed", Json.Fields("name", "OnDestroy"));
         }
     }
 

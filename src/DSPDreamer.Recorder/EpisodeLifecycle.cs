@@ -29,6 +29,7 @@ namespace DSPDreamer.Recorder
             cameraSeed = Config.Bind("Trial", "CameraSeed", 29);
             policySeed = Config.Bind("Trial", "PolicySeed", 41);
             diagnostics = Config.Bind("Diagnostics", "Enabled", false, "受控故障測試；此模式的錄製不供訓練。");
+            diagnosticCase = Config.Bind("Diagnostics", "Case", "full", "F6: full / focus_hold / final_readback / disable / destroy；後兩項測後須重啟遊戲。");
         }
 
         private void DiagnosticUpdate()
@@ -140,6 +141,7 @@ namespace DSPDreamer.Recorder
             if (reason != null && !allowed.Contains(reason)) throw new ArgumentException("Unknown validity reason");
             if (outcome == null && reason == null) throw new ArgumentException("Missing episode end reason");
             if (!active || episode == null || episode["end_ticks"] != null) return;
+            if (selectedDiagnostic != "full") stopPending = true;
             long now;
             lock (progressGate)
             {

@@ -35,6 +35,7 @@ Repository = $repoRoot
 
 [Diagnostics]
 Enabled = $($Diagnostics.IsPresent.ToString().ToLowerInvariant())
+Case = full
 "@
 Set-Content -LiteralPath $config -Value $settings -Encoding utf8
 Get-FileHash -LiteralPath $dll

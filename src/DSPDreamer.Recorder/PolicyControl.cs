@@ -186,6 +186,7 @@ namespace DSPDreamer.Recorder
             if (!ControlReady) return;
             if (InputSettingsIdentity() != frozenSettings) { EndEpisode(reason: "fingerprint_mismatch"); return; }
             if (controlMode == "human") return;
+            if (selectedDiagnostic != "full") { RunDiagnostic(); return; }
             long now = Stopwatch.GetTimestamp();
             if (controlMode == "policy")
             {
@@ -253,9 +254,11 @@ namespace DSPDreamer.Recorder
         private void OnDisable()
         {
             if (Current != this) return;
+            diagnosticObserver?.Record("callback", Json.Fields("name", "OnDisable"));
             EndEpisode(reason: "stopped");
             StopRecording();
             ReleaseControls();
+            diagnosticObserver?.Record("callback_completed", Json.Fields("name", "OnDisable"));
         }
     }
 }
