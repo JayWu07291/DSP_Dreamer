@@ -1,0 +1,219 @@
+{
+  "recording_id": "67763ac3-f286-4f93-b094-8793415c3d06",
+  "requested_case": "injection_failure",
+  "observed_case": "human_intervention",
+  "injection_failure_exercised": false,
+  "episode": {
+    "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+    "end_ticks": 6166991153,
+    "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+    "episode_outcome": null,
+    "final_capture_id": 65,
+    "start_ticks": 6134022832,
+    "validity_reasons": [
+      "human_intervention"
+    ],
+    "validity_status": "invalid"
+  },
+  "source_manifest_sha256": "9fd3ac40e89ad4110bee458da338ecd5c72fc033b86655911327af4237b0cc01",
+  "dataset_completed_sha256": "a0515e1f1d9f69539556e516f8b38c33322ce238909193e3c16dc38cea3adb30",
+  "evidence": [
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "delta": [
+        0,
+        0
+      ],
+      "down": [
+        "LeftShift"
+      ],
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "focused": true,
+      "fullscreen_ui": false,
+      "game_tick": 389,
+      "held": [
+        "R",
+        "LeftShift"
+      ],
+      "horizontal_wheel": 0,
+      "in_screen": true,
+      "inputing": false,
+      "mouse_x": 924,
+      "mouse_y": 377,
+      "paused": false,
+      "sequence_number": 2970,
+      "ticks": 6162847448,
+      "type": "input",
+      "unity_frame": 36164,
+      "up": [],
+      "wheel": 0,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "game_tick": 393,
+      "operation": "release_all",
+      "requested_count": 27,
+      "requested_ticks": 6163515561,
+      "sent_count": 27,
+      "sequence_number": 2977,
+      "simulated": false,
+      "succeeded": true,
+      "ticks": 6163623256,
+      "type": "control_request",
+      "unity_frame": 36168,
+      "win32_error": 0,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "delta": [
+        0,
+        0
+      ],
+      "down": [],
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "focused": true,
+      "fullscreen_ui": false,
+      "game_tick": 394,
+      "held": [],
+      "horizontal_wheel": 0,
+      "in_screen": true,
+      "inputing": false,
+      "mouse_x": 924,
+      "mouse_y": 377,
+      "paused": false,
+      "sequence_number": 2980,
+      "ticks": 6163685378,
+      "type": "input",
+      "unity_frame": 36169,
+      "up": [
+        "R",
+        "LeftShift"
+      ],
+      "wheel": 0,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "delta": [
+        0,
+        0
+      ],
+      "down": [
+        "F10"
+      ],
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "focused": true,
+      "fullscreen_ui": true,
+      "game_tick": 411,
+      "held": [
+        "F10"
+      ],
+      "horizontal_wheel": 0,
+      "in_screen": true,
+      "inputing": false,
+      "mouse_x": 924,
+      "mouse_y": 377,
+      "paused": false,
+      "sequence_number": 3007,
+      "ticks": 6166986083,
+      "type": "input",
+      "unity_frame": 36183,
+      "up": [],
+      "wheel": 0,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "case": "human_intervention",
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "game_tick": 411,
+      "operation": "diagnostic_fault",
+      "sequence_number": 3008,
+      "simulated": true,
+      "ticks": 6166990864,
+      "type": "control_request",
+      "unity_frame": 36183,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "game_tick": 411,
+      "name": "episode_ended",
+      "outcome": null,
+      "reason": "human_intervention",
+      "sequence_number": 3009,
+      "ticks": 6166991175,
+      "type": "game_event",
+      "unity_frame": 36183,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "game_tick": 411,
+      "operation": "release_all",
+      "requested_count": 26,
+      "requested_ticks": 6167053238,
+      "sent_count": 26,
+      "sequence_number": 3010,
+      "simulated": false,
+      "succeeded": true,
+      "ticks": 6167121980,
+      "type": "control_request",
+      "unity_frame": 36183,
+      "win32_error": 0,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "delta": [
+        0,
+        0
+      ],
+      "down": [],
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "focused": true,
+      "fullscreen_ui": true,
+      "game_tick": 412,
+      "held": [],
+      "horizontal_wheel": 0,
+      "in_screen": true,
+      "inputing": false,
+      "mouse_x": 924,
+      "mouse_y": 377,
+      "paused": false,
+      "sequence_number": 3011,
+      "ticks": 6167211629,
+      "type": "input",
+      "unity_frame": 36184,
+      "up": [
+        "F10"
+      ],
+      "wheel": 0,
+      "world_binding": 6
+    },
+    {
+      "attempt_id": "bf7cb49f-871b-4506-b23a-284b53c600c4",
+      "episode_id": "ade66d98-254c-4b4f-8bfc-1424985352b1",
+      "game_tick": 749,
+      "operation": "release_all",
+      "requested_count": 25,
+      "requested_ticks": 6223329559,
+      "sent_count": 25,
+      "sequence_number": 3353,
+      "simulated": false,
+      "succeeded": true,
+      "ticks": 6223420283,
+      "type": "control_request",
+      "unity_frame": 36523,
+      "win32_error": 0,
+      "world_binding": 6
+    }
+  ],
+  "later_model_requests": 0,
+  "first_empty_ms": 22.0454
+}

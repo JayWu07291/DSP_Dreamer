@@ -137,6 +137,12 @@ NumPad1 探針 sequence 2294 注入 `0x4F`，2295 讀到 End down／held，2319 
 
 下一個人工案例：F6 開始探針，自動操作開始後按 Shift+F10，放開按鍵、等一秒，再按 F8 完成發布，核對模擬注入失敗與實際 release 重試。F6 已啟用診斷模式，不必修改 Config。
 
+## 注入失敗測試未觸發：人工介入證據
+
+錄製 `67763ac3-f286-4f93-b094-8793415c3d06` 已由正式 dataset loader 讀回，但實際 diagnostic case／episode reason 為 `human_intervention`。sequence 2970 讀到 LeftShift down，2977 探針 release 成功送出 27／27，2980 讀到 LeftShift up；3007 讀到 F10 時已沒有 Shift。故本次沒有模擬 release failure，也沒有故障重試證據，不可算注入失敗驗收。
+
+介入後 release 成功送出 26／26，首筆 input 在 22.0454 ms 後 held 清空，無後續模型要求，final capture 65 存在。逐筆依據與來源 checksum 見[人工介入證據](issue-20-intervention-live.json)。重試 Shift+F10 時應快速連按兩鍵，避免提前長按 Shift 被探針釋放；這是目前快捷鍵操作的限制。
+
 ## 規範審查
 
 無書面規範硬性違規。審查列出四項非阻擋性的簡化建議：C#／Python 契約重複、mode 字串分派、動作欄位群組與 `Pixel` 命名。跨語言契約以 parity 測試核對；單筆佇列使用 `PendingAction` 保存欄位。本次保留三種 mode 的直接分派，未新增 handler 架構。另發現 `rejected`／`deadline_miss` 可能未影響 gate，已納入失敗報告並增加測試。
