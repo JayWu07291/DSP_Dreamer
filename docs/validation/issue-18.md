@@ -24,6 +24,10 @@
 
 `tests/test_model_view.py` 包含模型視圖整合案例、動作編解碼與損壞資料拒載。透過正式 synthetic recording → FFV1 四檔 → Zarr／Parquet → 模型視圖完成驗證，沒有以 mock 代替資料路徑。
 
+審查補強了 COMPLETED 發布前驗證、gap 重算、unknown-control 後綴拒載及 lifecycle targets 重算。模型視圖與生命週期針對性回歸共 51 項通過。mypy 檢查 13 個原始碼檔案無問題。
+
+2026-09-11 最終完整 pytest 共 109 項通過，耗時 124.19 秒。JUnit 結果保存在本機 `tmp/issue18-accepted.xml`。
+
 可重跑指令：
 
 ```powershell
@@ -33,3 +37,13 @@
 ```
 
 本票未新增遊戲端掛點或控制注入。合成資料驗證不代表已測量實機 10 Hz 閉迴路 deadline、長程 loader 記憶體或模型訓練品質；這些仍由後續工作驗收。尚無正式 checkpoint loader，後續訓練器須呼叫共用 `validate_action_contract`，本票不宣稱已完成模型載入器。
+
+## Standards
+
+以 `ec83811a824450d5ca2c80edbb783c688fbe7000` 為基準，由獨立 agent 審查 AGENTS.md、domain 規則、CONTEXT.md、Ponytail 及 code-review smell baseline，沒有需修改的問題。
+
+## Spec
+
+獨立 agent 發現一項缺口：loader 沒有重算 lifecycle validity、terminal／truncation／bootstrap，重新封存後可能接受偽標為有效的無效尾段。現已保存 next episode／attempt 身分，重用 `transition_lifecycle` 驗證回合身分、邊界與 targets，並新增 human_intervention 尾段偽造後必須拒載的整合測試。未發現範圍擴張。
+
+原審查 agent 已複核確認修正。Standards 共 0 項，Spec 共 1 項已解決，兩軸均無未解決問題。

@@ -153,7 +153,7 @@ def reseal(path):
     (path / "COMPLETED").write_text(json.dumps(marker))
 
 
-@pytest.mark.parametrize("corruption", ["schema", "catalog", "codec", "missing", "time", "index", "event", "reference", "action", "table", "checksum"])
+@pytest.mark.parametrize("corruption", ["schema", "catalog", "codec", "missing", "time", "index", "event", "reference", "action", "action_dtype", "table", "checksum"])
 def test_loader_rejects_incompatible_or_corrupt_artifacts(tmp_path, corruption):
     path = build(tmp_path, [sample(0)], ticks=range(0, 201, 50))
     metadata = json.loads((path / "dataset.json").read_text())
@@ -183,9 +183,9 @@ def test_loader_rejects_incompatible_or_corrupt_artifacts(tmp_path, corruption):
             rows[0]["next_observation_index"] = 100
         elif corruption == "reference":
             rows[0]["event_refs"] = [9999]
-        elif corruption == "action":
+        elif corruption in ("action", "action_dtype"):
             action = json.loads(rows[0]["action_json"])
-            action["binary"][1] = 1
+            action["binary"][1] = 1 if corruption == "action" else 0.0
             rows[0]["action_json"] = json.dumps(action)
         pq.write_table(pa.Table.from_pylist(rows), path / name, compression="snappy" if corruption == "table" else "zstd")
         metadata["tables"][name] = table_contract(path / name)
@@ -226,3 +226,30 @@ def test_unknown_control_excludes_following_windows_without_erasing_evidence(tmp
     assert view[1]["actual_action"]["horizontal_wheel"] == 1
     assert view[1]["actual_action"]["down_counts"] == {"RightControl": 1}
     assert view.sequence(0, 3)["valid_mask"].tolist() == [True, False, False]
+    rows = pq.read_table(path / "transitions.parquet").to_pylist()
+    for row in rows[4:]:
+        row.update(valid=True, bootstrap_mask=1)
+    pq.write_table(pa.Table.from_pylist(rows), path / "transitions.parquet", compression="zstd")
+    reseal(path)
+    with pytest.raises(InvalidRecording, match="trainable"):
+        open_model_view(path)
+
+
+def test_lifecycle_invalid_tail_cannot_be_resealed_as_trainable(tmp_path):
+    with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
+        recording.begin_attempt(dict(manifest_id="trial", split_group_id="trial", mecha_seed=1, camera_seed=2, policy_seed=3))
+        recording.input(**sample(0))
+        for ticks in (0, 50, 100, 150, 200):
+            if ticks == 200:
+                recording.end_episode(175, reason="human_intervention")
+            request = recording.request(ticks, 1, 1)
+            recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
+    evidence = recording.publish(tmp_path / "evidence")
+    path = compile_recording(evidence, tmp_path / "dataset", FFMPEG)
+    assert open_model_view(path).sequence_starts(1) == [0]
+    rows = pq.read_table(path / "transitions.parquet").to_pylist()
+    rows[-1].update(valid=True, bootstrap_mask=1)
+    pq.write_table(pa.Table.from_pylist(rows), path / "transitions.parquet", compression="zstd")
+    reseal(path)
+    with pytest.raises(InvalidRecording, match="lifecycle"):
+        open_model_view(path)

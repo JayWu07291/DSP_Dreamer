@@ -128,7 +128,9 @@ def compile_recording(source, destination, ffmpeg):
             lifecycle["bootstrap_mask"] = 0
         rows.append(dict(observation_index=index, next_observation_index=index + 1,
                          requested_ticks=start, next_requested_ticks=end, capture_id=first["capture_id"],
-                         next_capture_id=second["capture_id"], action_json=json.dumps(action, sort_keys=True),
+                         next_capture_id=second["capture_id"],
+                         next_episode_id=second.get("episode_id", manifest["episode_id"]),
+                         next_attempt_id=second.get("attempt_id", manifest["attempt_id"]), action_json=json.dumps(action, sort_keys=True),
                          event_refs=[e["sequence_number"] for e in interval if e["type"] != "input"],
                          valid=valid, **lifecycle, **progress[index],
                          gap=gap, is_first=index == 0 or first.get("episode_id") != frames[index - 1].get("episode_id"),
@@ -167,23 +169,21 @@ def compile_recording(source, destination, ffmpeg):
                     array_metadata=rgb.metadata.to_dict(),
                     tables={name: table_contract(destination / name) for name in ("transitions.parquet", "events.parquet")})
     save(destination / "dataset.json", metadata)
-    # Reopen actual stored chunks and tables before publication.
-    for index in range(len(frames)):
-        require(sha(np.asarray(rgb[index]).tobytes()) == rgb_hashes[index], "Compiled RGB checksum mismatch")
-    require(pq.read_table(destination / "transitions.parquet").num_rows == len(frames) - 1, "Transition count mismatch")
     files = {p.relative_to(destination).as_posix(): file_info(p) for p in destination.rglob("*") if p.is_file()}
+    completed = dict(schema="dsp-completed/1", files=files)
+    # The same loader validation must pass before publishing COMPLETED.
+    Dataset(destination, _completed=completed)
     require(file_info(source / "manifest.json") == metadata["source_manifest"], "Source manifest changed")
     for name, info in manifest["files"].items():
         require(file_info(source / name) == info, "Recording changed during compile")
-    atomic_save(destination / "COMPLETED", dict(schema="dsp-completed/1", files=files))
-    open_dataset(destination)
+    atomic_save(destination / "COMPLETED", completed)
     return destination
 
 
 class Dataset:
-    def __init__(self, path):
+    def __init__(self, path, *, _completed=None):
         self.path = Path(path)
-        completed = load(self.path / "COMPLETED")
+        completed = load(self.path / "COMPLETED") if _completed is None else _completed
         require(completed["schema"] == "dsp-completed/1", "Unknown completion schema")
         actual = {p.relative_to(self.path).as_posix() for p in self.path.rglob("*") if p.is_file()} - {"COMPLETED"}
         require(actual == set(completed["files"]), "Dataset file inventory mismatch")
@@ -236,10 +236,15 @@ class Dataset:
         require(version is None or type(version) is int and version in (1, 2, 3), "Unknown progress version")
         require(len(self.rows) == self.metadata["frame_count"] - 1, "Invalid transition count")
         event_index, held = 0, []
+        control_faults = set()
+        scheduler_gaps = [e for e in self.events if e["type"] == "gap" and e["reason"] == "scheduler"]
+        lifecycle_metadata = dict(self.metadata)
+        if self.metadata["episodes"]:
+            lifecycle_metadata["lifecycle_version"] = 1
         for index, row in enumerate(self.rows):
             required = {"observation_index", "next_observation_index", "requested_ticks", "next_requested_ticks",
                         "capture_id", "next_capture_id", "action_json", "event_refs", "valid", "gap", "episode_id",
-                        "attempt_id", "episode_outcome", "validity_status", "validity_reasons", "is_terminal",
+                        "attempt_id", "next_episode_id", "next_attempt_id", "episode_outcome", "validity_status", "validity_reasons", "is_terminal",
                         "truncation", "bootstrap_mask", "is_first", "is_last"}
             require(required <= row.keys(), "Missing transition field")
             require(all(type(row[k]) is int and row[k] >= 0 for k in ("observation_index", "next_observation_index",
@@ -247,7 +252,9 @@ class Dataset:
             require(row["capture_id"] < row["next_capture_id"] and (index == 0 or
                     row["capture_id"] == self.rows[index - 1]["next_capture_id"]), "Nonmonotonic capture index")
             validate_progress_row(row, version in (1, 2, 3))
-            require(len(json.loads(row["action_json"])["binary"]) == len(CONTROLS), "Invalid action width")
+            stored_action = json.loads(row["action_json"])
+            require(isinstance(stored_action["binary"], list) and len(stored_action["binary"]) == len(CONTROLS)
+                    and all(type(v) is int and v in (0, 1) for v in stored_action["binary"]), "Invalid action width/bits")
             require(not self.metadata["diagnostic_mode"] or not row["valid"] and row["bootstrap_mask"] == 0,
                     "Diagnostic recording cannot train")
             require(row["observation_index"] == index and row["next_observation_index"] == index + 1,
@@ -264,15 +271,39 @@ class Dataset:
                 interval.append(self.events[event_index])
                 event_index += 1
             action = aggregate([e for e in interval if e["type"] == "input"], row["requested_ticks"], row["next_requested_ticks"], held)
-            require(json.loads(row["action_json"]) == action, "Actual action differs from input evidence")
+            require(stored_action == action, "Actual action differs from input evidence")
             held = action["end_held"]
+            if action["unsupported"]:
+                control_faults.add(row["episode_id"])
+            gap = row["next_capture_id"] != row["capture_id"] + 1 or any(
+                e["type"] == "gap" and e["reason"] != "scheduler" for e in interval)
+            gap |= any(e["gap_start_ticks"] < row["next_requested_ticks"] and
+                       e["gap_end_ticks"] > row["requested_ticks"] for e in scheduler_gaps)
+            require(row["gap"] == gap, "Gap differs from input evidence")
             require(row["event_refs"] == [e["sequence_number"] for e in interval if e["type"] != "input"], "Invalid event reference")
             require(all(type(row[k]) is bool for k in ("valid", "gap", "is_terminal", "truncation", "is_first", "is_last"))
                     and type(row["bootstrap_mask"]) is int and row["bootstrap_mask"] in (0, 1), "Invalid validity flags")
             require(not row["valid"] or not any(action[k] for k in ("ambiguous", "unsupported", "forbidden"))
-                    and not row["gap"] and all(e.get("focused", True) for e in interval if e["type"] == "input"),
+                    and not row["gap"] and row["episode_id"] not in control_faults
+                    and all(e.get("focused", True) for e in interval if e["type"] == "input"),
                     "Invalid input marked trainable")
             require(row["valid"] or row["bootstrap_mask"] == 0, "Invalid bootstrap target")
+            first = {k: row[k] for k in ("requested_ticks", "capture_id", "episode_id", "attempt_id")}
+            second = {k: row["next_" + k] for k in first}
+            require(index == 0 or all(first[k] == self.rows[index - 1]["next_" + k] for k in first),
+                    "Discontinuous observation identity")
+            require(not self.metadata["episodes"] or all(any(e["episode_id"] == f["episode_id"]
+                    and e["attempt_id"] == f["attempt_id"] for e in self.metadata["episodes"])
+                    for f in (first, second)), "Unknown episode/attempt")
+            lifecycle = transition_lifecycle(lifecycle_metadata, first, second)
+            is_first = index == 0 or row["episode_id"] != self.rows[index - 1]["episode_id"]
+            is_last = index == len(self.rows) - 1 or row["next_episode_id"] != self.rows[index + 1]["next_episode_id"]
+            require(row["is_first"] == is_first and row["is_last"] == is_last, "Invalid episode boundary")
+            lifecycle_valid = lifecycle.pop("lifecycle_valid")
+            require(not row["valid"] or lifecycle_valid, "Invalid lifecycle marked trainable")
+            if not row["valid"] or is_last and row["validity_status"] != "valid":
+                lifecycle["bootstrap_mask"] = 0
+            require(all(row[k] == v for k, v in lifecycle.items()), "Invalid lifecycle target")
         require(len(self.metadata["rgb_sha256"]) == self.metadata["frame_count"], "Missing RGB checksums")
         for index, expected in enumerate(self.metadata["rgb_sha256"]):
             require(sha(np.asarray(self.rgb[index]).tobytes()) == expected, "Compiled RGB checksum mismatch")
