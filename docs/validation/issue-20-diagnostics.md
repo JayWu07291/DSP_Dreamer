@@ -84,6 +84,12 @@ Case = focus_hold
 
 `disable` 錄製 `53cfed21-0d4b-499f-aa22-a13d1f8458bd` 已通過正式 dataset 與獨立 journal 核對，7／7 checks 為 true。獨立觀察記錄 OnDisable 於 index 393 開始、399 完成，回呼內三次釋放分別為 25／25、24／24、24／24。W 注入與 down／held 已確認，結束後 30.5342 ms 的空 held 觀察位於回呼完成之後，無後續模型要求，獨立完成紀錄確認 published=true。停用未取得 final observation，episode 保留 `incomplete`／`stopped`，符合本案例。結果與 journal checksum 見[插件停用證據](issue-20-disable-live.json)。下一項須重啟 DSP 並設定 `Case = destroy`，核對實際銷毀回呼。
 
+## 插件銷毀實機結果
+
+2026-09-12：`destroy` 錄製 `66900be2-682a-4ca5-94d3-b4882ea98c5d` 已通過正式 dataset 與獨立 journal 核對，8／8 checks 為 true。OnDisable 於 index 385–391 執行，回呼內釋放 25／25、24／24、24／24；OnDestroy 於 392–394 執行，回呼內另釋放 24／24。W 注入與 down／held 已確認，395 為銷毀回呼完成後第一筆 input，讀到 W up 且 held 清空，其後無殘留或模型要求，獨立紀錄確認 published=true。
+
+首筆空 held 距 episode 結束 204.1987 ms，距 OnDestroy 完成 13.2345 ms；兩回呼之間沒有 input 樣本，不能把 204.1987 ms 當作 Windows 實際釋放延遲。未取得 final observation，episode 保留 `incomplete`／`stopped`。結果與 journal checksum 見[插件銷毀證據](issue-20-destroy-live.json)。四種新增專用診斷均已有通過證據；最後仍須重啟 DSP、設定 `Case = full` 並完整 F6 重錄，確認銷毀後重啟恢復正常。
+
 ## 離線驗證與審查
 
 2026-09-11：完整 pytest 136 項通過，139.44 秒，JUnit 存於本機 `tmp/issue20-diagnostic-tests-final.xml`。其中 8 項診斷核對測試涵蓋 checksum／錄製身分、缺失回呼與釋放、零封包或缺 down、失焦清空與回焦殘留、final capture 故障位置及錯誤收錄。mypy 16 檔通過，Release 建置 0 warnings／0 errors。這些離線結果不取代新版實機操作。
