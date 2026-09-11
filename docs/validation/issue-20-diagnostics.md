@@ -72,6 +72,8 @@ Case = focus_hold
 
 重測不必更動 Config 或重新校正。切出去後放開 Alt／Tab，再重新按一次 Alt+Tab 切回，盡量在一秒內完成；釋放動作會清除 Alt，不能依靠一直按住 Alt 再按 Tab。回 DSP 後放開所有按鍵並等待診斷完成。
 
+重測 `aeee40ac-f49d-4eb6-9790-8ac04a5168e4` 的正式 dataset 與獨立 journal 核對通過，8／8 checks 為 true，`gate_passed=true`。W 注入與實際 down／held 已確認；失焦後三次釋放分別為 28／28、24／24、24／24，43.3781 ms 後 held 清空。回焦首筆 index 412 的 held／down／up 全空，沒有後續模型要求，final capture 45 存在。episode 保留 `invalid`／`focus_loss`／`unknown_control`（切換視窗用的非模型按鍵不作訓練），不影響本項專用故障核對。完整結果與 journal checksum 見[持續按鍵失焦通過證據](issue-20-focus-hold-live.json)。下一項為 `Case = final_readback`，F6 後不操作，等待自動發布。
+
 重啟 DSP，將 Case 改回 `full`，再按 F6 跑一次完整探針，確認插件重啟後仍正常。要恢復正常人工 F8 錄製時，設定 `Enabled = false`，並保留本版已核准的 CalibrationFile／ApprovedCalibration。專用診斷的結果不供訓練，也不會替換校正檔。
 
 ## 離線驗證與審查
