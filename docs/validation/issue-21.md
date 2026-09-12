@@ -54,4 +54,14 @@ PowerShell 單筆取樣與真實 venv 子程序檢查通過，原始結果為 `r
 
 修正後最終完整 pytest 137 項通過，167.63 秒，JUnit 在 `tmp/issue21-tests-final.xml`。
 
-Standards 1 項註解缺口已處理，Spec 1 項掉幀漏計已修正；沒有未解決的準備程式 finding。實機驗收尚未開始。
+Standards 1 項註解缺口已處理，Spec 1 項掉幀漏計已修正；沒有未解決的準備程式 finding。
+
+## 新版冷啟動與校正
+
+2026-09-12，使用者冷啟動 DSP 並執行 F6。候選指紋 `65aacc586235f804a556e4a7b09c52c15a94124fbd5b8c50796c97c5f6874245` 已逐一核對 11 個磁碟二進位／遊戲資源雜湊及目前 options.xml；除新版 DLL 外，runtime 設定與 #20 已通過的重啟證據一致。候選原檔保存於 `runs/issue21-runtime-20260912.json`。
+
+新版 F6 錄製為 `ded6443d-93b9-44d0-8097-0717f34e2f58`。正式 compiler 發布 406 筆轉移，控制 verifier 通過，44 個模型要求全部有實際觀察，NumPad1 讀為 End 並與 Digit1 區分；詳細要求、釋放與 sample refs 見[校正報告](issue-21-calibration-live.json)。已發布並核准 `runs/issue21-ded6443d-calibration.json`，SHA-256 為 `c97d86595e049ece90ecba4537fd7c96083da4c49f521bf9199778a3ca796dcf`，Diagnostics 保持 false。
+
+新錄製 verifier 已實際跑通：407 幀完整 RGBA 驗證、逐幀 compiled RGB 比較及 203 個模型視窗讀回通過。擷取跨度 20.3917211 秒，scheduler 遺失 2 slots，分母 409，掉幀率 0.488998%；成功寫入間隔 406，寫入率 19.9100408 Hz。GPU readback error、slot 不足及 writer backpressure 均為 0。writer queue 取樣最高 6、busy buffers 最高 8；這次只有兩個段邊界，不能據此證明長程佇列不累積。
+
+正式自動封存、發布、來源清理及 compiler 完成訊息已確認；來源目錄留空，四檔與 dataset 留在本機。各檔 checksum、Zarr／Parquet 配置、延遲與佇列數值見[錄製核對結果](issue-21-calibration-recording.json)。此錄製為 diagnostic，不供訓練，也不計入三次完整基準流程或 30 分鐘長錄製門檻。長程驗收尚待執行。
