@@ -77,6 +77,8 @@ namespace DSPDreamer.Recorder
             frame["segment"] = "segment-" + (ordinal / 200).ToString("D6") + ".mkv";
             frame["segment_ordinal"] = ordinal % 200;
             frame["rgba_sha256"] = Hash(rgba);
+            // Pipe submission and hash completion, not an encoder acknowledgement or durable write.
+            frame["encoder_submitted_ticks"] = Stopwatch.GetTimestamp();
             index.WriteLine(Json.Encode(frame));
             ordinal++;
             if (ordinal % 200 == 0) CloseSegment();

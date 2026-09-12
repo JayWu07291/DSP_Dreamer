@@ -224,7 +224,10 @@ def test_native_writer_termination_recovers_checkpoint(tmp_path):
         worker.communicate(timeout=10)
     assert not (source / "SOURCE.json").exists()
     evidence = recover(source, tmp_path / "recovered", FFMPEG)
-    assert verify_recording(evidence, FFMPEG)[0]["frame_count"] == 200
+    manifest, frames, _ = verify_recording(evidence, FFMPEG)
+    assert manifest["frame_count"] == 200
+    submitted = [f["encoder_submitted_ticks"] for f in frames]
+    assert all(b > a > 0 for a, b in zip(submitted, submitted[1:]))
     dataset = open_dataset(compile_recording(evidence, tmp_path / "dataset", FFMPEG))
     assert len(dataset) == 199 and dataset[-1]["bootstrap_mask"] == 0
 

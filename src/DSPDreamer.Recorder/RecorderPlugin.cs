@@ -252,6 +252,10 @@ namespace DSPDreamer.Recorder
                     slot.Identity["attempt_id"] = episode["attempt_id"];
                     slot.Identity["task_id"] = progress.Active;
                     slot.Identity["node_completed"] = (int[])progress.Done.Clone();
+                    slot.Identity["capture_buffers_busy"] = slots.Count(s => Volatile.Read(ref s.Busy) != 0);
+                    slot.Identity["writer_queue_count"] = frames.Count;
+                    slot.Identity["event_queue_count"] = events.Count;
+                    slot.Identity["gpu_pending"] = pending;
                     slot.Dropped = false;
                     if (episode["start_ticks"] == null) firstPending = true;
                     ScreenCapture.CaptureScreenshotIntoRenderTexture(slot.Full);
@@ -259,6 +263,7 @@ namespace DSPDreamer.Recorder
                     pending++;
                     try { AsyncGPUReadback.Request(slot.Small, 0, TextureFormat.RGBA32, request =>
                     {
+                        string stage = "gpu_readback_error";
                         try
                         {
                             if (failNextReadback || (failFinalReadback && episode["end_ticks"] != null &&
@@ -272,13 +277,16 @@ namespace DSPDreamer.Recorder
                             }
                             if (request.hasError) throw new IOException("GPU readback failed");
                             request.GetData<byte>().CopyTo(slot.Pixels);
+                            slot.Identity["readback_completed_ticks"] = Stopwatch.GetTimestamp();
                             cursor.Item2(slot.Pixels);
                             CaptureCompleted(slot.Identity);
                             slot.MetadataSnapshot = Json.Encode(metadata);
+                            stage = "writer_backpressure";
                             if (!frames.TryAdd(slot)) throw new IOException("Writer queue full");
                         }
                         catch (Exception ex)
                         {
+                            Emit("gap", Json.Fields("reason", stage, "capture_id", slot.Identity["capture_id"]));
                             slot.Dropped = true;
                             firstPending = false;
                             bool wasEnding = episode["end_ticks"] != null;
@@ -366,6 +374,7 @@ namespace DSPDreamer.Recorder
                         {
                             if (!slot.Dropped)
                             {
+                                slot.Identity["writer_started_ticks"] = Stopwatch.GetTimestamp();
                                 storage.Write(slot.Pixels, slot.Identity);
                                 if (storage.AtBoundary)
                                 {
