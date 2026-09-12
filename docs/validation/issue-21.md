@@ -40,6 +40,18 @@ Release 建置 0 warnings／0 errors；封存與恢復專用 16 項測試通過�
 
 PowerShell 單筆取樣與真實 venv 子程序檢查通過，原始結果為 `runs/issue21-monitor-check-v3.ndjson`、`runs/issue21-monitor-python-check.ndjson`。後者核對 launcher 與實際 interpreter 兩個 PID 都有 working set，避免只量到 launcher。sampler 要求 PowerShell 7。
 
-原有 27 份 evidence manifest 的 SHA-256、`runs/live` 原有總容量 73,893,112,235 bytes 與 E 槽可用量，保存於 `runs/issue21-existing-evidence.json`。部署備份在 `runs/issue21-deployment`。本次部署 DLL SHA-256 為 `9e03986148fc7d345e7318aa85843a0bcfda81c54305ad47b2fd69099794f1b3`，舊指紋核准已清空，新實機候選與校正尚待取得。
+原有 27 份 evidence manifest 的 SHA-256、`runs/live` 原有總容量 73,893,112,235 bytes 與 E 槽可用量，保存於 `runs/issue21-existing-evidence.json`。部署備份在 `runs/issue21-deployment`。初次量測 DLL 的 SHA-256 為 `9e03986148fc7d345e7318aa85843a0bcfda81c54305ad47b2fd69099794f1b3`；審查後補齊 callback 前例外的 gap，部署改為 `8d57b61ae1265c42568262b43ffc99426885060771f206cfc4331bb55fb4abfd`，前版另存 `telemetry-initial.dll`。舊指紋核准已清空，新實機候選與校正尚待取得。
 
 待填本次實機 artifact 與量測結果。未取得三個完整流程、30 分鐘原始資料及其完整核對前，不宣告本票通過。
+
+## Standards
+
+獨立審查未發現 AGENTS.md／domain 規範違反。取樣會漏掉瞬時峰值的限制已補上 `ponytail:` 註解與升級方向。單一 verifier 同時核對及產生本票報告，審查認為作為一次性驗收工具可接受，不拆出額外架構。
+
+## Spec
+
+獨立審查發現一項掉幀漏計：CaptureLoop 外層例外會丟棄 slot，但沒有 gap。已在 EndEpisode 前補上 `gpu_readback_error`，尚無 capture ID 時保留 null；正式 schema 允許此欄位，verifier 依 gap 計數而不依賴 capture ID。原審查者複核確認已解決。修正後 Release 建置及封存／診斷 24 項測試通過。這不代表已執行對應自然 GPU 故障的實機測試。
+
+修正後最終完整 pytest 137 項通過，167.63 秒，JUnit 在 `tmp/issue21-tests-final.xml`。
+
+Standards 1 項註解缺口已處理，Spec 1 項掉幀漏計已修正；沒有未解決的準備程式 finding。實機驗收尚未開始。

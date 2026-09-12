@@ -311,6 +311,8 @@ namespace DSPDreamer.Recorder
                 }
                 catch (Exception ex)
                 {
+                    Emit("gap", Json.Fields("reason", "gpu_readback_error", "capture_id",
+                        slot.Identity == null ? null : slot.Identity["capture_id"]));
                     firstPending = false;
                     EndEpisode(reason: "recorder_fault");
                     if (slot.Identity != null)
