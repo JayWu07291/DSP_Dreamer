@@ -95,3 +95,39 @@ Standards 1 項註解缺口已處理，Spec 1 項掉幀漏計已修正；沒有�
 新版校正錄製 `6d5c13b8-9ecc-4e2c-88a3-60ad7c969581` 已通過[44 項控制核對](issue-21-checkpoint-calibration-live.json)，發布並核准 `runs/issue21-6d5c13b8-calibration.json`，SHA-256 `7f45bc3b44bff9c85bfd079e1897e2ab60d5490b1a5aae7dee45b2d50d698fff`。完整 RGBA、406 幀 RGB 比較及模型視窗讀回通過；20.3602377 秒，掉幀 0.490196%，19.8917 Hz，詳見[新版短錄製核對](issue-21-checkpoint-calibration-recording.json)。此短探針不取代新長錄製。
 
 首輪額外核對已完成，耗時 604.283117 秒：原四檔完整驗證、35,771 幀 RGB 比較及 17,889 個模型視窗全部讀回通過，詳見[五次流程完整核對](issue-21-five-flows-live.json)。有效寫入率 19.4530682 Hz 達標，掉幀率 2.7327605% 未達標。資料完整性修復不代表錄製品質通過。舊資料核對結束後，另啟動 `runs/issue21-checkpoint-retest-resources.ndjson` 取樣新長錄製，避免離線逐幀工作干擾重測。
+
+## 2026-09-14 六次自然流程與 finalize 效能
+
+新版錄製 `9a3dccda-e332-4a6d-80f3-d99c16485c12` 保存 40,679 幀，六回合擷取跨度合計 2,034.6273185 秒，即 33 分 54.6 秒。scheduler 遺失 17 slots、no_free_buffer 2，GPU readback error／writer backpressure 均為 0。遺失 19／預期 40,698，掉幀率 0.0466853%，低於 1%。原始六回合均 success；編譯後第三與第六回合因 V／CapsLock 的同回合 unknown_control 標為無效，其餘四回合有效成功。沒有為達標忽略不支援輸入。
+
+使用者回報 F8 結束至 COMPLETED 與 Ready 約 30 分鐘。[資源原始取樣](issue-21-six-flows-resources.ndjson)及[分階段報告](issue-21-six-flows-resources.json)保留本輪錄製至 finalize worker 結束。UTC 15:32:21 worker 啟動、15:39:38 首次見 evidence manifest、15:44:44 首次見 dataset 目錄、15:57:28 首次見 COMPLETED、16:00:18 最後見 worker，時間解析度約 5 秒。從 worker 啟動至 COMPLETED 約 25 分鐘，加最後讀回約 3 分鐘，符合使用者觀察。
+
+source 目錄最後清理時點約 15:43:01，推定 publication／核對／清理共約 10 分 40 秒；compiler 至 COMPLETED 約 14 分 24 秒。這不是只量 mux 的時間，也不能用 dataset 目錄首次出現代替 compiler 開始，因為 compiler 先驗證 evidence。RGB 第一個 chunk 至最後一個 chunk 的修改時間相差 528.98879 秒，是這次定位到的主要 compiler 成本。
+
+取樣器有錄製與封存期的 DSP／FFmpeg 資源，但只捕捉到遊戲啟動的 Python launcher，沒有實際 interpreter。不可把 launcher 的約 26 MB working set 宣稱為 compiler RAM 峰值。磁碟 free 差值包含其他程序。另以代理直接啟動完整重編譯補量 compiler 資源；原 finalize 的 interpreter RAM 仍屬缺漏。
+
+實際 128 幀畫面對照探針：單幀寫入 1.173103 秒、32 幀批次 0.351489 秒；讀回分別 0.311321／0.150107 秒。這是短探針，且與離線核對重疊，不直接外推整段改善比例。回歸測試先重現 205 次同步寫入，再限制批次總數與最多 32 幀暫存，核對所有像素、原單幀 chunk、最後不足批次的 checksum 拒絕。32 幀 RGB 約 21 MiB；事件／轉移 metadata 與 Zarr codec 額外記憶體另計。既有發布、清理、完整來源解碼及發布後讀回全部保留。
+
+Standards：未發現硬性違反。固定批次大小不新增設定或依賴。Spec：未發現缺漏、scope creep 或錯誤；不以 raw 品質達標代替完整驗收。完整長錄製核對與批次重編譯實測結果見下文。
+
+使用者確認六次包含主要 UI／游標、快速移動、建造與拆除，已播放影片；尚未做失焦與按鍵釋放測試。使用者觀察 F9 前短段不在影片中。核對[回合終點](issue-21-six-flows-endpoints.json)及 `EpisodeLifecycle.EpisodeUpdate`／`CaptureLoop`：成功時自動 EndEpisode，補最後一幀後不再擷取，直到 F9 開始新回合。前五次 success 至 F9 分別 5.2363、5.6213、5.1363、4.4518、7.5193 秒；最後 capture 均在 success 後 16–28 ms 且 final node=1。這是成功後未擷取的等待時間，不是封存漏幀；連續影片不是完整桌面實況錄影。播放確認仍保留使用者此觀察，沒有更改回合邊界。
+
+六次長錄製完整核對已完成，詳見[完整報告](issue-21-six-flows-live.json)：40,679 幀 RGBA／RGB 與 20,343 個模型視窗全部通過，有效寫入率 19.9903931 Hz。writer queue 首末十分位平均 0.20998／0.26875，busy buffers 1.33882／1.40595，未見平均佇列隨時間持續累積；成功 capture 取樣仍不能排除瞬時峰值。最高 busy=12、writer queue=10，兩個 slot 不足已如實計入掉幀。
+
+實際 evidence 為 11,506,866,919 bytes，dataset 19,669,956,713 bytes，按擷取跨度分別為 18.9615943 與 32.4131444 GiB／capture 小時。合計約 51.3747387 GiB／小時，十小時約 513.7474 GiB，再加至少 1 GiB scratch 與所有既有資料；若保留舊 compiled dataset，須額外加上該份完整容量。這是此場景壓縮結果，不保證其他畫面有相同比例；仍保留未壓縮 RGB 的 compiler 容量預檢。合併另需 source／工作複本預留，不能把最終四檔大小當作合併峰值。
+
+效能診斷使用 cProfile 的完整 verifier 耗時 776.027917 秒，包含正式 loader、額外逐幀比較及逐模型視窗讀回，且與回歸測試部分重疊，不是正常 finalize benchmark。其顯示約 122,000 次同步 Zarr 讀取，支持逐幀 I/O 開銷的診斷。正式批次修改的全套 pytest 139 項通過，173.75 秒，JUnit `tmp/issue21-batched-io-tests.xml`；mypy 17 檔通過。修改已提交 `900781f`，只改 Python 與文件，不需更換 DLL 或重新校正。
+
+本版短失焦診斷未全數通過，保留失敗結果：[第一次](issue-21-focus-hold-live.json) `9a9b714d-837c-4375-a6ac-8fed5ee07a21`，140.1743 ms 首次觀察空 held，766.6 ms 回焦且空 held，但 2,214.38 ms 有新 Mouse0 輸入，使 observed_release 的持續空白檢查失敗；[第二次](issue-21-focus-hold-retest-live.json) `97661b8b-d56c-49c0-8ead-b0ef98d4be86`，103.1409 ms 首次空 held，後續保持空白，但 176 筆、至 2,989.87 ms 的觀察全為 focused=false，refocused_empty 失敗。兩次均確認模型 W 原先按住、release_all 成功且沒有後續模型要求；不合併兩份局部結果宣稱完整診斷 gate 通過。設定已恢復 Diagnostics=false、Case=full，保留目前已核准校正。
+
+本輪完整重編譯有上述兩次短診斷／其自動編譯的少量重疊，會保留在資源取樣，不宣稱閒置主機的排他 benchmark。這不降低資料一致性比較要求。
+
+批次完整重編譯已完成，輸出 `runs/live/issue21-six-flows-batched`，[計時與一致性結果](issue-21-six-flows-batched-compile.json)記錄 compiler PID 38976。編譯含來源完整驗證及發布前 loader 共 527.8062865 秒，即 8 分 48 秒，對照原約 14 分 24 秒縮短約 39%；額外正式讀回 129.8476573 秒，即 2 分 10 秒。兩段合計 657.6539438 秒，即 10 分 58 秒。RGB chunk 首末寫入跨度由 528.9887898 秒降至 225.4186506 秒，約縮短 57%。原階段起點只有取樣及檔案時點可定位，對照時間與百分比均為近似，不是同時執行的嚴格 A/B 基準。
+
+所有新舊影像 chunk 與 Parquet 檔案 checksum 完全一致；dataset metadata 除新 artifact_id 外完全一致。新版 COMPLETED SHA-256 `9fd31a2836e2d71f6d1a6de63ebb637a39c32b4e6dc103196b23103bd6c45344`。原六流程 evidence／dataset、首輪失敗 dataset 及其他舊資料全部保留，原有 27 份 evidence manifest 再次核對未變。報告的 `complete_successes` 明確指 raw source 成功回合數 6，不是 compiled 有效成功回合數 4。
+
+此次未重跑整個 F8 至 Ready 的合併／清理流程，不把 10 分 58 秒稱為總 finalize 時間，也不宣稱已量到新總等待時間。#21 仍未全數通過：本版單次失焦／回焦診斷未全數通過，原長合併的 Python interpreter RAM 峰值缺漏。未關閉 issue，未以短診斷或 launcher 記憶體填補長錄製資源證據。
+
+[批次編譯資源](issue-21-six-flows-batched-resources.json)與[原始取樣](issue-21-six-flows-batched-resources.ndjson)已保存。compiler 105 筆取樣，OS 回報 peak working set 2,014,167,040 bytes，約 1.88 GiB；取樣 private bytes 最高 2,774,491,136 bytes，約 2.58 GiB。readback 的 OS peak 沿用同一程序先前峰值，不把它解讀為該階段新增需求。磁碟 free 最低值分段列於 JSON，包含短診斷與其他工作，不能宣稱獨占磁碟峰值。取樣器已停止。
+
+重編譯後 `runs/live` 全部保留資料的 logical bytes 為 169,612,412,780，包含新版重編譯副本、兩輪長錄製、失敗資料與診斷；E 槽 free 1,188,024,897,536 bytes。容量預算應加上這份目前保留量，不再只用最早的 73,893,112,235 bytes。Git 對驗收 NDJSON 固定 LF，以便報告中的原始取樣 SHA-256 在不同平台 checkout 後仍可核對。
