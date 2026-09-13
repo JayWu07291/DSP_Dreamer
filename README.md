@@ -58,6 +58,8 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 恢復從最新可驗證檢查點取連續前綴，完整核對 sidecar 位元組前綴、來源段 checksum、RGBA 解碼、索引與進度重播，再產生新 artifact ID。原始來源與故障尾端保留；manifest 和 dataset 的 `recovery.recording_complete=false` 明示它不是完整錄製，記錄排除起點與無法確定的尾端。缺 final observation 的回合標為 `incomplete`，尾端不提供 bootstrap。相同恢復指令可重試已發布產物。舊來源若沒有 sealed 檢查點，不能憑診斷檔推測恢復。
 
+每 200 幀的檢查點先 flush 並凍結 sidecar 前綴長度，再由單一背景工作計算 checksum 與原子發布。下一檢查點、停止與封存均等待前一工作並檢查錯誤，避免累積未完成工作。若中斷時最新檢查點尚未發布，恢復採用較早的已驗證檢查點；原始來源不刪除。這項修改針對 #21 長錄製的 buffer 不足，實機品質仍須重驗。
+
 容量預檢在已有來源之外，預留兩份本次檔案容量及 1 GiB 餘裕；恢復另多預留一份副本。compiler 以未壓縮 RGB、每 capture 小時 2 GiB 表格及 1 GiB scratch 估算。空間不足或來源變更會停止流程。受控程序終止測試不代表斷電、OS 或磁碟故障保證，詳細結果見[封存恢復驗證](docs/validation/issue-17.md)。
 
 編譯器只接受已驗證的四檔錄製證據。動作區間為 `[requested_ticks_t, requested_ticks_next)`，事件依 `(ticks, sequence_number)` 排序。資料保留按住狀態、按住時間比例、按下與放開次數、observed delta／wheel 總和及原始取樣引用。不支援、有歧義、禁止的動作，以及漏幀區間，皆標為無效。2026-09-10 使用者新增 Space（跳躍）及 E（單獨開關背包），動作契約升為 `action_catalog_v3`，共 20 維。原本 18 個 index 保持不變，Space 追加在 index 18、E 在 index 19，Digit1 仍在 index 1；不使用 Unity enum 數值代替硬體 scan code。

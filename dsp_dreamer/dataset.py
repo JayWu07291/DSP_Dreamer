@@ -116,7 +116,7 @@ def compile_recording(source, destination, ffmpeg):
         gap |= any(e["gap_start_ticks"] < end and e["gap_end_ticks"] > start for e in scheduler_gaps)
         invalid_input = any(not s.get("focused", True) for s in samples)
         lifecycle = transition_lifecycle(manifest, first, second)
-        if action["unsupported"]:
+        if action["unsupported"] and first.get("episode_id") == second.get("episode_id"):
             control_faults.add(lifecycle["episode_id"])
         if lifecycle["episode_id"] in control_faults:
             lifecycle["lifecycle_valid"] = False
@@ -273,7 +273,7 @@ class Dataset:
             action = aggregate([e for e in interval if e["type"] == "input"], row["requested_ticks"], row["next_requested_ticks"], held)
             require(stored_action == action, "Actual action differs from input evidence")
             held = action["end_held"]
-            if action["unsupported"]:
+            if action["unsupported"] and row["episode_id"] == row["next_episode_id"]:
                 control_faults.add(row["episode_id"])
             gap = row["next_capture_id"] != row["capture_id"] + 1 or any(
                 e["type"] == "gap" and e["reason"] != "scheduler" for e in interval)

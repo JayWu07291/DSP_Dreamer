@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DSPDreamer.Recorder
 {
@@ -18,6 +19,7 @@ namespace DSPDreamer.Recorder
         private Timer watchdog;
         private int ordinal;
         private string partial;
+        private Task checkpoint;
         private readonly Dictionary<string, object> sealedSegments = new Dictionary<string, object>();
         internal bool AtBoundary => ordinal > 0 && ordinal % 200 == 0;
 
@@ -100,20 +102,37 @@ namespace DSPDreamer.Recorder
             sealedSegments[name] = FileInfo(name);
         }
 
-        private Dictionary<string, object> FileInfo(string name)
+        private Dictionary<string, object> FileInfo(string name, long? prefixLength = null)
         {
             using (var file = new FileStream(Path.Combine(root, name), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var hash = SHA256.Create())
-                return Json.Fields("bytes", file.Length, "sha256", Hex(hash.ComputeHash(file)));
+            {
+                long length = prefixLength ?? file.Length, remaining = length;
+                var buffer = new byte[65536];
+                while (remaining > 0)
+                {
+                    int read = file.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                    if (read == 0) throw new EndOfStreamException("Checkpoint prefix truncated: " + name);
+                    hash.TransformBlock(buffer, 0, read, buffer, 0);
+                    remaining -= read;
+                }
+                hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                return Json.Fields("bytes", length, "sha256", Hex(hash.Hash));
+            }
         }
 
-        internal Dictionary<string, object> Seal(StreamWriter events)
+        private void FlushSidecars(StreamWriter events)
         {
             index.Flush(); events.Flush();
             ((FileStream)index.BaseStream).Flush(true);
             ((FileStream)events.BaseStream).Flush(true);
+        }
+
+        internal Dictionary<string, object> Seal(StreamWriter events)
+        {
+            checkpoint?.GetAwaiter().GetResult();
+            FlushSidecars(events);
             var files = new Dictionary<string, object>(sealedSegments);
-            // ponytail: sidecar prefix hashing is quadratic across segments; use incremental hashes if it stalls the writer.
             files["frames.ndjson"] = FileInfo("frames.ndjson");
             files["events.ndjson"] = FileInfo("events.ndjson");
             return files;
@@ -121,19 +140,29 @@ namespace DSPDreamer.Recorder
 
         internal void Checkpoint(StreamWriter events, string metadataSnapshot)
         {
-            var files = Seal(events);
-            string json = metadataSnapshot.Substring(0, metadataSnapshot.Length - 1) + ",\"sealed_files\":" + Json.Encode(files) + "}";
+            // ponytail: one background prefix hash; if it exceeds a segment duration, adopt resumable hash state.
+            checkpoint?.GetAwaiter().GetResult();
+            FlushSidecars(events);
+            var files = new Dictionary<string, object>(sealedSegments);
+            long frameBytes = index.BaseStream.Length, eventBytes = events.BaseStream.Length;
             string path = Path.Combine(root, "checkpoint-" + (ordinal / 200 - 1).ToString("D6") + ".json");
-            using (var file = new FileStream(path + ".partial", FileMode.CreateNew))
+            checkpoint = Task.Run(() =>
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(json);
-                file.Write(bytes, 0, bytes.Length); file.Flush(true);
-            }
-            File.Move(path + ".partial", path);
+                files["frames.ndjson"] = FileInfo("frames.ndjson", frameBytes);
+                files["events.ndjson"] = FileInfo("events.ndjson", eventBytes);
+                string json = metadataSnapshot.Substring(0, metadataSnapshot.Length - 1) + ",\"sealed_files\":" + Json.Encode(files) + "}";
+                using (var file = new FileStream(path + ".partial", FileMode.CreateNew))
+                {
+                    byte[] bytes = Encoding.UTF8.GetBytes(json);
+                    file.Write(bytes, 0, bytes.Length); file.Flush(true);
+                }
+                File.Move(path + ".partial", path);
+            });
         }
 
         internal void Finish()
         {
+            checkpoint?.GetAwaiter().GetResult();
             if (ordinal < 2) throw new IOException("Need at least two observations");
             CloseSegment();
             index.Flush();
@@ -142,6 +171,8 @@ namespace DSPDreamer.Recorder
 
         public void Dispose()
         {
+            // Finish/Seal surface checkpoint errors before publication; disposal also joins failed work.
+            try { checkpoint?.GetAwaiter().GetResult(); } catch { }
             watchdog?.Dispose();
             if (encoder != null)
             {

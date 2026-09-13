@@ -75,6 +75,7 @@ def verify(source, dataset_path, ffmpeg):
                 dropped_fraction=lost / expected_slots, written_intervals=written_intervals,
                 written_hz=written_intervals / seconds, configured_rate_fraction=written_intervals / seconds / 20,
                 queue_samples=queues, latency=latency, episodes=manifest['episodes'],
+                compiled_episodes=dataset.metadata['episodes'],
                 complete_successes=sum(s['outcome'] == 'success' and s['validity'] == 'valid' for s in spans),
                 rgba_verified=manifest['validation'], rgb_frames_compared=len(frames), model_windows_read=len(view),
                 array_metadata=dataset.metadata['array_metadata'], observation_contract=dataset.metadata['observation'],

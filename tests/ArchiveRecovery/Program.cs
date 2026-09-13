@@ -22,7 +22,25 @@ internal static class Program
                     writer.Write(new byte[640 * 360 * 4], Json.Fields("ticks", i * 50, "requested_ticks", i * 50,
                         "capture_id", i, "sequence_number", i, "unity_frame", i, "game_tick", i,
                         "cursor", Json.Fields("visible", false)));
+                if (args.Length > 2)
+                    File.WriteAllText(Path.Combine(args[0], "checkpoint-000000.json.partial"), "retain");
                 writer.Checkpoint(events, metadata);
+                if (args.Length > 2)
+                {
+                    File.WriteAllText(Path.Combine(args[0], "checkpoint-returned"), "ready");
+                    writer.Finish(); // Must surface the background publication failure.
+                    throw new Exception("Checkpoint failure was ignored");
+                }
+                for (int i = 200; i < 230; i++)
+                {
+                    events.WriteLine(Json.Encode(Json.Fields("type", "control_request", "ticks", i * 50,
+                        "sequence_number", i + 1000, "operation", "after_checkpoint")));
+                    writer.Write(new byte[640 * 360 * 4], Json.Fields("ticks", i * 50, "requested_ticks", i * 50,
+                        "capture_id", i, "sequence_number", i, "unity_frame", i, "game_tick", i,
+                        "cursor", Json.Fields("visible", false)));
+                }
+                events.Flush();
+                File.WriteAllText(Path.Combine(args[0], "append-ready"), "ready");
                 Thread.Sleep(60000); // The test terminates this process before Finish/SOURCE publication.
             }
             return 0;

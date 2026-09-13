@@ -215,8 +215,9 @@ def test_native_writer_termination_recovers_checkpoint(tmp_path):
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     try:
         deadline = time.monotonic() + 30
-        while not (source / "checkpoint-000000.json").exists() and worker.poll() is None and time.monotonic() < deadline:
+        while not all((source / name).exists() for name in ("append-ready", "checkpoint-000000.json")) and worker.poll() is None and time.monotonic() < deadline:
             time.sleep(0.05)
+        assert (source / "append-ready").exists(), worker.communicate(timeout=1)
         assert (source / "checkpoint-000000.json").exists(), worker.communicate(timeout=1)
     finally:
         if worker.poll() is None:
@@ -230,6 +231,16 @@ def test_native_writer_termination_recovers_checkpoint(tmp_path):
     assert all(b > a > 0 for a, b in zip(submitted, submitted[1:]))
     dataset = open_dataset(compile_recording(evidence, tmp_path / "dataset", FFMPEG))
     assert len(dataset) == 199 and dataset[-1]["bootstrap_mask"] == 0
+    checkpoint = json.loads((source / "checkpoint-000000.json").read_text())
+    assert checkpoint["sealed_files"]["events.ndjson"]["bytes"] == 0
+    assert (source / "events.ndjson").stat().st_size > 0
+    assert (source / "frames.ndjson").stat().st_size > checkpoint["sealed_files"]["frames.ndjson"]["bytes"]
+    failed_source = tmp_path / "checkpoint-failure"
+    failed = subprocess.run([str(executable), str(failed_source), str(FFMPEG), "error"],
+                            capture_output=True, timeout=30)
+    assert failed.returncode == 1 and b"System.IO.IOException" in failed.stderr
+    assert (failed_source / "checkpoint-returned").exists()
+    assert not (failed_source / "SOURCE.json").exists()
 
 
 def test_recovery_trims_lifecycle_and_progress_without_claiming_completion(tmp_path):

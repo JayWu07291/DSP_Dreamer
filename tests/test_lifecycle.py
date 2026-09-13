@@ -101,6 +101,29 @@ def test_unknown_control_blocks_later_sequences_but_keeps_prefix(tmp_path):
     assert dataset.metadata["episodes"][0]["validity_status"] == "invalid"
 
 
+def test_retry_key_between_successful_episodes_does_not_invalidate_completed_episode(tmp_path):
+    with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
+        trial = dict(manifest_id="trial", split_group_id="trial", mecha_seed=1, camera_seed=2, policy_seed=3)
+        recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
+        for start in (50, 500):
+            recording.begin_attempt(trial)
+            for ticks in (start, start + 50):
+                request = recording.request(ticks, 1, 1)
+                recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
+            recording.end_episode(start + 75, "success")
+            final = recording.request(start + 100, 1, 1)
+            recording.complete(final, np.zeros((360, 640, 4), dtype=np.uint8))
+            if start == 50:
+                recording.input(200, held=["F9"], down=["F9"], up=[], delta=[0, 0], wheel=0)
+                recording.input(210, held=[], down=[], up=["F9"], delta=[0, 0], wheel=0)
+    dataset = open_dataset(compile_recording(recording.publish(tmp_path / "evidence"), tmp_path / "dataset", FFMPEG))
+    assert all(e["validity_status"] == "valid" and not e["validity_reasons"] for e in dataset.metadata["episodes"])
+    assert dataset[1]["valid"] and dataset[1]["is_terminal"]
+    assert not dataset[2]["valid"] and dataset[2]["action"]["down_counts"] == {"F9": 1}
+    assert dataset[4]["valid"] and dataset[4]["is_terminal"]
+    assert dataset.sequence_starts(2) == [0, 3]
+
+
 def test_gap_splits_sequences_and_missing_final_masks_only_tail(tmp_path):
     with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
         recording.begin_attempt(dict(manifest_id="trial", split_group_id="trial", mecha_seed=1, camera_seed=2, policy_seed=3))
