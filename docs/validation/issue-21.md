@@ -1,6 +1,6 @@
 # Issue #21 正式實機驗收
 
-更新至 2026-09-14。新版六次流程已通過長錄製品質核對，單次失焦／回焦八項檢查與離線長合併資源補驗完成。最新完整回歸為 139 項通過、1 項遭 Smart App Control 阻擋，未宣稱全套通過或關閉 issue。以下按實作與驗證時序保留先前失敗；#16、#17、#18、#20 的既有結果只作為前置證據。
+更新至 2026-09-14，#21 六項驗收條件均已取得證據。新版六次流程通過長錄製品質核對，失焦／回焦八項檢查、長合併資源與編譯磁碟補驗完成。本機完整回歸 139 項通過、1 項遭 Smart App Control 阻擋；同一項原測試已在 Windows CI 另行通過，不宣稱本機單輪 140 項全過。以下按時序保留先前失敗；#16、#17、#18、#20 的既有結果只作為前置證據。
 
 ## 適用版本
 
@@ -157,3 +157,26 @@ Standards：未發現硬性違反。固定批次大小不新增設定或依賴�
 兩項實測完成後的完整 pytest 為 139 passed、1 failed，耗時 157.16 秒，JUnit 保存於 `tmp/issue21-final-verification-tests.xml`。失敗項 `test_native_action_contract_matches_model_codec` 的 .NET 建置成功，但啟動 `tests/ControlReplay/bin/Debug/net472/ControlReplay.exe` 時收到 WinError 4551。該檔 Authenticode 狀態為 NotSigned；[Code Integrity 紀錄](issue-21-smart-app-control.json)於台灣時間 2026-09-14 00:53:33 記載 3033／3077／3118，指出簽署等級未符合政策而被封鎖。這是環境封鎖，該測試尚未在本輪完成，不以其他測試代替。
 
 保留 Smart App Control，未修改政策、繞過封鎖或重試被擋的程式。此封鎖发生在失焦與長合併完成之後，未使已保存的兩項結果失效。Standards／Spec 複核要求的 replay 身分限制、取樣失敗傳遞及 RAM 原始證據連結均已補齊。
+
+## 編譯磁碟與控制契約最終補驗
+
+[編譯結果](issue-21-compile-storage.json)與[原始容量取樣](issue-21-compile-storage.ndjson)補足 compiler 磁碟證據。UTC 17:07:15.691555 至 17:16:31.074727，完整正式 compiler 共 555.3828871 秒，40,679 幀，73.24496 幀／秒；專用 `runs/issue21-compile-storage` 同時包含新 dataset 與指定的暫存目錄。59 筆 logical bytes 取樣最高 19,669,956,713 bytes，約 18.32 GiB，與完成後保留量相同。這不是實體配置區塊數，也不保證沒有漏掉瞬時峰值。
+
+每次掃描完成後等待五秒；掃描期間仍在寫入，取樣不是原子快照。最大起點間隔實際為 25.102053 秒，不能稱為嚴格每五秒取樣。首筆在 compiler 前，最後掃描於 compiler 返回時開始、UTC 17:16:37.051402 完成。目錄掃描與短暫的容量盤點有額外 I/O 成本，此次耗時不作嚴格效能 A/B；RAM 仍使用前述獨立編譯量測。
+
+所有影像與 Parquet 的 receipt 雜湊與舊 dataset 一致，metadata 僅 artifact_id 不同。舊 receipt 身分另核對至先前已提交的[批次編譯報告](issue-21-six-flows-batched-compile.json)，SHA-256 `9fd31a2836e2d71f6d1a6de63ebb637a39c32b4e6dc103196b23103bd6c45344`，其 metadata 檔亦符合 receipt 雜湊。[基準核對](issue-21-compile-storage-baseline.json)保留時點。此獨立核對在量測後完成；保存的[重現腳本](issue-21-compile-storage.py)另補上編譯前固定 baseline 快照與編譯後再驗，不冒稱加強後的腳本已重跑長量測。
+
+[容量帳](issue-21-compile-storage-capacity.json)明列原 evidence 11,506,866,919 bytes、既有對照 dataset 19,669,956,713 bytes；兩者已包含在舊 `runs/live` 帳內，不重複相加。受測來源加新 compiler 取樣峰值為 31,176,823,632 bytes。舊 live 帳加後續失焦錄製 39,920,126 bytes、保留的合併重播 11,506,855,483 bytes 及新 compiler 輸出後，錄製資料容量帳為 200,829,145,102 bytes。此帳不含 repo、遊戲或測試暫存；全部舊 evidence 與 dataset 保留。
+
+#12 容量校正採本場景 evidence 18.9615943、compiled 含表格／metadata 32.4131444 GiB／capture 小時，合計 51.3747387；十小時約 513.7474 GiB，另加 scratch、既有資料與保留副本。合併取樣峰值 32.05 GiB、compiler 專用輸出取樣峰值 18.32 GiB 分算，依先合併清理再編譯取階段較大者並加來源／既有資料。此場景壓縮率不保證未來資料；#12 原 71.35×H+1 GiB 的保守預算及未壓縮容量預檢不下修，合併附屬檔與餘裕另留。
+
+使用者核准發布獨立 CI 驗證分支後，[Windows CI 最終 run 34771073990](https://github.com/JayWu07291/DSP_Dreamer/actions/runs/34771073990)在 commit `a1157fa54b0541acc46582071b81051731df1c44` 執行原本 `test_native_action_contract_matches_model_codec`，1 passed、0 skipped。Windows Server 2022、Python 3.12、pytest 固定為 README 的 8.4.2，使用原 net472 ControlReplay 與所有原斷言；相對本機回歸版本，production／tests／src 無差異。[JUnit](issue-21-control-ci-pinned/control-contract.xml)、[run 身分](issue-21-control-ci-pinned-run.json)與[完整日誌](issue-21-control-ci-pinned.log)已保存。第一次 CI 使用未固定的 pytest 9.1.1，雖通過仍保留[首次紀錄](issue-21-control-ci-run.json)，以固定版本重跑結果作最終證據。沒有修改本機安全政策或將本機 SAC 阻擋改寫成通過。
+
+| #21 驗收項目 | 最終證據 |
+| --- | --- |
+| 正式 20 Hz、30 分鐘、至少三流程及互動 | 六流程 33 分 54.6 秒，四個 compiled 有效成功；UI／建造拆除人工確認，世界重載與單次失焦八項通過 |
+| 品質與有界佇列 | 掉幀 0.0466853%、19.9903931 Hz、GPU／writer error 為零；分類與佇列趨勢已保存 |
+| 四檔、模型讀回、冷啟動、恢復、合併與清理 | 完整逐幀與模型視窗核對，加本版冷啟動／恢復回歸與正式 publisher 重驗 |
+| 版本、原始取樣、時點與分母 | 本文件連結各階段 JSON／NDJSON 與 checksum，沒有以原型代替 |
+| compiler 配置、吞吐、RAM、磁碟與容量 | 獨立 RAM 報告、此次 compiler 專用目錄峰值、合併峰值及容量帳 |
+| 失敗、修復與資料保留 | 保留掉幀超標、失焦失敗與 SAC 阻擋；修復後重驗及 CI 結果分列，未刪舊資料 |

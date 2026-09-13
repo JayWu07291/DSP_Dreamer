@@ -1,0 +1,268 @@
+control-contract	Set up job	﻿2026-09-13T17:08:50.6349267Z Current runner version: '2.337.0'
+control-contract	Set up job	2026-09-13T17:08:50.6431713Z ##[group]Runner Image Provisioner
+control-contract	Set up job	2026-09-13T17:08:50.6432954Z Hosted Compute Agent
+control-contract	Set up job	2026-09-13T17:08:50.6433924Z Version: 20260828.587
+control-contract	Set up job	2026-09-13T17:08:50.6434969Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+control-contract	Set up job	2026-09-13T17:08:50.6436276Z Build Date: 2026-08-28T16:44:25Z
+control-contract	Set up job	2026-09-13T17:08:50.6437386Z Worker ID: {0ef436fa-7cb4-472d-9ec7-e7ce1cea56a1}
+control-contract	Set up job	2026-09-13T17:08:50.6438501Z Azure Region: eastus
+control-contract	Set up job	2026-09-13T17:08:50.6439399Z ##[endgroup]
+control-contract	Set up job	2026-09-13T17:08:50.6441497Z ##[group]Operating System
+control-contract	Set up job	2026-09-13T17:08:50.6442539Z Microsoft Windows Server 2022
+control-contract	Set up job	2026-09-13T17:08:50.6443617Z 10.0.20348
+control-contract	Set up job	2026-09-13T17:08:50.6444377Z Datacenter
+control-contract	Set up job	2026-09-13T17:08:50.6445173Z ##[endgroup]
+control-contract	Set up job	2026-09-13T17:08:50.6446088Z ##[group]Runner Image
+control-contract	Set up job	2026-09-13T17:08:50.6447094Z Image: windows-2022
+control-contract	Set up job	2026-09-13T17:08:50.6447973Z Version: 20260907.297.1
+control-contract	Set up job	2026-09-13T17:08:50.6449762Z Included Software: https://github.com/actions/runner-images/blob/win22/20260907.297/images/windows/Windows2022-Readme.md
+control-contract	Set up job	2026-09-13T17:08:50.6453799Z Image Release: https://github.com/actions/runner-images/releases/tag/win22%2F20260907.297
+control-contract	Set up job	2026-09-13T17:08:50.6455518Z ##[endgroup]
+control-contract	Set up job	2026-09-13T17:08:50.6457313Z ##[group]GITHUB_TOKEN Permissions
+control-contract	Set up job	2026-09-13T17:08:50.6460135Z Contents: read
+control-contract	Set up job	2026-09-13T17:08:50.6461027Z Metadata: read
+control-contract	Set up job	2026-09-13T17:08:50.6461843Z ##[endgroup]
+control-contract	Set up job	2026-09-13T17:08:50.6464781Z Secret source: Actions
+control-contract	Set up job	2026-09-13T17:08:50.6466216Z Cache mode: write
+control-contract	Set up job	2026-09-13T17:08:50.6467316Z Prepare workflow directory
+control-contract	Set up job	2026-09-13T17:08:50.6851341Z Prepare all required actions
+control-contract	Set up job	2026-09-13T17:08:50.6897881Z Getting action download info
+control-contract	Set up job	2026-09-13T17:08:50.8333471Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+control-contract	Set up job	2026-09-13T17:08:50.9483503Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+control-contract	Set up job	2026-09-13T17:08:51.0785092Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+control-contract	Set up job	2026-09-13T17:08:51.4192906Z Complete job name: control-contract
+control-contract	Run actions/checkout@v4	﻿2026-09-13T17:08:51.5697562Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5709247Z ##[group]Run actions/checkout@v4
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5710296Z with:
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5710996Z   repository: JayWu07291/DSP_Dreamer
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5715861Z   token: ***
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5716553Z   ssh-strict: true
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5717257Z   ssh-user: git
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5717953Z   persist-credentials: true
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5718704Z   clean: true
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5719456Z   sparse-checkout-cone-mode: true
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5720254Z   fetch-depth: 1
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5720933Z   fetch-tags: false
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5721665Z   show-progress: true
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5722373Z   lfs: false
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5723033Z   submodules: false
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5723768Z   set-safe-directory: true
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5724543Z   allow-unsafe-pr-checkout: false
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.5725558Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.7192619Z Syncing repository: JayWu07291/DSP_Dreamer
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.7196015Z ##[group]Getting Git version info
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.7197607Z Working directory is 'D:\a\DSP_Dreamer\DSP_Dreamer'
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:51.8230566Z [command]"C:\Program Files\Git\bin\git.exe" version
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2078141Z git version 2.55.0.windows.5
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2117427Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2135137Z Temporarily overriding HOME='D:\a\_temp\80995d13-4651-45de-a315-a926cb29650a' before making global git config changes
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2136822Z Adding repository directory to the temporary git global config as a safe directory
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2146282Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\DSP_Dreamer\DSP_Dreamer
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2676925Z Deleting the contents of 'D:\a\DSP_Dreamer\DSP_Dreamer'
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2681848Z ##[group]Initializing the repository
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.2691228Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\DSP_Dreamer\DSP_Dreamer
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.3586195Z Initialized empty Git repository in D:/a/DSP_Dreamer/DSP_Dreamer/.git/
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.3618891Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/JayWu07291/DSP_Dreamer
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4064940Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4066000Z ##[group]Disabling automatic garbage collection
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4074007Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4292541Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4293588Z ##[group]Setting up auth
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4295079Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:52.4503783Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:53.8454511Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:53.8671350Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:54.2939518Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:54.3164968Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:54.7664063Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:54.7896739Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:54.7897611Z ##[group]Fetching the repository
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:54.7910316Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a6a2976680870e28114995022dd86113b3139002:refs/remotes/origin/codex/issue21-control-validation
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0543416Z From https://github.com/JayWu07291/DSP_Dreamer
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0569962Z  * [new ref]         a6a2976680870e28114995022dd86113b3139002 -> origin/codex/issue21-control-validation
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0572117Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0572783Z ##[group]Determining the checkout info
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0573541Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0582804Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.0954063Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.1179997Z ##[group]Checking out the ref
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.1189610Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B codex/issue21-control-validation refs/remotes/origin/codex/issue21-control-validation
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.2022498Z Switched to a new branch 'codex/issue21-control-validation'
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.2043872Z branch 'codex/issue21-control-validation' set up to track 'origin/codex/issue21-control-validation'.
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.2386747Z ##[endgroup]
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.2392884Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+control-contract	Run actions/checkout@v4	2026-09-13T17:08:56.2586573Z a6a2976680870e28114995022dd86113b3139002
+control-contract	Run actions/setup-python@v5	﻿2026-09-13T17:08:56.3045315Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3047965Z ##[group]Run actions/setup-python@v5
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3048243Z with:
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3048444Z   python-version: 3.12
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3048677Z   check-latest: false
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3051102Z   token: ***
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3051314Z   update-environment: true
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3051579Z   allow-prereleases: false
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3051831Z   freethreaded: false
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.3052044Z ##[endgroup]
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.4548707Z ##[group]Installed versions
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.4744104Z (node:7620) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.4745384Z (Use `node --trace-deprecation ...` to show where the warning was created)
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.4746372Z Successfully set up CPython (3.12.10)
+control-contract	Run actions/setup-python@v5	2026-09-13T17:08:56.4747213Z ##[endgroup]
+control-contract	Install Python test dependencies	﻿2026-09-13T17:08:56.4990552Z ##[group]Run python -m pip install -e . pytest
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.4991056Z ^[[36;1mpython -m pip install -e . pytest^[[0m
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5073640Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5074154Z env:
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5074539Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5075235Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5075895Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5076485Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5077003Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Install Python test dependencies	2026-09-13T17:08:56.5077357Z ##[endgroup]
+control-contract	Install Python test dependencies	2026-09-13T17:09:01.3268436Z Obtaining file:///D:/a/DSP_Dreamer/DSP_Dreamer
+control-contract	Install Python test dependencies	2026-09-13T17:09:01.3298868Z   Installing build dependencies: started
+control-contract	Install Python test dependencies	2026-09-13T17:09:03.7946348Z   Installing build dependencies: finished with status 'done'
+control-contract	Install Python test dependencies	2026-09-13T17:09:03.7961536Z   Checking if build backend supports build_editable: started
+control-contract	Install Python test dependencies	2026-09-13T17:09:04.2915032Z   Checking if build backend supports build_editable: finished with status 'done'
+control-contract	Install Python test dependencies	2026-09-13T17:09:04.2939834Z   Getting requirements to build editable: started
+control-contract	Install Python test dependencies	2026-09-13T17:09:04.8542211Z   Getting requirements to build editable: finished with status 'done'
+control-contract	Install Python test dependencies	2026-09-13T17:09:04.8570355Z   Preparing editable metadata (pyproject.toml): started
+control-contract	Install Python test dependencies	2026-09-13T17:09:05.1879048Z   Preparing editable metadata (pyproject.toml): finished with status 'done'
+control-contract	Install Python test dependencies	2026-09-13T17:09:05.4619656Z Collecting pytest
+control-contract	Install Python test dependencies	2026-09-13T17:09:05.6109751Z   Downloading pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:05.9007984Z Collecting numpy==2.2.6 (from dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:05.9359706Z   Downloading numpy-2.2.6-cp312-cp312-win_amd64.whl.metadata (60 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.0529664Z Collecting zarr==3.1.2 (from dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.0615954Z   Downloading zarr-3.1.2-py3-none-any.whl.metadata (10 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.1801154Z Collecting pyarrow==21.0.0 (from dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.1868213Z   Downloading pyarrow-21.0.0-cp312-cp312-win_amd64.whl.metadata (3.4 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.2330688Z Collecting donfig>=0.8 (from zarr==3.1.2->dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.2394807Z   Downloading donfig-0.8.1.post1-py3-none-any.whl.metadata (5.0 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.3121350Z Collecting numcodecs>=0.14 (from numcodecs[crc32c]>=0.14->zarr==3.1.2->dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.3182188Z   Downloading numcodecs-0.16.5-cp312-cp312-win_amd64.whl.metadata (3.5 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.3381024Z Requirement already satisfied: packaging>=22.0 in C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\site-packages (from zarr==3.1.2->dsp-dreamer==0.1.0) (26.3)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.3707041Z Collecting typing-extensions>=4.9 (from zarr==3.1.2->dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.3798629Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.3982535Z Requirement already satisfied: colorama>=0.4 in C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\site-packages (from pytest) (0.4.6)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.4263679Z Collecting iniconfig>=1.0.1 (from pytest)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.4310139Z   Downloading iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.4887181Z Collecting pluggy<2,>=1.5 (from pytest)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.5024014Z   Downloading pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.5608646Z Collecting pygments>=2.7.2 (from pytest)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.5666042Z   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.6550686Z Collecting pyyaml (from donfig>=0.8->zarr==3.1.2->dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.6616759Z   Downloading pyyaml-6.0.3-cp312-cp312-win_amd64.whl.metadata (2.4 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.7991827Z Collecting crc32c>=2.7 (from numcodecs[crc32c]>=0.14->zarr==3.1.2->dsp-dreamer==0.1.0)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.8043622Z   Downloading crc32c-2.9.post0-cp312-cp312-win_amd64.whl.metadata (8.0 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:06.8316821Z Downloading numpy-2.2.6-cp312-cp312-win_amd64.whl (12.6 MB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.0214584Z    ---------------------------------------- 12.6/12.6 MB 71.8 MB/s  0:00:00
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.0389130Z Downloading pyarrow-21.0.0-cp312-cp312-win_amd64.whl (26.2 MB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.6636546Z    ---------------------------------------- 26.2/26.2 MB 41.5 MB/s  0:00:00
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.6701318Z Downloading zarr-3.1.2-py3-none-any.whl (261 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.7073085Z Downloading pytest-9.1.1-py3-none-any.whl (386 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.7405912Z Downloading pluggy-1.6.0-py3-none-any.whl (20 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.8188446Z Downloading donfig-0.8.1.post1-py3-none-any.whl (21 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.8474190Z Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.8756496Z Downloading numcodecs-0.16.5-cp312-cp312-win_amd64.whl (801 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.8994459Z    ---------------------------------------- 801.4/801.4 kB 17.4 MB/s  0:00:00
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.9083994Z Downloading crc32c-2.9.post0-cp312-cp312-win_amd64.whl (65 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.9310379Z Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.9597765Z    ---------------------------------------- 1.3/1.3 MB 61.8 MB/s  0:00:00
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.9636143Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:07.9951829Z Downloading pyyaml-6.0.3-cp312-cp312-win_amd64.whl (154 kB)
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.1230606Z Building wheels for collected packages: dsp-dreamer
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.1301078Z   Building editable for dsp-dreamer (pyproject.toml): started
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.4769581Z   Building editable for dsp-dreamer (pyproject.toml): finished with status 'done'
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.4805392Z   Created wheel for dsp-dreamer: filename=dsp_dreamer-0.1.0-0.editable-py3-none-any.whl size=1517 sha256=6fa4edb5a6e2be4ea0ae5e7e3f5dbfda7e7016ca767f451bd8df83bb4d2748ef
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.4807888Z   Stored in directory: C:\Users\runneradmin\AppData\Local\Temp\pip-ephem-wheel-cache-c0erfa8q\wheels\76\1e\57\893814a11b07f3ec19707bc797e97bb34cd590df89e681e808
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.4831462Z Successfully built dsp-dreamer
+control-contract	Install Python test dependencies	2026-09-13T17:09:08.5435980Z Installing collected packages: typing-extensions, pyyaml, pygments, pyarrow, pluggy, numpy, iniconfig, crc32c, pytest, numcodecs, donfig, zarr, dsp-dreamer
+control-contract	Install Python test dependencies	2026-09-13T17:09:19.8477135Z 
+control-contract	Install Python test dependencies	2026-09-13T17:09:19.8502259Z Successfully installed crc32c-2.9.post0 donfig-0.8.1.post1 dsp-dreamer-0.1.0 iniconfig-2.3.0 numcodecs-0.16.5 numpy-2.2.6 pluggy-1.6.0 pyarrow-21.0.0 pygments-2.21.0 pytest-9.1.1 pyyaml-6.0.3 typing-extensions-4.16.0 zarr-3.1.2
+control-contract	Restore native test project	﻿2026-09-13T17:09:20.0981080Z ##[group]Run dotnet restore tests/ControlReplay/ControlReplay.csproj
+control-contract	Restore native test project	2026-09-13T17:09:20.0981718Z ^[[36;1mdotnet restore tests/ControlReplay/ControlReplay.csproj^[[0m
+control-contract	Restore native test project	2026-09-13T17:09:20.1013516Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+control-contract	Restore native test project	2026-09-13T17:09:20.1013881Z env:
+control-contract	Restore native test project	2026-09-13T17:09:20.1014183Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Restore native test project	2026-09-13T17:09:20.1014814Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+control-contract	Restore native test project	2026-09-13T17:09:20.1015279Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Restore native test project	2026-09-13T17:09:20.1015689Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Restore native test project	2026-09-13T17:09:20.1016104Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Restore native test project	2026-09-13T17:09:20.1016427Z ##[endgroup]
+control-contract	Restore native test project	2026-09-13T17:09:30.2537912Z   Determining projects to restore...
+control-contract	Restore native test project	2026-09-13T17:09:31.9859157Z   Restored D:\a\DSP_Dreamer\DSP_Dreamer\tests\ControlReplay\ControlReplay.csproj (in 438 ms).
+control-contract	Run original native action contract test	﻿2026-09-13T17:09:32.1455767Z ##[group]Run python -m pytest tests/test_control.py::test_native_action_contract_matches_model_codec -v --junitxml=control-contract.xml
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1457541Z ^[[36;1mpython -m pytest tests/test_control.py::test_native_action_contract_matches_model_codec -v --junitxml=control-contract.xml^[[0m
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1505488Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1505864Z env:
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1506160Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1506663Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1507160Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1507590Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1508003Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Run original native action contract test	2026-09-13T17:09:32.1508338Z ##[endgroup]
+control-contract	Run original native action contract test	2026-09-13T17:09:33.5681614Z C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\site-packages\numcodecs\__init__.py:106: DeprecationWarning: crc32c usage is deprecated since numcodecs v0.16.4. It is recommended to install google_crc32c instead.
+control-contract	Run original native action contract test	2026-09-13T17:09:33.5683286Z   from numcodecs.checksum32 import CRC32, Adler32, JenkinsLookup3
+control-contract	Run original native action contract test	2026-09-13T17:09:34.0128939Z ============================= test session starts =============================
+control-contract	Run original native action contract test	2026-09-13T17:09:34.0130075Z platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\hostedtoolcache\windows\Python\3.12.10\x64\python.exe
+control-contract	Run original native action contract test	2026-09-13T17:09:34.0130936Z cachedir: .pytest_cache
+control-contract	Run original native action contract test	2026-09-13T17:09:34.0131320Z rootdir: D:\a\DSP_Dreamer\DSP_Dreamer
+control-contract	Run original native action contract test	2026-09-13T17:09:34.0131751Z configfile: pyproject.toml
+control-contract	Run original native action contract test	2026-09-13T17:09:34.0132112Z plugins: zarr-3.1.2
+control-contract	Run original native action contract test	2026-09-13T17:09:34.1161479Z collecting ... collected 1 item
+control-contract	Run original native action contract test	2026-09-13T17:09:34.1161821Z 
+control-contract	Run original native action contract test	2026-09-13T17:09:41.2243489Z tests/test_control.py::test_native_action_contract_matches_model_codec PASSED [100%]
+control-contract	Run original native action contract test	2026-09-13T17:09:41.2244447Z 
+control-contract	Run original native action contract test	2026-09-13T17:09:41.2244910Z ---- generated xml file: D:\a\DSP_Dreamer\DSP_Dreamer\control-contract.xml ----
+control-contract	Run original native action contract test	2026-09-13T17:09:41.2245769Z ============================== 1 passed in 7.19s ==============================
+control-contract	Preserve test result	﻿2026-09-13T17:09:41.3766616Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+control-contract	Preserve test result	2026-09-13T17:09:41.3768067Z ##[group]Run actions/upload-artifact@v4
+control-contract	Preserve test result	2026-09-13T17:09:41.3768361Z with:
+control-contract	Preserve test result	2026-09-13T17:09:41.3768574Z   name: control-contract-result
+control-contract	Preserve test result	2026-09-13T17:09:41.3768842Z   path: control-contract.xml
+control-contract	Preserve test result	2026-09-13T17:09:41.3769087Z   if-no-files-found: error
+control-contract	Preserve test result	2026-09-13T17:09:41.3769315Z   compression-level: 6
+control-contract	Preserve test result	2026-09-13T17:09:41.3769526Z   overwrite: false
+control-contract	Preserve test result	2026-09-13T17:09:41.3769736Z   include-hidden-files: false
+control-contract	Preserve test result	2026-09-13T17:09:41.3769963Z env:
+control-contract	Preserve test result	2026-09-13T17:09:41.3770226Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Preserve test result	2026-09-13T17:09:41.3770694Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+control-contract	Preserve test result	2026-09-13T17:09:41.3771193Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Preserve test result	2026-09-13T17:09:41.3772314Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Preserve test result	2026-09-13T17:09:41.3772730Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+control-contract	Preserve test result	2026-09-13T17:09:41.3773051Z ##[endgroup]
+control-contract	Preserve test result	2026-09-13T17:09:41.5641000Z (node:5172) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+control-contract	Preserve test result	2026-09-13T17:09:41.5641849Z (Use `node --trace-deprecation ...` to show where the warning was created)
+control-contract	Preserve test result	2026-09-13T17:09:41.5690752Z With the provided path, there will be 1 file uploaded
+control-contract	Preserve test result	2026-09-13T17:09:41.5695783Z Artifact name is valid!
+control-contract	Preserve test result	2026-09-13T17:09:41.5698357Z Root directory input is valid!
+control-contract	Preserve test result	2026-09-13T17:09:41.7704019Z Beginning upload of artifact content to blob storage
+control-contract	Preserve test result	2026-09-13T17:09:41.7976723Z (node:5172) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+control-contract	Preserve test result	2026-09-13T17:09:41.8376840Z Uploaded bytes 377
+control-contract	Preserve test result	2026-09-13T17:09:41.8552462Z Finished uploading artifact content to blob storage!
+control-contract	Preserve test result	2026-09-13T17:09:41.8554322Z SHA256 digest of uploaded artifact zip is 6a6d753107914e957364676bbd963c3d0093baad2a804f59d32dd70922d91151
+control-contract	Preserve test result	2026-09-13T17:09:41.8556653Z Finalizing artifact upload
+control-contract	Preserve test result	2026-09-13T17:09:42.0691279Z Artifact control-contract-result.zip successfully finalized. Artifact ID 10321284384
+control-contract	Preserve test result	2026-09-13T17:09:42.0692777Z Artifact control-contract-result has been successfully uploaded! Final size is 377 bytes. Artifact ID is 10321284384
+control-contract	Preserve test result	2026-09-13T17:09:42.0700908Z Artifact download URL: https://github.com/JayWu07291/DSP_Dreamer/actions/runs/34770697322/artifacts/10321284384
+control-contract	Post Run actions/setup-python@v5	﻿2026-09-13T17:09:42.0967388Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+control-contract	Post Run actions/setup-python@v5	2026-09-13T17:09:42.0968790Z Post job cleanup.
+control-contract	Post Run actions/setup-python@v5	2026-09-13T17:09:42.2321802Z (node:7676) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+control-contract	Post Run actions/setup-python@v5	2026-09-13T17:09:42.2322940Z (Use `node --trace-deprecation ...` to show where the warning was created)
+control-contract	Post Run actions/checkout@v4	﻿2026-09-13T17:09:42.2566459Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.2568465Z Post job cleanup.
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.4568143Z [command]"C:\Program Files\Git\bin\git.exe" version
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.4781050Z git version 2.55.0.windows.5
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.4842011Z Temporarily overriding HOME='D:\a\_temp\8303f124-f73b-419b-945f-02f945062200' before making global git config changes
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.4843269Z Adding repository directory to the temporary git global config as a safe directory
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.4854479Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\DSP_Dreamer\DSP_Dreamer
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.5097643Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.5332206Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.9805848Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:42.9990305Z http.https://github.com/.extraheader
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:43.0018305Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:43.0228367Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:43.4462305Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+control-contract	Post Run actions/checkout@v4	2026-09-13T17:09:43.4678003Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+control-contract	Complete job	﻿2026-09-13T17:09:43.8841580Z Cleaning up orphan processes
+control-contract	Complete job	2026-09-13T17:09:43.9250156Z Terminate orphan process: pid (7800) (VBCSCompiler)
+control-contract	Complete job	2026-09-13T17:09:43.9419687Z Terminate orphan process: pid (1144) (conhost)
+control-contract	Complete job	2026-09-13T17:09:43.9435427Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
