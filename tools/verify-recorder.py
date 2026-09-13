@@ -18,6 +18,7 @@ from dsp_dreamer.video import decode
 def verify(source, dataset_path, ffmpeg):
     started = time.perf_counter()
     manifest, frames, events = verify_recording(source, ffmpeg)
+    require('benchmark_replay' not in manifest, 'Benchmark replay cannot count as live acceptance evidence')
     require(manifest['source_kind'] == 'live', 'Live evidence required')
     source_info = file_info(source / 'manifest.json')
     view = open_model_view(dataset_path)

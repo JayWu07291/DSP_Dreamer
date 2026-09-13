@@ -78,6 +78,7 @@ def aggregate(samples, start, end, initial):
 def compile_recording(source, destination, ffmpeg):
     source, destination = Path(source), Path(destination)
     manifest, frames, events = verify_recording(source, ffmpeg)
+    require("benchmark_replay" not in manifest, "Publication benchmark replay cannot compile as training evidence")
     # Uncompressed RGB plus the agreed 2 GiB/hour table allowance and 1 GiB scratch reserve.
     capacity_preflight(destination, len(frames) * (640 * 360 * 3 + (2 * 1024 ** 3 // 72000)), copies=1)
     events.sort(key=lambda event: (event["ticks"], event["sequence_number"]))

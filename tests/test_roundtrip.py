@@ -184,3 +184,12 @@ def test_compiler_batches_image_io_without_changing_pixels_or_chunk_contract(evi
     receipt.write_text(json.dumps(completed))
     with pytest.raises(InvalidRecording, match='Compiled RGB checksum mismatch'):
         open_dataset(tmp_path / 'batched')
+
+def test_compiler_rejects_publication_benchmark_replay(evidence, tmp_path):
+    manifest_path = evidence / 'manifest.json'
+    manifest = json.loads(manifest_path.read_text())
+    manifest['benchmark_replay'] = {'purpose': 'publication resource measurement'}
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(InvalidRecording, match='benchmark replay'):
+        compile_recording(evidence, tmp_path / 'benchmark-dataset', FFMPEG)
+    assert not (tmp_path / 'benchmark-dataset').exists()

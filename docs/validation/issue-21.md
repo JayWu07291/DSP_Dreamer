@@ -1,6 +1,6 @@
 # Issue #21 正式實機驗收
 
-更新至 2026-09-13，進行中。首輪五次流程達到 30 分鐘，但掉幀率超標，尚未通過本票品質 gate。#16、#17、#18、#20 的既有結果只作為前置證據，不取代本次長錄製。
+更新至 2026-09-14。新版六次流程已通過長錄製品質核對，單次失焦／回焦八項檢查與離線長合併資源補驗完成。最新完整回歸為 139 項通過、1 項遭 Smart App Control 阻擋，未宣稱全套通過或關閉 issue。以下按實作與驗證時序保留先前失敗；#16、#17、#18、#20 的既有結果只作為前置證據。
 
 ## 適用版本
 
@@ -131,3 +131,29 @@ Standards：未發現硬性違反。固定批次大小不新增設定或依賴�
 [批次編譯資源](issue-21-six-flows-batched-resources.json)與[原始取樣](issue-21-six-flows-batched-resources.ndjson)已保存。compiler 105 筆取樣，OS 回報 peak working set 2,014,167,040 bytes，約 1.88 GiB；取樣 private bytes 最高 2,774,491,136 bytes，約 2.58 GiB。readback 的 OS peak 沿用同一程序先前峰值，不把它解讀為該階段新增需求。磁碟 free 最低值分段列於 JSON，包含短診斷與其他工作，不能宣稱獨占磁碟峰值。取樣器已停止。
 
 重編譯後 `runs/live` 全部保留資料的 logical bytes 為 169,612,412,780，包含新版重編譯副本、兩輪長錄製、失敗資料與診斷；E 槽 free 1,188,024,897,536 bytes。容量預算應加上這份目前保留量，不再只用最早的 73,893,112,235 bytes。Git 對驗收 NDJSON 固定 LF，以便報告中的原始取樣 SHA-256 在不同平台 checkout 後仍可核對。
+
+## 失焦與長合併資源補驗
+
+第三次短測試 `3b01b5c3-cfb2-474a-ad2f-dfa32d7bcd45` 已在同一次錄製通過全部 8 項檢查，見[失焦最終結果](issue-21-focus-hold-final-live.json)。模型 W 確實按住後失焦，release_all 全數送出成功；62.4312 ms 首次觀察空 held，之後保持空白，回焦也空白，沒有後續模型要求，正式 dataset 發布成功。未修改三秒觀察窗或放寬 verifier；前兩次失敗結果仍保留。已恢復 Diagnostics=false、Case=full。
+
+原長錄製的來源分段已在成功發布時正常清理，因此長合併資源以原四檔影片的 stream copy 重建 204 個分段，保留 40,679 幀的原始 frames／events 位元組及錄製工作階段身分。封裝 bytes 可能與原分段不同，不聲稱恢復原容器 checksum；正式 publisher 仍逐段、合併後逐幀 RGBA 核對並檢查所有段邊界 seek。重建 SOURCE 標有 benchmark_replay 與原 manifest 身分，這是離線重播，不是新增實機示範或新增品質樣本。
+
+重播目錄為 `runs/issue21-merge-replay`。此根目錄限定本次來源、工作複本、輸出與量測檔，每五秒計算 logical file bytes，分別保存程序 working set／private bytes 與整個受測目錄容量，不以磁碟 free 差值冒充獨占磁碟峰值。Python worker PID 41772 已確認為實際 interpreter，launcher 為 40188；資源報告以 worker 及其直接 FFmpeg 子程序區分，PID 需配合開始時間判讀。重建分段的準備階段不計入正式 publication／cleanup 耗時。
+
+可重現步驟保存為[準備腳本](issue-21-merge-replay-prepare.py)與[合併量測腳本](issue-21-merge-replay-publish.py)，均從 repo 根目錄執行；固定 artifact 名稱存在時拒絕覆寫。合併採正式 `publish(..., cleanup=True)`，不變更 production 程式，完成後核對原始 sidecar 身分、回合與幀數、來源清理及原 manifest 未變。
+
+離線重播未重建原先已清理的 203 個 checkpoint／encoder 附屬檔；原 manifest 記載這些檔案合計 3,186,963 bytes。重播的分段容器與新 SOURCE 封裝也可能有 byte 差異，因此量測代表同一組長畫面與事件的正式合併工作負載，不回填為歷史實機 finalize 的精確峰值。容量預算須另保留這些附屬檔及既有 scratch 餘裕。
+
+[合併結果](issue-21-merge-replay.json)記錄 UTC 16:39:03.877160 至 16:50:54.525329，正式 publication、完整核對與來源清理共 710.64835 秒，即 11 分 50.6 秒。40,679 幀完整 RGBA 解碼及 408 個 seek 位置全部通過，sidecar 位元組一致，原 manifest 未变，來源清理成功。此時間不包含重建準備或 compiler，也不是重新量測整段 F8 至 Ready。
+
+[資源報告](issue-21-merge-replay-resources.json)附[程序原始取樣](issue-21-merge-replay-processes.ndjson)與[目錄容量原始取樣](issue-21-merge-replay-storage.ndjson)的 SHA-256、worker 開始時間及量測區間。程序取樣使用 `tools/measure-recorder.ps1 -Out runs/issue21-merge-replay-processes.ndjson`。實際 worker 共 141 筆，OS peak working set 1,245,028,352 bytes（1.16 GiB），取樣 private bytes 最高 1,824,026,624（1.70 GiB）；worker 加直接 FFmpeg 子程序的同時取樣峰值分別為 1,263,968,256 與 1,904,115,712 bytes。OS 累積峰值與定時取樣峰值分開呈現，不混算。
+
+受測目錄 logical bytes 最高 34,415,832,800（32.05 GiB）。142 筆容量取樣從 UTC 16:39:03.879675 至 16:50:51.191318，最大間隔 5.2816 秒；起點差小於一秒、尾端差小於六秒，未見取樣中斷，但仍可能漏掉兩筆間瞬時峰值。重播保留資料 11,506,855,483 bytes 位於 `runs/live` 之外，容量帳須在前述既有資料量之外另加；不刪除旧資料以降低峰值。
+
+量測完成後，保存的合併腳本補上「主執行緒先拒絕既有取樣檔」及「背景取樣失敗必須使報告失敗」，另核對 replay marker 與 session 身分；這些防護不是原量測當時的腳本版本。[取樣失敗檢查](issue-21-merge-replay-sampler-check.py)已通過，原始量測另外核對上述覆蓋區間與 hash。compiler 與正式實機驗收入口均拒絕 `benchmark_replay`，避免離線副本被計為新的訓練資料或實機樣本。新增拒絕測試先重現失敗、修正後通過；mypy 17 檔通過。
+
+## Smart App Control 阻擋補充回歸
+
+兩項實測完成後的完整 pytest 為 139 passed、1 failed，耗時 157.16 秒，JUnit 保存於 `tmp/issue21-final-verification-tests.xml`。失敗項 `test_native_action_contract_matches_model_codec` 的 .NET 建置成功，但啟動 `tests/ControlReplay/bin/Debug/net472/ControlReplay.exe` 時收到 WinError 4551。該檔 Authenticode 狀態為 NotSigned；[Code Integrity 紀錄](issue-21-smart-app-control.json)於台灣時間 2026-09-14 00:53:33 記載 3033／3077／3118，指出簽署等級未符合政策而被封鎖。這是環境封鎖，該測試尚未在本輪完成，不以其他測試代替。
+
+保留 Smart App Control，未修改政策、繞過封鎖或重試被擋的程式。此封鎖发生在失焦與長合併完成之後，未使已保存的兩項結果失效。Standards／Spec 複核要求的 replay 身分限制、取樣失敗傳遞及 RAM 原始證據連結均已補齊。
