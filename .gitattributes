@@ -1,2 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# Acceptance reports hash these raw samples; preserve their bytes across checkouts.
+docs/validation/*.ndjson text eol=lf

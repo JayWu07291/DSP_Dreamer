@@ -88,11 +88,18 @@ def compile_recording(source, destination, ffmpeg):
     rgb = group.create_array("rgb", shape=(len(frames), 360, 640, 3), chunks=(1, 360, 640, 3),
                              dtype="uint8", compressors=[BloscCodec(cname="zstd", clevel=3)])
     rgb_hashes = []
+    # Bound image staging to 32 frames (~21 MiB); keep one frame per on-disk chunk.
+    buffer = np.empty((min(32, len(frames)), 360, 640, 3), dtype=np.uint8)
     for index, raw in enumerate(decode(ffmpeg, source / "recording.mkv")):
         require(sha(raw) == frames[index]["rgba_sha256"], "Source changed during compile")
-        pixels = np.frombuffer(raw, dtype=np.uint8).reshape(360, 640, 4)[:, :, :3].copy()
-        rgb[index] = pixels
+        pixels = buffer[index % len(buffer)]
+        pixels[:] = np.frombuffer(raw, dtype=np.uint8).reshape(360, 640, 4)[:, :, :3]
         rgb_hashes.append(sha(pixels.tobytes()))
+        count = index % len(buffer) + 1
+        if count == len(buffer) or index == len(frames) - 1:
+            rgb[index + 1 - count:index + 1] = buffer[:count]
+    require(len(rgb_hashes) == len(frames), "Decoded frame count changed during compile")
+    del buffer, pixels
     rows = []
     derived_episodes = copy.deepcopy(manifest.get("episodes", []))
     control_faults = set()
@@ -305,8 +312,10 @@ class Dataset:
                 lifecycle["bootstrap_mask"] = 0
             require(all(row[k] == v for k, v in lifecycle.items()), "Invalid lifecycle target")
         require(len(self.metadata["rgb_sha256"]) == self.metadata["frame_count"], "Missing RGB checksums")
-        for index, expected in enumerate(self.metadata["rgb_sha256"]):
-            require(sha(np.asarray(self.rgb[index]).tobytes()) == expected, "Compiled RGB checksum mismatch")
+        for start in range(0, self.metadata["frame_count"], 32):
+            for offset, pixels in enumerate(np.asarray(self.rgb[start:start + 32])):
+                require(sha(pixels.tobytes()) == self.metadata["rgb_sha256"][start + offset],
+                        "Compiled RGB checksum mismatch")
 
     def __len__(self):
         return len(self.rows)

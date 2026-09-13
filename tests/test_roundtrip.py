@@ -156,3 +156,31 @@ def test_compiler_sorts_actual_input_by_ticks_then_sequence(tmp_path):
     dataset = open_dataset(tmp_path / "dataset")
     assert dataset[0]["action"]["delta"] == [1, 0]
     assert dataset[1]["action"]["delta"] == [2, 0]
+
+def test_compiler_batches_image_io_without_changing_pixels_or_chunk_contract(evidence, tmp_path, monkeypatch):
+    import zarr
+    writes = []
+    original = zarr.Array.__setitem__
+
+    def counted_write(array, selection, value):
+        writes.append(np.asarray(value).nbytes)
+        return original(array, selection, value)
+
+    monkeypatch.setattr(zarr.Array, "__setitem__", counted_write)
+    compile_recording(evidence, tmp_path / "batched", FFMPEG)
+    dataset = open_dataset(tmp_path / "batched")
+    assert dataset.rgb.chunks == (1, 360, 640, 3)
+    assert all(np.all(dataset.rgb[i] == [i % 256, 2, 3]) for i in range(205))
+    assert len(writes) < 20, "Per-frame synchronous writes dominate long compilation"
+    assert max(writes) <= 32 * 360 * 640 * 3, "Image write buffer must stay bounded"
+    # A changed last partial batch must still fail decoded-pixel validation,
+    # even when its compressed-file receipt has been regenerated.
+    from dsp_dreamer.contract import file_info
+    rgb = zarr.open_group(str(tmp_path / 'batched' / 'observations.zarr'), mode='r+')['rgb']
+    rgb[204] = np.ones((360, 640, 3), dtype=np.uint8)
+    receipt = tmp_path / 'batched' / 'COMPLETED'
+    completed = json.loads(receipt.read_text())
+    completed['files'] = {name: file_info(tmp_path / 'batched' / name) for name in completed['files']}
+    receipt.write_text(json.dumps(completed))
+    with pytest.raises(InvalidRecording, match='Compiled RGB checksum mismatch'):
+        open_dataset(tmp_path / 'batched')

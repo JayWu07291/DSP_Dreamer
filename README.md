@@ -66,7 +66,7 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 這項使用者決議修訂 #12 的 v2／18 維設定。後續模型視圖、action encoder 與 policy head 應使用 v3／20 維，尚未實作的模型模組不宣稱已更新。完整控制順序以 `dsp_dreamer/contract.py` 的 `CONTROLS` 為準，並存入每份 dataset metadata 供 loader 核對。
 
-RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
+RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。編譯寫入與載入器像素核對每批最多 32 幀，RGB 暫存約 21 MiB，仍逐幀保存並驗證 SHA-256；這不包含既有事件／轉移 metadata 或 codec 的記憶體。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
 
 資料集格式為 `dsp-transitions/4`，catalog 為 `action_catalog_v3`。舊 `/1`、`/2`、`/3` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄。raw evidence v2／v3 皆可驗證，重編譯從原始輸入產生新版動作並保存 `source_catalog`。缺 lifecycle 的舊 evidence 不推測終止結果，bootstrap mask 為 0；缺進度事實時 `progress_available=false`，不推測任務或 reward。
 
