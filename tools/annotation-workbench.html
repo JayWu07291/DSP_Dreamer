@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DSP 原始證據標註</title>
+<style>
+body{font:16px system-ui,sans-serif;margin:24px auto;padding:0 20px;max-width:1180px;color:#182735;background:#f5f6f7}h1{margin-bottom:8px}p{line-height:1.6}button,select,input,textarea{font:inherit;padding:8px;max-width:100%;box-sizing:border-box}button{cursor:pointer}label{display:block;margin:12px 0 4px}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #007c91}nav,.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}.layout{display:grid;grid-template-columns:660px 1fr;gap:24px}.card{background:white;padding:16px;border:1px solid #ccd4d8;border-radius:8px}canvas,video{display:block;width:100%;max-width:640px;height:auto;background:#121b23}canvas{cursor:crosshair;touch-action:none}textarea{width:100%}small{display:block;line-height:1.6;color:#475b6a}.notice{background:#fff2c5;padding:12px}#message{min-height:24px;color:#006273}#items{white-space:pre-wrap;font-size:14px}.primary{background:#07586b;color:white;border:0;border-radius:4px} @media(max-width:1000px){.layout{grid-template-columns:1fr}}
+</style>
+<h1>DSP 原始證據標註</h1>
+<p class="notice">這是待人工確認的工作頁。只顯示 validation 原始證據，沒有模型結果。草稿不等於凍結標籤或 gate 通過；補錄後名單可能更新，請保留下載草稿，之後核對同一原圖能否沿用。</p>
+<nav><label>工作 <select id="mode"><option value="reconstruction">重建原圖</option><option value="prediction">預測序列分類</option></select></label>
+<button id="prev">上一筆</button><input aria-label="筆數" id="number" type="number" min="1" value="1" style="width:90px"><button id="next">下一筆</button><span id="count"></span>
+<button id="download" class="primary">下載標註草稿</button><label>載入草稿 <input id="import" type="file" accept="application/json"></label></nav>
+<p id="progress"></p><div id="message" role="status" aria-live="polite"></div>
+<div class="layout"><section class="card"><h2 id="identity"></h2><small id="source"></small>
+<div id="movie"><video id="video" controls preload="metadata"></video><div class="row"><button id="play">播放完整歷史與未來</button><button id="future">只看後 15 步</button></div><small>影片經壓縮，只供操作導覽。下方 PNG 是無損原圖，請以它標定文字、數字與區域。</small><label>原圖時點 <select id="frame"><option value="0">歷史末圖</option><option value="1">第 5 步</option><option value="2" selected>第 15 步</option></select></label></div>
+<canvas id="canvas" width="640" height="360" aria-label="640×360 原圖；可拖曳標定矩形，也可輸入座標"></canvas><small>拖曳框選或填入原生座標。預測區域依協定先合併、四周加 8 pixel，且至少 64×64；可按下方按鈕自動展開。</small>
+<div class="row"><input id="box" aria-label="矩形 x0 y0 x1 y1" placeholder="x0,y0,x1,y1"><button id="whole">全畫面</button><button id="expand">展開預測區域</button></div></section>
+<section class="card"><label for="reviewer">判讀者</label><input id="reviewer" autocomplete="name" placeholder="姓名或識別名稱">
+<div id="classification"><label for="category">主要操作分類</label><select id="category"><option value="">尚未分類</option><option value="movement">移動／視角</option><option value="ui">UI 操作</option><option value="interaction">建造／物品互動</option><option value="waiting">等待</option></select></div>
+<label for="type">關鍵項目類型</label><select id="type"><option value="cursor">游標</option><option value="recipe">選中配方</option><option value="item_number">重要物品／數字</option><option value="connection">建築連接</option></select>
+<label for="expected">原圖中的正確狀態</label><textarea id="expected" rows="3" placeholder="例：選中配方名稱、物品名稱與完整數字，或連接端點／方向／狀態"></textarea>
+<label for="eligible">原圖能否辨識此項目</label><select id="eligible"><option value="true">能辨識，納入標註</option><option value="false">不能辨識或不存在，記錄排除</option></select>
+<label for="reason">排除原因</label><input id="reason" placeholder="排除時必填；不可根據模型表現排除">
+<div class="row"><button id="add">加入關鍵項目</button><button id="remove">移除最後一項</button></div><div id="items"></div>
+<label for="ui_regions">UI 區域座標，每行 x0,y0,x1,y1</label><textarea id="ui_regions" rows="2" placeholder="有 UI 的重建圖需填面板區域，可有多個；沒有 UI 留空"></textarea>
+<label for="note">UI 覆蓋／判讀備註</label><textarea id="note" rows="2" placeholder="請記錄科技／背包／製造／建造／研究站 UI，或需要協助的判讀"></textarea>
+<button id="exclude">無法分類，記錄序列排除</button><button id="save" class="primary">儲存本筆人工確認</button><button id="pending">標回待確認</button><p><small>每張圖可加入多個關鍵項目。預測序列必須有分類、至少一個可辨識的第 15 步狀態，以及一個符合尺寸的受影響區域。</small></p></section></div>
+<script src="data.js"></script><script>
+const $=id=>document.getElementById(id), key='dsp-annotation:'+WORK.evaluation_inputs_id;
+let draft={schema:'dsp-annotation-draft/1',protocol_id:WORK.protocol_id,index_id:WORK.index_id,evaluation_inputs_id:WORK.evaluation_inputs_id,reviewer:'',records:{},status:'pending',training_authorized:false};
+function validateDraft(d){
+if(!d||d.schema!=='dsp-annotation-draft/1'||d.evaluation_inputs_id!==WORK.evaluation_inputs_id||d.protocol_id!==WORK.protocol_id||d.index_id!==WORK.index_id||d.training_authorized!==false||d.status!=='pending'||typeof d.reviewer!=='string'||!d.records||typeof d.records!=='object'||Array.isArray(d.records))throw Error('草稿格式錯誤或不屬於這份輸入包。');
+for(const [k,r] of Object.entries(d.records)){
+if(!r||!['reconstruction','prediction'].includes(r.mode)||typeof r.reviewed!=='boolean'||!Array.isArray(r.items)||!r.source||k!==r.mode+':'+r.source.id||!WORK[r.mode].some(source=>JSON.stringify(source)===JSON.stringify(r.source)))throw Error('草稿紀錄與原始輸入不符。');
+if(!Array.isArray(r.ui_regions)||r.ui_regions.some(b=>!validBox(b)))throw Error('UI 區域格式錯誤。');
+if(typeof r.note!=='string'||typeof r.reviewer!=='string'||!r.reviewer.trim()||typeof r.reviewed_at!=='string'||!Number.isFinite(Date.parse(r.reviewed_at))||r.region!==null&&!validBox(r.region))throw Error('草稿判讀者、時間或區域格式錯誤。');
+if(r.mode==='prediction'&&typeof r.candidate_exclusion==='string'&&r.candidate_exclusion.trim()&&!r.reviewed)continue;
+if(!r.items.length)throw Error('草稿缺關鍵項目。');
+for(const x of r.items){if(!x||!['cursor','recipe','item_number','connection'].includes(x.type)||typeof x.eligible!=='boolean'||typeof x.expected!=='string'||x.box!==null&&!validBox(x.box)||x.eligible&&(!x.expected.trim()||!validBox(x.box))||!x.eligible&&(typeof x.exclusion_reason!=='string'||!x.exclusion_reason.trim()))throw Error('草稿關鍵項目格式錯誤。')}
+if(r.mode==='prediction'&&(!['movement','ui','interaction','waiting'].includes(r.category)||!validBox(r.region,64)||!r.items.some(x=>x.eligible)))throw Error('預測草稿缺分類、區域或可辨識狀態。');
+if(r.mode==='prediction'&&r.category==='waiting'&&r.region.join(',')!=='0,0,640,360')throw Error('等待組區域必須為全畫面。');
+}return d}
+try{const prior=localStorage.getItem(key);if(prior)draft=validateDraft(JSON.parse(prior))}catch(e){$('message').textContent='瀏覽器草稿不可用，請載入下載備份。'}
+let pos=0, img=new Image(), drag=null, localItems=[], dirty=false, renderedMode='reconstruction'; const ctx=$('canvas').getContext('2d');
+function rows(){return WORK[$('mode').value]} function current(){return rows()[pos]} function id(){return $('mode').value+':'+current().id}
+function persist(){draft.reviewer=$('reviewer').value;try{localStorage.setItem(key,JSON.stringify(draft))}catch(e){$('message').textContent='無法自動儲存，請下載草稿。'}}
+function box(){return $('box').value.split(',').map(Number)}
+function validBox(b,min=1){return Array.isArray(b)&&b.length===4&&b.every(Number.isInteger)&&b[0]>=0&&b[1]>=0&&b[2]<=640&&b[3]<=360&&b[2]-b[0]>=min&&b[3]-b[1]>=min}
+function paint(){ctx.clearRect(0,0,640,360);if(img.complete&&img.naturalWidth)ctx.drawImage(img,0,0);const b=box();if(validBox(b)){ctx.strokeStyle='#ffdc00';ctx.lineWidth=2;ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1])}}
+function image(){img.onload=paint;img.src=$('mode').value==='reconstruction'?current().image:current().images[Number($('frame').value)]}
+function showItems(){$('items').textContent=localItems.map((x,i)=>`${i+1}. ${x.type}：${x.eligible?x.expected:'排除：'+x.exclusion_reason}`).join('\n')}
+function progress(){const records=Object.values(draft.records), counts={movement:0,ui:0,interaction:0,waiting:0};records.filter(r=>r.mode==='prediction'&&r.reviewed).forEach(r=>counts[r.category]++);$('progress').textContent=`已人工確認 ${records.filter(r=>r.reviewed).length} 筆；預測分類 移動 ${counts.movement}/50、UI ${counts.ui}/50、建造／物品 ${counts.interaction}/50、等待 ${counts.waiting}/50。這是候選進度，尚非正式 gate。`}
+function render(){dirty=false;renderedMode=$('mode').value;pos=Number.isFinite(pos)?Math.max(0,Math.min(pos,rows().length-1)):0;if(!rows().length)return;const r=current(), p=draft.records[id()]||{};localItems=structuredClone(p.items||[]);$('number').value=pos+1;$('count').textContent='/ '+rows().length;$('identity').textContent=r.id;$('source').textContent=`來源 ${r.artifact_id}；${r.evidence||'capture '+r.capture_id}`;
+const pred=$('mode').value==='prediction';$('movie').hidden=!pred;$('classification').hidden=!pred;$('expand').hidden=!pred;$('exclude').hidden=!pred;
+if(pred){$('video').src=r.video;$('source').textContent+='；請依畫面判定操作分類'}
+$('box').value=(p.region||[]).join(',');$('category').value=p.category||'';$('expected').value='';$('reason').value='';$('note').value=p.note||'';$('ui_regions').value=(p.ui_regions||[]).map(b=>b.join(',')).join('\n');showItems();image();progress();$('message').textContent=p.candidate_exclusion?'已記錄序列排除：'+p.candidate_exclusion:p.reviewed?'此筆已人工確認，仍可修改後重新儲存。':'此筆待確認。'}
+function capture(){const b=box(),type=$('type').value,eligible=$('eligible').value==='true',expected=$('expected').value.trim(),reason=$('reason').value.trim();if(eligible&&(!expected||!validBox(b))||!eligible&&!reason)throw Error('可辨識項目需正確狀態及矩形；排除項目需原因。');return {type,box:validBox(b)?b:null,expected,eligible,exclusion_reason:eligible?null:reason}}
+$('add').onclick=()=>{try{if($('mode').value==='prediction'&&$('frame').value!=='2')throw Error('請切到第 15 步原圖後再加入關鍵狀態。');localItems.push(capture());dirty=true;showItems();$('message').textContent='已加入，請按儲存本筆。'}catch(e){$('message').textContent=e.message}};
+$('remove').onclick=()=>{localItems.pop();dirty=true;showItems()};
+$('save').onclick=()=>{try{const mode=$('mode').value,region=box(),ui_regions=$('ui_regions').value.trim()?$('ui_regions').value.trim().split(/\n/).map(line=>line.split(',').map(Number)):[];if(ui_regions.some(b=>!validBox(b)))throw Error('UI 區域每行需四個有效座標。');if(mode==='prediction'&&$('category').value==='waiting'&&region.join(',')!=='0,0,640,360')throw Error('等待組請選全畫面區域。');if(!$('reviewer').value.trim())throw Error('請填判讀者。');if(!localItems.length)throw Error('請至少加入一個項目或明確排除。');if(mode==='prediction'&&(!$('category').value||!validBox(region,64)||!localItems.some(x=>x.eligible)))throw Error('預測需分類、至少 64×64 區域及可辨識關鍵狀態。');draft.records[id()]={mode,source:current(),items:structuredClone(localItems),category:$('category').value,region:validBox(region)?region:null,note:$('note').value,ui_regions,reviewed:true,reviewer:$('reviewer').value.trim(),reviewed_at:new Date().toISOString()};dirty=false;persist();progress();$('message').textContent='已儲存本筆。請定期下載草稿備份。'}catch(e){$('message').textContent=e.message}};
+$('exclude').onclick=()=>{if(!$('reviewer').value.trim()||!$('note').value.trim()){$('message').textContent='請填判讀者，並在備註說明無法分類的原因。';return}draft.records[id()]={mode:'prediction',source:current(),items:[],ui_regions:[],region:null,note:$('note').value,candidate_exclusion:$('note').value.trim(),reviewed:false,reviewer:$('reviewer').value.trim(),reviewed_at:new Date().toISOString()};dirty=false;persist();render()};
+$('pending').onclick=()=>{if(draft.records[id()])draft.records[id()].reviewed=false;persist();render()};
+function coordinate(e){const r=$('canvas').getBoundingClientRect();return [Math.round(Math.max(0,Math.min(640,(e.clientX-r.left)*640/r.width))),Math.round(Math.max(0,Math.min(360,(e.clientY-r.top)*360/r.height)))]}
+$('canvas').onpointerdown=e=>{drag=coordinate(e);$('canvas').setPointerCapture(e.pointerId)};
+$('canvas').onpointerup=e=>{if(!drag)return;const p=coordinate(e);$('box').value=[Math.min(drag[0],p[0]),Math.min(drag[1],p[1]),Math.max(drag[0],p[0]),Math.max(drag[1],p[1])].join(',');drag=null;dirty=true;paint()};
+$('box').oninput=()=>{dirty=true;paint()};$('whole').onclick=()=>{$('box').value='0,0,640,360';dirty=true;paint()};
+$('expand').onclick=()=>{let b=box();if(!validBox(b))return;const w=Math.max(64,b[2]-b[0]+16),h=Math.max(64,b[3]-b[1]+16),x=Math.max(0,Math.min(640-w,Math.floor((b[0]+b[2]-w)/2))),y=Math.max(0,Math.min(360-h,Math.floor((b[1]+b[3]-h)/2)));$('box').value=[x,y,Math.min(640,x+w),Math.min(360,y+h)].join(',');dirty=true;paint()};
+$('play').onclick=()=>{$('video').currentTime=current().begin;$('video').play()};$('future').onclick=()=>{$('video').currentTime=current().boundary;$('video').play()};$('video').ontimeupdate=()=>{if($('mode').value==='prediction'&&$('video').currentTime>=current().end)$('video').pause()};
+function canLeave(){return !dirty||confirm('本筆尚未儲存。放棄這次修改？')}
+$('prev').onclick=()=>{if(canLeave()){pos--;render()}};$('next').onclick=()=>{if(canLeave()){pos++;render()}};$('number').onchange=()=>{if(canLeave()){pos=Number($('number').value)-1;render()}else $('number').value=pos+1};$('mode').onchange=()=>{if(canLeave()){pos=0;render()}else $('mode').value=renderedMode};$('frame').onchange=image;
+$('download').onclick=()=>{persist();draft.exported_at=new Date().toISOString();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(draft,null,2)],{type:'application/json'}));a.download='dsp-annotation-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('import').onchange=async()=>{try{if(!canLeave()||!$('import').files.length)return;const d=validateDraft(JSON.parse(await $('import').files[0].text()));draft=d;$('reviewer').value=draft.reviewer;persist();render()}catch(e){$('message').textContent=e.message}};
+for(const name of ['expected','reason','note','ui_regions','category','eligible','type'])$(name).addEventListener('input',()=>dirty=true);
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+$('reviewer').value=draft.reviewer;render();
+</script></html>
