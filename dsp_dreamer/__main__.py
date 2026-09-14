@@ -6,6 +6,7 @@ from . import publish, verify_recording, compile_recording, open_dataset
 from . import recover
 from .contract import file_info, load, require
 from .training_index import TrainingIndex
+from .reschedule import reschedule_dataset
 
 
 def main():
@@ -23,8 +24,13 @@ def main():
     index.add_argument("--registry", type=Path, required=True)
     index.add_argument("--length", type=int, default=64)
     index.add_argument("--out", type=Path, required=True)
+    reschedule = commands.add_parser('reschedule', help='將 v3 轉移資料另存為 v4 排程，保留原始證據')
+    reschedule.add_argument('--source', type=Path, required=True)
+    reschedule.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
-    if args.command == "index":
+    if args.command == 'reschedule':
+        print(reschedule_dataset(args.source, args.out))
+    elif args.command == "index":
         result = TrainingIndex(args.source, load(args.registry), length=args.length)
         result.save(args.out)
         print(json.dumps(dict(artifact_id=result.report["artifact_id"],

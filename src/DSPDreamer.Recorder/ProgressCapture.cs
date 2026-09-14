@@ -41,12 +41,12 @@ namespace DSPDreamer.Recorder
             lock (progressGate)
             {
                 progressFacts.Clear();
-                progress = new TaskProgress(progressTechIds, 3);
+                progress = new TaskProgress(progressTechIds, 4);
                 progressBoundary = 0;
             }
             ProductionCapture.Reset();
             suppliedTechs.Clear();
-            metadata["progress_version"] = 3;
+            metadata["progress_version"] = 4;
             metadata["progress_tech_ids"] = progressTechIds;
             reactor = player.mecha.reactorStorage;
             reactorFuel = reactor.GetItemCount(1801);

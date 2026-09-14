@@ -13,6 +13,37 @@ MILESTONES = ["lander_done", "electromagnetism_done", "metallurgy_done", "logist
 # Milestone indices follow the 16 action nodes, not the waiting task ID.
 DEPENDENCIES = [[], [0], [16], [16], [16], [17], [17], [17], [18], [18, 6, 4],
                 [19], [9, 19, 6, 7], [20], [11, 20], [11, 20], [13, 14, 21]]
+PRIORITY_V4 = (0, 1, 2, 3, 4, 6, 7, 5, 8, 9, 10, 11, 12, 13, 14, 15)
+
+
+def select_task(active, done, version):
+    if active != 16 and not done[active]:
+        return active
+    order = PRIORITY_V4 if version == 4 else range(16)
+    return next((i for i in order if not done[i] and all(done[d] for d in DEPENDENCIES[i])), 16)
+
+
+def reschedule_rows(rows, version):
+    """Project unchanged node facts onto a schedule; never change validity or actions."""
+    require(type(version) is int and version in (3, 4), "Unsupported schedule projection")
+    active: dict[str, int] = {}
+    result = []
+    for index, row in enumerate(rows):
+        episode = row['episode_id']
+        done = row['microtask_completed'] + row['milestone_completed']
+        task = select_task(active.get(episode, 0), done, version)
+        if episode == row['next_episode_id']:
+            after = [int(bool(value) or i in row['node_completions']) for i, value in enumerate(done)]
+            next_task = select_task(task, after, version)
+            active[episode] = next_task
+        else:
+            following = rows[index + 1] if index + 1 < len(rows) else None
+            after = following['microtask_completed'] + following['milestone_completed'] if following else [0] * 23
+            next_task = select_task(0, after, version)
+        result.append(dict(row, task_id=task, next_task_id=next_task,
+                           task_condition=[int(i == task) for i in range(17)],
+                           reward=row['reward_vector'][task] if task < 16 else 0))
+    return result
 FIELDS = ("task_id", "next_task_id", "task_condition", "reward_vector", "reward",
           "microtask_completed", "milestone_completed", "node_completions", "progress_available")
 
@@ -100,6 +131,7 @@ def validate_progress_row(row, available):
 
 class Progress:
     def __init__(self, tech_ids, version=1):
+        require(type(version) is int and version in (1, 2, 3, 4), "Unknown progress version")
         self.tech_ids = tech_ids
         self.version = version
         self.done = [0] * 23
@@ -152,15 +184,13 @@ class Progress:
                 self.done[6 if event["item_id"] == 1001 else 7] = 1
 
     def observe(self):
-        if self.active == 16 or self.done[self.active]:
-            self.active = next((i for i, deps in enumerate(DEPENDENCIES)
-                                if not self.done[i] and all(self.done[d] for d in deps)), 16)
+        self.active = select_task(self.active, self.done, self.version)
         return self.active, self.done.copy()
 
 
 def replay_progress(manifest, frames, events):
     version = manifest.get("progress_version")
-    require(version is None or type(version) is int and version in (1, 2, 3), "Unknown progress version")
+    require(version is None or type(version) is int and version in (1, 2, 3, 4), "Unknown progress version")
     facts = [e for e in events if e.get("name") in ("progress_fact", "progress_observation")]
     require(version is not None or not facts, "Progress facts lack version")
     tech_ids = manifest.get("progress_tech_ids", [])
@@ -169,7 +199,7 @@ def replay_progress(manifest, frames, events):
                 and all(type(x) is int and 0 < x <= 2147483647 for x in tech_ids)
                 and len(set(tech_ids)) == 5, "Invalid progress tech IDs")
     episodes = {e["episode_id"]: e for e in manifest.get("episodes", [])}
-    states = {key: Progress(tech_ids, version) for key in episodes}
+    states = {key: Progress(tech_ids, version) for key in episodes} if version else {}
     boundaries = [e for e in facts if e.get("name") == "progress_observation"]
     if version and not boundaries:
         require(manifest["source_kind"] == "synthetic", "Missing live progress observations")
@@ -185,7 +215,7 @@ def replay_progress(manifest, frames, events):
         require(key in episodes, "Unknown progress episode")
         if event["name"] == "progress_fact":
             validate_fact(event)
-            require(event["kind"] != "line_state" or version == 3, "Line connections require progress version 3")
+            require(event["kind"] != "line_state" or version >= 3, "Line connections require progress version >=3")
             require(version >= 2 or event["kind"] in ("lander_work", "lander_removed", "research_queue",
                     "craft_queued", "item_received", "fuel_inserted", "foreign_fuel_produced", "tech_state", "miner_output"),
                     "Production facts require progress version 2")
@@ -230,5 +260,5 @@ def replay_progress(manifest, frames, events):
         rows.append(dict(task_id=task, next_task_id=next_task, task_condition=[int(i == task) for i in range(17)],
                          reward_vector=completed[:16], reward=completed[task] if task < 16 else 0,
                          microtask_completed=before[:16], milestone_completed=before[16:],
-                         node_completions=[i for i, value in enumerate(completed) if value], progress_available=version in (1, 2, 3)))
+                         node_completions=[i for i, value in enumerate(completed) if value], progress_available=version in (1, 2, 3, 4)))
     return rows

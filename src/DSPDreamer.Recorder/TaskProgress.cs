@@ -8,6 +8,7 @@ namespace DSPDreamer.Recorder
     // Pure fact replay, also compiled into the evidence integration check.
     internal sealed class TaskProgress
     {
+        internal static readonly int[] PriorityV4 = { 0, 1, 2, 3, 4, 6, 7, 5, 8, 9, 10, 11, 12, 13, 14, 15 };
         internal static readonly int[][] Dependencies = {
             new int[0], new[] { 0 }, new[] { 16 }, new[] { 16 }, new[] { 16 },
             new[] { 17 }, new[] { 17 }, new[] { 17 }, new[] { 18 }, new[] { 18, 6, 4 },
@@ -25,7 +26,10 @@ namespace DSPDreamer.Recorder
         private long coils, boards, copper, landerFuel, foreignFuel;
 
         internal TaskProgress(int[] techIds, int version = 1)
-        { this.techIds = techIds; this.version = version; production = new ProductionProgress(Done, version); }
+        {
+            if (version < 1 || version > 4) throw new ArgumentOutOfRangeException(nameof(version));
+            this.techIds = techIds; this.version = version; production = new ProductionProgress(Done, version);
+        }
         private static int Number(Dictionary<string, object> e, string name) => Convert.ToInt32(e[name]);
         private static int[] Numbers(Dictionary<string, object> e, string name) =>
             ((IEnumerable)e[name]).Cast<object>().Select(Convert.ToInt32).ToArray();
@@ -95,7 +99,8 @@ namespace DSPDreamer.Recorder
             observed = (int[])Done.Clone();
             if (Active != 16 && Done[Active] == 0) return;
             Active = 16;
-            for (int i = 0; i < 16; i++)
+            IEnumerable<int> order = version == 4 ? (IEnumerable<int>)PriorityV4 : Enumerable.Range(0, 16);
+            foreach (int i in order)
                 if (Done[i] == 0 && Dependencies[i].All(d => Done[d] == 1)) { Active = i; break; }
         }
     }

@@ -84,7 +84,7 @@ legal_starts = dataset.sequence_starts(64)
 
 轉移包含 `episode_outcome`、`validity_status`、原因、`is_terminal`、`truncation` 與 `bootstrap_mask`。success／death／unrecoverable 的終止轉移不 bootstrap；timeout 可 bootstrap；無效或 incomplete 尾端不 bootstrap。缺 next observation 的動作不產生轉移。`sequence_starts` 只回傳不跨回合、gap 或無效範圍的固定長度起點；未知控制之後的同回合範圍不納入訓練。
 
-進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。新版 `progress_version=3` 依目前供電、固定配方、採礦機／傳送帶／分揀器連接與各機器實際產出判定完整產線。允許保留或補入人工材料；只有人工餵料、缺少可自行運作的上游連接不算成功。舊版 1、2 保留各自原有重播語意。完整契約、已測範圍與實機驗收結果見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。長程記憶體與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
+進度提供固定 17 維任務條件、16 維 reward_vector 與 7 維背景里程碑，並核對遊戲端與離線重播結果。`progress_version=3` 起依目前供電、固定配方、採礦機／傳送帶／分揀器連接與各機器實際產出判定完整產線。允許保留或補入人工材料；只有人工餵料、缺少可自行運作的上游連接不算成功。舊版 1、2、3 保留各自原有重播語意。完整契約、已測範圍與實機驗收結果見[完整產線驗證](docs/validation/issue-16.md)，前置實機證據見[早期進度驗證](docs/validation/issue-15.md)。長程記憶體與訓練門檻仍需後續實作及驗收。#14 已測範圍見[生命週期驗證報告](docs/validation/issue-14.md)。
 
 ## 10 Hz 模型視圖
 
@@ -105,6 +105,14 @@ loader 合併同回合的兩個相鄰 capture 區間，沿用原始 request tick
 重複 click 或非法組合可能在合併後才出現，這些視窗保留證據但不供 BC／dynamics。不足兩個區間的尾段同樣不供訓練，保留 final observation 的來源。`sequence_starts` 只列出完整合法起點；`sequence` 遇無效區間或回合邊界便停止並補零。`valid_mask` 區分實際樣本與 padding，`loss_mask` 另排除 burn-in。不要將逐窗的無效資料直接送入模型，其 `inputs.action` 為 null。驗證範圍見 [#18 報告](docs/validation/issue-18.md)。
 
 ## 固定 split、片段與覆蓋
+
+目前原生排程使用 `progress_version=4`，保留 v3 的完成判定及 task ID，將鐵礦／銅礦採礦機的提示優先於冶金供料。舊 v1–v3 仍按原語意讀取；決議見 [排程 v4](docs/adr/0001-task-schedule-v4.md)。v3 資料可另存新版排程衍生：
+
+```powershell
+.\.venv\Scripts\python.exe -m dsp_dreamer reschedule --source runs/live/issue21-five-flows-fixed --out runs/my-schedule-v4
+```
+
+輸出必須不存在。工具完整驗證來源並複製原圖與事件，保留來源 checksum、動作、節點完成、有效性及 split；只更新排程條件與 scalar reward。舊事件中的排程宣告仍屬原始 v3 證據，`rescheduled_from` 明示衍生關係。v1／v2 不能以這個指令升級，索引拒絕混用 v4 與舊排程。資料仍須通過各項 gate，新的排程不等於訓練授權。
 
 用途登錄檔採 `dsp-split-registry/1`，每列指定 `manifest_id`、`split_group_id`、`purpose`，用途限 `demonstration`、`development`、`final`。範例見 [#19 登錄檔](docs/validation/issue-19-registry.json)。錄製前先登錄並凍結用途，納入全部保留 manifests；沒有登錄或身分不符的資料會拒收。現有錄製沒有用途欄位，因此由登錄檔補上，不修改原始 evidence。
 

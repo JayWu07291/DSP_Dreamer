@@ -1,0 +1,2458 @@
+{
+  "status": "proposal",
+  "method": "completed-node timeline; no video intent inference or dataset relabeling",
+  "proposed_priority": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    5,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "dependencies_changed": false,
+  "sources": [
+    {
+      "path": "runs\\live\\issue21-five-flows-fixed",
+      "artifact_id": "9d12476c-b96f-4c43-a98d-90110fe38d40",
+      "completed": {
+        "bytes": 4854390,
+        "sha256": "4bb501da2edf2812aef0b95730309a7e3cf0bfaf2e306e6a9510f70acbc2007d"
+      },
+      "transitions": {
+        "bytes": 1879347,
+        "sha256": "3f3c8ccac310b3292973070ce0442efa8f667b91fbd94253d54d6ae263ec43de"
+      }
+    },
+    {
+      "path": "runs\\live\\issue21-six-flows-batched",
+      "artifact_id": "fb08ef9a-a641-4543-be93-d277e8f2baa1",
+      "completed": {
+        "bytes": 5521878,
+        "sha256": "9fd31a2836e2d71f6d1a6de63ebb637a39c32b4e6dc103196b23103bd6c45344"
+      },
+      "transitions": {
+        "bytes": 2108748,
+        "sha256": "adfc5b2f55457bb9fd2215ceb8cf4e74d7167eb44d00a351d80173092cf93f1f"
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "source": "issue21-five-flows-fixed",
+      "number": 1,
+      "episode_id": "b3c58aca-34e9-41f7-942c-82ab13d2ccaa",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 3.71,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 11.408,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 18.762,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 24.003,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 25.166,
+          "active": 3,
+          "proposed_active": 3,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 31.558,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 42.623,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 55.656,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 112.497,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 131.709,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 154.665,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 186.549,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 193.712,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 214.654,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 238.9,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 258.702,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 279.713,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 279.713,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 309.703,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 337.959,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 341.558,
+          "active": 14,
+          "proposed_active": 14,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 355.058,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 361.923,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        8,
+        10,
+        13,
+        14,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        5,
+        8,
+        10,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "source": "issue21-five-flows-fixed",
+      "number": 2,
+      "episode_id": "2a4954d8-8e3d-43be-aeca-213d621d8974",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 4.308,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 12.703,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 19.308,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 20.252,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 27.465,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 28.602,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 46.456,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 60.211,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 116.607,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 136.313,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 159.302,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 182.314,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 198.314,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 219.307,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 242.057,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": false
+        },
+        {
+          "node": 10,
+          "seconds": 242.457,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 268.421,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 336.26,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 339.262,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 342.716,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 348.202,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 355.212,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 362.001,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        8,
+        10,
+        12,
+        13,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        4,
+        6,
+        7,
+        5,
+        8,
+        10,
+        12,
+        13,
+        15
+      ]
+    },
+    {
+      "source": "issue21-five-flows-fixed",
+      "number": 3,
+      "episode_id": "3a04bc26-1206-4ce3-a0d9-0f9117643012",
+      "validity": "invalid",
+      "validity_reasons": [
+        "unknown_control"
+      ],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 2.609,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 13.005,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 17.654,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 23.305,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 25.208,
+          "active": 3,
+          "proposed_active": 3,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 31.85,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 42.26,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 54.204,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 108.213,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 128.608,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 151.566,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 185.609,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 194.56,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 195.406,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 251.854,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": false
+        },
+        {
+          "node": 10,
+          "seconds": 280.903,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": false
+        },
+        {
+          "node": 12,
+          "seconds": 306.904,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 20,
+          "seconds": 306.904,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 21,
+          "seconds": 337.204,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 13,
+          "seconds": 366.916,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 14,
+          "seconds": 370.467,
+          "active": 14,
+          "proposed_active": 14,
+          "valid_transition": false
+        },
+        {
+          "node": 15,
+          "seconds": 373.652,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": false
+        },
+        {
+          "node": 22,
+          "seconds": 381.0,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        8,
+        9
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        5,
+        8,
+        9
+      ]
+    },
+    {
+      "source": "issue21-five-flows-fixed",
+      "number": 4,
+      "episode_id": "ee06d1f2-435d-4921-a769-808a7d10cc6c",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 2.905,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 11.803,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": false
+        },
+        {
+          "node": 16,
+          "seconds": 17.905,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 25.767,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 27.414,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 28.351,
+          "active": 3,
+          "proposed_active": 3,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 46.4,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 61.355,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 113.965,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 135.003,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 158.006,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 175.012,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 185.062,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 195.969,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 225.761,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 237.019,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 262.971,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 289.205,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 315.209,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 322.701,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 327.201,
+          "active": 14,
+          "proposed_active": 14,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 334.255,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 341.6,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        2,
+        3,
+        5,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        2,
+        3,
+        6,
+        7,
+        5,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "source": "issue21-five-flows-fixed",
+      "number": 5,
+      "episode_id": "7836f36d-fb8d-4923-8b27-e3f3dac8923e",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 3.21,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 11.707,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 18.255,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 20.559,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 26.456,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 26.803,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 45.659,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 6,
+          "seconds": 58.209,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 112.115,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 132.557,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 155.551,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 172.558,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 198.555,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 203.805,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 240.259,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 248.358,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 274.353,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 290.065,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 316.061,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 371.563,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 375.155,
+          "active": 14,
+          "proposed_active": 14,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 384.76,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 392.055,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        5,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        6,
+        7,
+        5,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "source": "issue21-six-flows-batched",
+      "number": 1,
+      "episode_id": "ec8373c2-f351-463d-9a56-d5c6711be00d",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 0.701,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 8.456,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 15.713,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 17.055,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 22.208,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 29.659,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 41.164,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 53.652,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 89.852,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 115.822,
+          "active": 7,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 144.159,
+          "active": 7,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 171.902,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 175.751,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 196.762,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 221.017,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 225.912,
+          "active": 11,
+          "proposed_active": 11,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 246.967,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 262.303,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 288.3,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 344.764,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 348.161,
+          "active": 14,
+          "proposed_active": 14,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 360.216,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 366.898,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        4,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "source": "issue21-six-flows-batched",
+      "number": 2,
+      "episode_id": "8c3b5a33-d703-48e9-a130-b4db14f2a61c",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 2.513,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 12.954,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 17.553,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 26.004,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 28.106,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 29.808,
+          "active": 3,
+          "proposed_active": 3,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 47.104,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 61.701,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 116.765,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 136.61,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 159.61,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 176.606,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 184.162,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 202.608,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 226.655,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 242.515,
+          "active": 11,
+          "proposed_active": 11,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 247.608,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 261.556,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 287.55,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 321.357,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 325.663,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 332.861,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 339.712,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        6,
+        7,
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        15
+      ]
+    },
+    {
+      "source": "issue21-six-flows-batched",
+      "number": 3,
+      "episode_id": "6a338989-2ea6-4692-b7ad-25b6ed364fe1",
+      "validity": "invalid",
+      "validity_reasons": [
+        "unknown_control"
+      ],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 2.656,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 12.707,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 17.663,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 20.561,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": false
+        },
+        {
+          "node": 2,
+          "seconds": 26.36,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": false
+        },
+        {
+          "node": 4,
+          "seconds": 32.062,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": false
+        },
+        {
+          "node": 17,
+          "seconds": 45.565,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 6,
+          "seconds": 58.111,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": false
+        },
+        {
+          "node": 7,
+          "seconds": 112.166,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": false
+        },
+        {
+          "node": 5,
+          "seconds": 132.508,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": false
+        },
+        {
+          "node": 18,
+          "seconds": 155.502,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 8,
+          "seconds": 172.507,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": false
+        },
+        {
+          "node": 9,
+          "seconds": 178.057,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": false
+        },
+        {
+          "node": 19,
+          "seconds": 198.511,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 10,
+          "seconds": 225.508,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": false
+        },
+        {
+          "node": 11,
+          "seconds": 228.05,
+          "active": 11,
+          "proposed_active": 11,
+          "valid_transition": false
+        },
+        {
+          "node": 20,
+          "seconds": 251.505,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 12,
+          "seconds": 254.668,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": false
+        },
+        {
+          "node": 21,
+          "seconds": 281.506,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 14,
+          "seconds": 311.505,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 13,
+          "seconds": 316.508,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 15,
+          "seconds": 321.304,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": false
+        },
+        {
+          "node": 22,
+          "seconds": 327.945,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1
+      ],
+      "proposed_active_hits": [
+        0,
+        1
+      ]
+    },
+    {
+      "source": "issue21-six-flows-batched",
+      "number": 4,
+      "episode_id": "b924ca5d-b8ca-4cd9-ab52-6b997860ed4b",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 3.05,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 11.008,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 18.105,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 18.906,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 24.753,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 25.553,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 43.951,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 57.504,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 112.564,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 133.201,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 156.205,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 173.201,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 178.001,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 199.201,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 223.764,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 235.1,
+          "active": 11,
+          "proposed_active": 11,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 249.718,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 249.763,
+          "active": 12,
+          "proposed_active": 12,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 279.76,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 318.704,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 321.511,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 327.764,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 334.395,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        4,
+        6,
+        7,
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        15
+      ]
+    },
+    {
+      "source": "issue21-six-flows-batched",
+      "number": 5,
+      "episode_id": "4eb1ea77-1d43-45eb-9468-4caa13cd5388",
+      "validity": "valid",
+      "validity_reasons": [],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 3.207,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 14.356,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 18.221,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 26.302,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 26.702,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 28.304,
+          "active": 3,
+          "proposed_active": 3,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 45.564,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 59.165,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 118.209,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 139.313,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 162.302,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 179.707,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 188.755,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 205.708,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 233.764,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 237.212,
+          "active": 11,
+          "proposed_active": 11,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 259.751,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 20,
+          "seconds": 259.751,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 21,
+          "seconds": 289.751,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 14,
+          "seconds": 327.865,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 13,
+          "seconds": 330.357,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": true
+        },
+        {
+          "node": 15,
+          "seconds": 335.262,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": true
+        },
+        {
+          "node": 22,
+          "seconds": 341.776,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        8,
+        9,
+        10,
+        11,
+        13,
+        15
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        6,
+        7,
+        5,
+        8,
+        9,
+        10,
+        11,
+        13,
+        15
+      ]
+    },
+    {
+      "source": "issue21-six-flows-batched",
+      "number": 6,
+      "episode_id": "53c15787-6ea0-4aa9-bbfa-80a19e1b90a2",
+      "validity": "invalid",
+      "validity_reasons": [
+        "unknown_control"
+      ],
+      "outcome": "success",
+      "events": [
+        {
+          "node": 0,
+          "seconds": 1.352,
+          "active": 0,
+          "proposed_active": 0,
+          "valid_transition": true
+        },
+        {
+          "node": 1,
+          "seconds": 10.661,
+          "active": 1,
+          "proposed_active": 1,
+          "valid_transition": true
+        },
+        {
+          "node": 16,
+          "seconds": 16.406,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 2,
+          "seconds": 20.66,
+          "active": 2,
+          "proposed_active": 2,
+          "valid_transition": true
+        },
+        {
+          "node": 3,
+          "seconds": 22.507,
+          "active": 3,
+          "proposed_active": 3,
+          "valid_transition": true
+        },
+        {
+          "node": 4,
+          "seconds": 26.357,
+          "active": 4,
+          "proposed_active": 4,
+          "valid_transition": true
+        },
+        {
+          "node": 17,
+          "seconds": 39.567,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 6,
+          "seconds": 53.708,
+          "active": 5,
+          "proposed_active": 6,
+          "valid_transition": true
+        },
+        {
+          "node": 7,
+          "seconds": 107.008,
+          "active": 5,
+          "proposed_active": 7,
+          "valid_transition": true
+        },
+        {
+          "node": 5,
+          "seconds": 128.154,
+          "active": 5,
+          "proposed_active": 5,
+          "valid_transition": true
+        },
+        {
+          "node": 18,
+          "seconds": 151.159,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 8,
+          "seconds": 168.164,
+          "active": 8,
+          "proposed_active": 8,
+          "valid_transition": true
+        },
+        {
+          "node": 9,
+          "seconds": 174.215,
+          "active": 9,
+          "proposed_active": 9,
+          "valid_transition": true
+        },
+        {
+          "node": 19,
+          "seconds": 194.122,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": true
+        },
+        {
+          "node": 10,
+          "seconds": 220.156,
+          "active": 10,
+          "proposed_active": 10,
+          "valid_transition": true
+        },
+        {
+          "node": 11,
+          "seconds": 226.904,
+          "active": 11,
+          "proposed_active": 11,
+          "valid_transition": true
+        },
+        {
+          "node": 12,
+          "seconds": 246.154,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 20,
+          "seconds": 246.154,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        },
+        {
+          "node": 21,
+          "seconds": 276.164,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 14,
+          "seconds": 302.502,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 13,
+          "seconds": 309.806,
+          "active": 13,
+          "proposed_active": 13,
+          "valid_transition": false
+        },
+        {
+          "node": 15,
+          "seconds": 316.512,
+          "active": 15,
+          "proposed_active": 15,
+          "valid_transition": false
+        },
+        {
+          "node": 22,
+          "seconds": 323.902,
+          "active": 16,
+          "proposed_active": 16,
+          "valid_transition": false
+        }
+      ],
+      "old_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        8,
+        9,
+        10,
+        11
+      ],
+      "proposed_active_hits": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        5,
+        8,
+        9,
+        10,
+        11
+      ]
+    }
+  ],
+  "counts": {
+    "all": {
+      "episodes": 11,
+      "tasks": [
+        {
+          "task": 0,
+          "name": "start_dismantle",
+          "completed": 11,
+          "old_active": 11,
+          "proposed_active": 11
+        },
+        {
+          "task": 1,
+          "name": "queue_research",
+          "completed": 11,
+          "old_active": 10,
+          "proposed_active": 10
+        },
+        {
+          "task": 2,
+          "name": "queue_crafting",
+          "completed": 11,
+          "old_active": 10,
+          "proposed_active": 10
+        },
+        {
+          "task": 3,
+          "name": "fuel_mecha",
+          "completed": 11,
+          "old_active": 6,
+          "proposed_active": 6
+        },
+        {
+          "task": 4,
+          "name": "mine_copper",
+          "completed": 11,
+          "old_active": 6,
+          "proposed_active": 6
+        },
+        {
+          "task": 5,
+          "name": "supply_metallurgy",
+          "completed": 11,
+          "old_active": 10,
+          "proposed_active": 9
+        },
+        {
+          "task": 6,
+          "name": "place_iron_miner",
+          "completed": 11,
+          "old_active": 0,
+          "proposed_active": 10
+        },
+        {
+          "task": 7,
+          "name": "place_copper_miner",
+          "completed": 11,
+          "old_active": 1,
+          "proposed_active": 10
+        },
+        {
+          "task": 8,
+          "name": "supply_logistics",
+          "completed": 11,
+          "old_active": 10,
+          "proposed_active": 10
+        },
+        {
+          "task": 9,
+          "name": "manual_smelting",
+          "completed": 11,
+          "old_active": 7,
+          "proposed_active": 7
+        },
+        {
+          "task": 10,
+          "name": "supply_manufacturing",
+          "completed": 11,
+          "old_active": 9,
+          "proposed_active": 9
+        },
+        {
+          "task": 11,
+          "name": "connect_smelters",
+          "completed": 11,
+          "old_active": 5,
+          "proposed_active": 5
+        },
+        {
+          "task": 12,
+          "name": "supply_matrix_tech",
+          "completed": 11,
+          "old_active": 6,
+          "proposed_active": 6
+        },
+        {
+          "task": 13,
+          "name": "setup_coil_line",
+          "completed": 11,
+          "old_active": 8,
+          "proposed_active": 8
+        },
+        {
+          "task": 14,
+          "name": "setup_board_line",
+          "completed": 11,
+          "old_active": 4,
+          "proposed_active": 4
+        },
+        {
+          "task": 15,
+          "name": "setup_lab",
+          "completed": 11,
+          "old_active": 8,
+          "proposed_active": 8
+        }
+      ]
+    },
+    "valid_only": {
+      "episodes": 8,
+      "tasks": [
+        {
+          "task": 0,
+          "name": "start_dismantle",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 8
+        },
+        {
+          "task": 1,
+          "name": "queue_research",
+          "completed": 8,
+          "old_active": 7,
+          "proposed_active": 7
+        },
+        {
+          "task": 2,
+          "name": "queue_crafting",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 8
+        },
+        {
+          "task": 3,
+          "name": "fuel_mecha",
+          "completed": 8,
+          "old_active": 4,
+          "proposed_active": 4
+        },
+        {
+          "task": 4,
+          "name": "mine_copper",
+          "completed": 8,
+          "old_active": 4,
+          "proposed_active": 4
+        },
+        {
+          "task": 5,
+          "name": "supply_metallurgy",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 7
+        },
+        {
+          "task": 6,
+          "name": "place_iron_miner",
+          "completed": 8,
+          "old_active": 0,
+          "proposed_active": 8
+        },
+        {
+          "task": 7,
+          "name": "place_copper_miner",
+          "completed": 8,
+          "old_active": 1,
+          "proposed_active": 8
+        },
+        {
+          "task": 8,
+          "name": "supply_logistics",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 8
+        },
+        {
+          "task": 9,
+          "name": "manual_smelting",
+          "completed": 8,
+          "old_active": 5,
+          "proposed_active": 5
+        },
+        {
+          "task": 10,
+          "name": "supply_manufacturing",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 8
+        },
+        {
+          "task": 11,
+          "name": "connect_smelters",
+          "completed": 8,
+          "old_active": 4,
+          "proposed_active": 4
+        },
+        {
+          "task": 12,
+          "name": "supply_matrix_tech",
+          "completed": 8,
+          "old_active": 6,
+          "proposed_active": 6
+        },
+        {
+          "task": 13,
+          "name": "setup_coil_line",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 8
+        },
+        {
+          "task": 14,
+          "name": "setup_board_line",
+          "completed": 8,
+          "old_active": 4,
+          "proposed_active": 4
+        },
+        {
+          "task": 15,
+          "name": "setup_lab",
+          "completed": 8,
+          "old_active": 8,
+          "proposed_active": 8
+        }
+      ]
+    }
+  }
+}

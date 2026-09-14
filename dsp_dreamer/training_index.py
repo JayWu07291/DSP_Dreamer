@@ -40,6 +40,8 @@ class TrainingIndex:
                             non_active_completions=0, required=threshold, deficit=threshold, passed=False)
                             for i, name in enumerate(TASKS[:16])]) for split, threshold in COVERAGE_REQUIREMENTS.items()}
         views = sorted((open_model_view(path) for path in paths), key=lambda v: v.metadata["source_artifact_id"])
+        versions = {v.dataset.metadata['progress_version'] for v in views}
+        require(4 not in versions or versions == {4}, "Cannot mix v4 and legacy task schedules")
         for view in views:
             metadata = view.dataset.metadata
             trial = metadata["trial_manifest"]
@@ -67,7 +69,7 @@ class TrainingIndex:
             self.views[source["artifact_id"]] = view
             if split is None:
                 continue
-            require(metadata["progress_version"] in (1, 2, 3), "Missing progress labels")
+            require(metadata["progress_version"] in (1, 2, 3, 4), "Missing progress labels")
             source["uniform"] = view.sequence_starts(length)
             progress_refs = {e["sequence_number"] for e in view.dataset.events if e.get("name") == "progress_fact"}
             completion_prefix, progress_prefix = [0], [0]

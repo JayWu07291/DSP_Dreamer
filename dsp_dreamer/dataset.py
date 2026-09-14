@@ -16,7 +16,7 @@ from .actions import ACTION_CODEC, forbidden_buttons, validate_action_contract
 from .contract import CATALOG, CONTROLS, atomic_save, file_info, load, require, save, sha
 from .video import decode
 from .lifecycle import transition_lifecycle
-from .progress import FIELDS, TASKS, MILESTONES, replay_progress, validate_progress_row
+from .progress import FIELDS, TASKS, MILESTONES, replay_progress, validate_progress_row, reschedule_rows
 
 
 def observation_contract(count):
@@ -241,7 +241,7 @@ class Dataset:
         require(self.metadata.get("tasks") == TASKS and self.metadata.get("milestones") == MILESTONES,
                 "Invalid task/milestone catalog. Recompile original evidence.")
         version = self.metadata.get("progress_version")
-        require(version is None or type(version) is int and version in (1, 2, 3), "Unknown progress version")
+        require(version is None or type(version) is int and version in (1, 2, 3, 4), "Unknown progress version")
         require(len(self.rows) == self.metadata["frame_count"] - 1, "Invalid transition count")
         event_index, held = 0, []
         control_faults = set()
@@ -259,7 +259,7 @@ class Dataset:
                         "requested_ticks", "next_requested_ticks", "capture_id", "next_capture_id")), "Invalid transition index/time")
             require(row["capture_id"] < row["next_capture_id"] and (index == 0 or
                     row["capture_id"] == self.rows[index - 1]["next_capture_id"]), "Nonmonotonic capture index")
-            validate_progress_row(row, version in (1, 2, 3))
+            validate_progress_row(row, version in (1, 2, 3, 4))
             stored_action = json.loads(row["action_json"])
             require(isinstance(stored_action["binary"], list) and len(stored_action["binary"]) == len(CONTROLS)
                     and all(type(v) is int and v in (0, 1) for v in stored_action["binary"]), "Invalid action width/bits")
@@ -312,6 +312,8 @@ class Dataset:
             if not row["valid"] or is_last and row["validity_status"] != "valid":
                 lifecycle["bootstrap_mask"] = 0
             require(all(row[k] == v for k, v in lifecycle.items()), "Invalid lifecycle target")
+        if version == 4:
+            require(reschedule_rows(self.rows, 4) == self.rows, "Progress v4 schedule mismatch")
         require(len(self.metadata["rgb_sha256"]) == self.metadata["frame_count"], "Missing RGB checksums")
         for start in range(0, self.metadata["frame_count"], 32):
             for offset, pixels in enumerate(np.asarray(self.rgb[start:start + 32])):
