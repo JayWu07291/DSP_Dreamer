@@ -1,0 +1,198 @@
+{
+  "schema": "dsp-evaluation-protocol/1",
+  "version": "1.0.0",
+  "frozen_at": "2026-09-14T01:32:00.160471+00:00",
+  "trials_id": "905428657a5e793247f6bcb7bfcb0a459fa59d47b33f6389d0ed7dd15104d198",
+  "dependency_revision": "ea035eb408680310381d83bd7e99efbb33201f6f",
+  "action_codec": {
+    "version": "dsp-action/1",
+    "catalog": "action_catalog_v3",
+    "controls": [
+      "Escape",
+      "Digit1",
+      "Digit2",
+      "Tab",
+      "W",
+      "R",
+      "T",
+      "LeftControl",
+      "A",
+      "S",
+      "D",
+      "F",
+      "LeftShift",
+      "X",
+      "C",
+      "MouseLeft",
+      "MouseRight",
+      "MouseMiddle",
+      "Space",
+      "E"
+    ],
+    "binary_width": 20,
+    "scan_codes": [
+      1,
+      2,
+      3,
+      15,
+      17,
+      19,
+      20,
+      29,
+      30,
+      31,
+      32,
+      33,
+      42,
+      45,
+      46,
+      null,
+      null,
+      null,
+      57,
+      18
+    ],
+    "unity_names": [
+      "Escape",
+      "Alpha1",
+      "Alpha2",
+      "Tab",
+      "W",
+      "R",
+      "T",
+      "LeftControl",
+      "A",
+      "S",
+      "D",
+      "F",
+      "LeftShift",
+      "X",
+      "C",
+      "MouseLeft",
+      "MouseRight",
+      "MouseMiddle",
+      "Space",
+      "E"
+    ],
+    "observed_to_pixel_scale": [
+      20.0,
+      20.0
+    ],
+    "maxval": 10,
+    "binsize": 2,
+    "mu": 5,
+    "mouse_classes": 121,
+    "mouse_order": "x*11+y",
+    "wheel_classes": [
+      -1,
+      0,
+      1
+    ],
+    "rounding": "numpy.rint",
+    "noop": {
+      "binary": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "mouse": 60,
+      "wheel": 1
+    }
+  },
+  "capture_hz": 20,
+  "model_hz": 10,
+  "history_steps": 64,
+  "prediction_steps": [
+    1,
+    5,
+    15
+  ],
+  "seeds": {
+    "sampling": 2201,
+    "tokenizer_comparison": 2202,
+    "generation": 2203
+  },
+  "thresholds": {
+    "reconstruction": {
+      "frames": 200,
+      "min_per_task": 10,
+      "overall": 0.95,
+      "per_type": 0.9
+    },
+    "prediction": {
+      "sequences": 200,
+      "per_category": 50,
+      "step5_relative_improvement": 0.1,
+      "step15_overall": 0.8,
+      "step15_per_action_category": 0.7
+    },
+    "reward": {
+      "positive_threshold": 0.5,
+      "per_task_precision": 0.8,
+      "per_task_recall": 0.8
+    },
+    "policy": {
+      "binary_threshold": 0.5,
+      "binary_macro_f1": 0.6,
+      "nonzero_mouse_accuracy": 0.5,
+      "nonzero_wheel_accuracy": 0.5,
+      "baseline_absolute_margin": 0.1
+    },
+    "coverage": {
+      "train": 20,
+      "validation": 3,
+      "offline_test": 3
+    }
+  },
+  "trial_counts": {
+    "development": 10,
+    "final": 30
+  },
+  "episode_seconds": 1800,
+  "missing_evidence_status": "pending",
+  "annotations_status": "pending",
+  "files": {
+    "evaluation-v1.md": {
+      "bytes": 16113,
+      "sha256": "7ac32b050c629c1147e474425a5b40bd4e1563468f3cc7058f6e95202f057a09"
+    },
+    "evaluation-trials-v1.json": {
+      "bytes": 36638,
+      "sha256": "1c5d1eff67b625da9500782c5746454c4523159faa847e429030ca89e150591c"
+    },
+    "evaluation-registry-v1.json": {
+      "bytes": 9107,
+      "sha256": "3a18925e378e6b75eda9a1c869fbe2d2f4ab2d1536de0c4bf0b773438435da21"
+    },
+    "../dsp_dreamer/evaluation_protocol.py": {
+      "bytes": 12882,
+      "sha256": "03d5b83e5e2c1e2ee3122845395b537554485f056f424d5d96cf6d1ddb3def87"
+    },
+    "../tools/prepare-evaluation.py": {
+      "bytes": 1631,
+      "sha256": "b727a7fa7841b0fe7edee7bc49751aaf88322eb73023fc2cd46598173b541a4e"
+    },
+    "../tools/freeze-evaluation-trials.ps1": {
+      "bytes": 3752,
+      "sha256": "b94406a139ec7db64bcf02edffcd06447b78885db94d5b402e643dd769ae48a2"
+    }
+  },
+  "artifact_id": "3c3829ff63a3556add25d5f0900e78e2cc9af17040f59499a0e29d1b3c25b92a"
+}

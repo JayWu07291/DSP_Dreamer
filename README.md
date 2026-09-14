@@ -134,6 +134,16 @@ for sample in samples:
 
 輸出原子發布且不覆寫，`artifact_id` 是除該欄位外、依 key 排序 JSON 的 SHA-256；來源包含 dataset、recording、模型視圖版本及 COMPLETED／manifest checksum。`TrainingIndex.open` 重新核對來源並重建比對全部內容，拒絕損壞或與來源不符的索引。索引與完整模型視窗 metadata 目前放在記憶體；完整十小時資料的資源量測仍由 #21 驗證。
 
+## 凍結評估協定
+
+[#22 協定 v1](protocols/evaluation-v1.md)固定抽樣、標註格式、baseline、門檻與揭露規則；[版本與 checksum](protocols/evaluation-v1.json)、[10 development／30 final manifests](protocols/evaluation-trials-v1.json)及[含保留組的 registry](protocols/evaluation-registry-v1.json)一併保存。後續補錄必須在 registry 增加 demonstration，保留原 40 份試驗登錄，凍結新資料版本；不要再只用 #19 的單一示範 registry。
+
+```powershell
+.\.venv\Scripts\python.exe tools/prepare-evaluation.py --source runs/live/issue18-full-flow-v4 runs/live/issue18-retry-v4 --registry protocols/evaluation-registry-v1.json --out runs/evaluation-inputs.json
+```
+
+工具重驗 dataset 與來源 checksum，核對保留 manifests／偏航／seeds 隔離，只從 validation 取重建候選，baseline 只用 train。預測人工分類恢復後，以 `--candidates` 傳入已封存、綁定 protocol_id／index_id 的候選，格式見協定。候選分類與區域尚未完成時，四類各缺 50 段；重建的 200 張總數也不能替代每 task quota。輸出不覆寫，人工狀態為 pending、training_authorized=false，不能據此跳過資料或模型 gate。實際結果見 [#22 驗證紀錄](docs/validation/issue-22.md)。
+
 ## 驗證
 
 ```powershell
