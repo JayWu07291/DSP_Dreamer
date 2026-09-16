@@ -127,7 +127,7 @@ namespace DSPDreamer.Recorder
             CheckWorld();
             source = Path.Combine(output.Value, Guid.NewGuid().ToString() + ".source");
             Directory.CreateDirectory(source);
-            metadata = Json.Fields("schema", "dsp-recording/1", "catalog", "action_catalog_v3", "source_kind", "live",
+            metadata = Json.Fields("schema", "dsp-recording/1", "catalog", ModelAction.Catalog, "source_kind", "live",
                 "recording_session_id", session, "attempt_id", Guid.NewGuid().ToString(), "episode_id", Guid.NewGuid().ToString(),
                 "ticks_frequency", Stopwatch.Frequency, "runtime", runtime);
             episodes = new List<Dictionary<string, object>>();

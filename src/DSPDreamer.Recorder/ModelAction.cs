@@ -6,14 +6,14 @@ namespace DSPDreamer.Recorder
     // Wire identities mirror dsp_dreamer.actions; tests compare the complete contract.
     public static class ModelAction
     {
-        public const string Catalog = "action_catalog_v3";
+        public const string Catalog = "action_catalog_v4";
         public static readonly string[] Controls = { "Escape", "Digit1", "Digit2", "Tab", "W", "R", "T", "LeftControl",
-            "A", "S", "D", "F", "LeftShift", "X", "C", "MouseLeft", "MouseRight", "MouseMiddle", "Space", "E" };
-        public static readonly ushort[] ScanCodes = { 1, 2, 3, 15, 17, 19, 20, 29, 30, 31, 32, 33, 42, 45, 46, 0, 0, 0, 57, 18 };
+            "A", "S", "D", "F", "LeftShift", "X", "C", "MouseLeft", "MouseRight", "MouseMiddle", "Space", "E", "B" };
+        public static readonly ushort[] ScanCodes = { 1, 2, 3, 15, 17, 19, 20, 29, 30, 31, 32, 33, 42, 45, 46, 0, 0, 0, 57, 18, 48 };
 
         public static void Validate(string catalog, int[] binary, int mouse, int wheel)
         {
-            if (catalog != Catalog || binary == null || binary.Length != 20 || binary.Any(v => v != 0 && v != 1) ||
+            if (catalog != Catalog || binary == null || binary.Length != Controls.Length || binary.Any(v => v != 0 && v != 1) ||
                 mouse < 0 || mouse >= 121 || wheel < 0 || wheel >= 3)
                 throw new ArgumentException("Incompatible model action");
             if (binary[4] + binary[9] > 1 || binary[8] + binary[10] > 1 || binary[7] + binary[12] > 1 ||

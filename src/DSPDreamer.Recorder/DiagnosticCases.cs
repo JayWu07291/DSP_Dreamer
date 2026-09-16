@@ -41,7 +41,7 @@ namespace DSPDreamer.Recorder
             if (now - diagnosticStarted < Stopwatch.Frequency) return;
             if (!diagnosticSent)
             {
-                var binary = new int[20]; binary[4] = 1;
+                var binary = new int[ModelAction.Controls.Length]; binary[4] = 1;
                 InjectAction(binary, 60, 1);
                 diagnosticSent = true;
                 Logger.LogInfo("Diagnostic W held: " + selectedDiagnostic + "; focus_hold: Alt+Tab now (30 second limit)");

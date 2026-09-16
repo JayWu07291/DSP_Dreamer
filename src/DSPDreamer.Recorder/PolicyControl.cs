@@ -16,7 +16,7 @@ namespace DSPDreamer.Recorder
         private ConfigEntry<double> nativeScaleX, nativeScaleY;
         private string controlMode = "human", frozenSettings;
         private long lastAction, requestId;
-        private int[] injected = new int[20];
+        private int[] injected = new int[ModelAction.Controls.Length];
         private int probe = -1;
         private bool probeRelease;
         private long nextProbe;
@@ -157,8 +157,8 @@ namespace DSPDreamer.Recorder
             ModelAction.Validate(ModelAction.Catalog, binary, mouse, wheel);
             var inputs = new List<NativeInput>();
             // Releases precede presses, including switching between mouse buttons or opposing keys.
-            for (int i = 0; i < 20; i++) if (injected[i] == 1 && binary[i] == 0) inputs.Add(Button(i, false));
-            for (int i = 0; i < 20; i++) if (injected[i] == 0 && binary[i] == 1) inputs.Add(Button(i, true));
+            for (int i = 0; i < ModelAction.Controls.Length; i++) if (injected[i] == 1 && binary[i] == 0) inputs.Add(Button(i, false));
+            for (int i = 0; i < ModelAction.Controls.Length; i++) if (injected[i] == 0 && binary[i] == 1) inputs.Add(Button(i, true));
             var scale = NativeScale();
             int dx = (int)Math.Round(ModelAction.Pixel(mouse / 11) * scale[0]);
             int dy = (int)Math.Round(ModelAction.Pixel(mouse % 11) * scale[1]);
@@ -215,8 +215,10 @@ namespace DSPDreamer.Recorder
             else
             {
                 probe++;
-                if (probe >= 45) { stopPending = true; EndEpisode(reason: "stopped"); return; }
-                if (probe == 44)
+                int controlCount = ModelAction.Controls.Length;
+                int identityProbe = controlCount + 24;
+                if (probe > identityProbe) { stopPending = true; EndEpisode(reason: "stopped"); return; }
+                if (probe == identityProbe)
                 {
                     // Diagnostic identity probe only; Numpad1 is never accepted by SubmitAction.
                     var input = new NativeInput { Type = 1, Data = new InputUnion {
@@ -231,13 +233,13 @@ namespace DSPDreamer.Recorder
                     nextProbe = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 5;
                     return;
                 }
-                var binary = new int[20];
+                var binary = new int[controlCount];
                 int mouse = 60, wheel = 1;
                 // Escape runs after all clicks so the probe never clicks the pause menu.
-                if (probe < 20) binary[(probe + 1) % 20] = 1;
-                else if (probe < 31) mouse = (probe - 20) * 11 + 5;
-                else if (probe < 42) mouse = 55 + probe - 31;
-                else wheel = probe == 42 ? 2 : 0;
+                if (probe < controlCount) binary[(probe + 1) % controlCount] = 1;
+                else if (probe < controlCount + 11) mouse = (probe - controlCount) * 11 + 5;
+                else if (probe < controlCount + 22) mouse = 55 + probe - controlCount - 11;
+                else wheel = probe == controlCount + 22 ? 2 : 0;
                 InjectAction(binary, mouse, wheel);
                 probeRelease = true;
             }

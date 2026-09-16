@@ -78,14 +78,14 @@ internal static class Program
         };
         Reject(type, plugin, "StartPolicyRecording", "Recording already active");
         unchanged();
-        Reject(type, plugin, "SubmitAction", "No active policy episode", "action_catalog_v3", new int[20], 60, 1, 1L, 1L);
+        Reject(type, plugin, "SubmitAction", "No active policy episode", "action_catalog_v4", new int[21], 60, 1, 1L, 1L);
         unchanged();
         set("active", false);
         set("writer", new Thread(() => { }));
         Reject(type, plugin, "StartPolicyRecording", "Recording already active");
         set("mainThread", -1);
         Reject(type, plugin, "StartPolicyRecording", "Control must run on Unity main thread");
-        Reject(type, plugin, "SubmitAction", "Control must run on Unity main thread", "action_catalog_v3", new int[20], 60, 1, 1L, 1L);
+        Reject(type, plugin, "SubmitAction", "Control must run on Unity main thread", "action_catalog_v4", new int[21], 60, 1, 1L, 1L);
     }
 
     private static void Reject(Type type, object plugin, string method, string expected, params object[] args)

@@ -230,7 +230,7 @@ namespace DSPDreamer.Recorder
             pendingAction = null;
             var inputs = new List<NativeInput>();
             // Always release the complete injected catalog, including a partially accepted SendInput batch.
-            for (int index = 0; index < 20; index++) inputs.Add(Button(index, false));
+            for (int index = 0; index < ModelAction.Controls.Length; index++) inputs.Add(Button(index, false));
             if (controlMode == "calibration") inputs.Add(new NativeInput { Type = 1, Data = new InputUnion {
                 Keyboard = new KeyboardInput { Scan = 0x4F, Flags = 8 | 2 } } });
             for (ushort key = 8; key < 255; key++)
@@ -246,7 +246,7 @@ namespace DSPDreamer.Recorder
             uint sent = simulated ? 0 : SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput)));
             int error = sent == inputs.Count ? 0 : Marshal.GetLastWin32Error();
             bool ok = !simulated && sent == inputs.Count;
-            if (ok) { injected = new int[20]; lastAction = 0; }
+            if (ok) { injected = new int[ModelAction.Controls.Length]; lastAction = 0; }
             Emit("control_request", Json.Fields("operation", "release_all", "succeeded", ok, "simulated", simulated,
                 "requested_ticks", requested, "requested_count", inputs.Count, "sent_count", sent, "win32_error", error));
             if (!ok)

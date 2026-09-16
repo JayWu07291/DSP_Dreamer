@@ -8,16 +8,16 @@ internal static class Program
     private static int Main()
     {
         var pairs = new List<int[]>();
-        for (int a = 0; a < 20; a++)
-            for (int b = a + 1; b < 20; b++)
+        for (int a = 0; a < ModelAction.Controls.Length; a++)
+            for (int b = a + 1; b < ModelAction.Controls.Length; b++)
             {
-                var binary = new int[20]; binary[a] = binary[b] = 1;
+                var binary = new int[ModelAction.Controls.Length]; binary[a] = binary[b] = 1;
                 try { ModelAction.Validate(ModelAction.Catalog, binary, 60, 1); pairs.Add(new[] { a, b }); }
                 catch (ArgumentException) { }
             }
-        foreach (var catalog in new[] { "action_catalog_v1", "action_catalog_v2", "unknown" })
+        foreach (var catalog in new[] { "action_catalog_v1", "action_catalog_v2", "action_catalog_v3", "unknown" })
         {
-            try { ModelAction.Validate(catalog, new int[20], 60, 1); return 1; }
+            try { ModelAction.Validate(catalog, new int[ModelAction.Controls.Length], 60, 1); return 1; }
             catch (ArgumentException) { }
         }
         Console.WriteLine(Json.Encode(Json.Fields("controls", ModelAction.Controls, "scan_codes", ModelAction.ScanCodes,

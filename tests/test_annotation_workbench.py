@@ -33,7 +33,7 @@ def test_synthetic_evidence_does_not_fill_human_review_queue(tmp_path):
     dataset = fixture(tmp_path)
     index = TrainingIndex([dataset], registry(('trial', 'demonstration')), length=64)
     output = tmp_path / 'workbench'
-    packet = module.export_workbench(index, read_protocol('protocols/evaluation-v1.json'), output,
+    packet = module.export_workbench(index, read_protocol('protocols/evaluation-v2.json'), output,
                                     FFMPEG, tmp_path)
     report = load(output / 'export.json')
     verify_seal(report)
@@ -41,7 +41,7 @@ def test_synthetic_evidence_does_not_fill_human_review_queue(tmp_path):
     assert packet['training_authorized'] is False
     assert (output / 'index.html').is_file()
     with pytest.raises(InvalidRecording, match='overwrite'):
-        module.export_workbench(index, read_protocol('protocols/evaluation-v1.json'), output, FFMPEG, tmp_path)
+        module.export_workbench(index, read_protocol('protocols/evaluation-v2.json'), output, FFMPEG, tmp_path)
 
 
 def test_video_server_supports_seek_ranges(tmp_path):

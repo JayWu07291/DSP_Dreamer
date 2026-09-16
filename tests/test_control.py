@@ -10,7 +10,7 @@ from dsp_dreamer import Recording, compile_recording, open_dataset
 from dsp_dreamer.control import inspect_control, publish_calibration
 from dsp_dreamer import InvalidRecording
 from dsp_dreamer.actions import SCANCODES, decode_action, forbidden_buttons
-from dsp_dreamer.contract import CONTROLS
+from dsp_dreamer.contract import CATALOG, CONTROLS
 
 
 FFMPEG = Path(r"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe")
@@ -23,10 +23,12 @@ def test_native_action_contract_matches_model_codec():
     assert result["controls"] == CONTROLS
     assert result["scan_codes"] == [v or 0 for v in SCANCODES]
     assert result["scan_codes"][1:3] == [2, 3]
-    assert result["pixels"] == [int(np.rint(decode_action(dict(binary=[0] * 20, mouse=i * 11 + 5, wheel=1))["pixel_delta"][0])) for i in range(11)]
+    assert result["controls"][13] == "X" and result["controls"][20] == "B"
+    assert result["scan_codes"][20] == 0x30
+    assert result["pixels"] == [int(np.rint(decode_action(dict(binary=[0] * len(CONTROLS), mouse=i * 11 + 5, wheel=1))["pixel_delta"][0])) for i in range(11)]
     expected = []
-    for a, b in itertools.combinations(range(20), 2):
-        binary = [int(i in (a, b)) for i in range(20)]
+    for a, b in itertools.combinations(range(len(CONTROLS)), 2):
+        binary = [int(i in (a, b)) for i in range(len(CONTROLS))]
         if not forbidden_buttons(binary):
             expected.append([a, b])
     assert result["legal_pairs"] == expected
@@ -36,7 +38,7 @@ def test_requests_never_replace_observed_training_labels(tmp_path):
     with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
         recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
         recording.events.append(dict(recording.identity(55), type="control_request", operation="model_action",
-            request_id=1, catalog="action_catalog_v3", binary=[0, 1] + [0] * 18, mouse=60, wheel=1,
+            request_id=1, catalog=CATALOG, binary=[0, 1] + [0] * (len(CONTROLS) - 2), mouse=60, wheel=1,
             requested_ticks=55, sent_count=1, requested_count=1, succeeded=True))
         # Windows accepted Digit1, but DSP actually saw Digit2. Submission is not observation.
         recording.input(65, held=["Digit2"], down=["Digit2"], up=[], delta=[0, 0], wheel=0)
@@ -61,9 +63,9 @@ def test_control_confirmation_and_release_from_compiled_evidence(tmp_path, fault
     with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
         recording.metadata["diagnostic_mode"] = True
         recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
-        bits = [int(i == 15) for i in range(20)]
+        bits = [int(i == 15) for i in range(len(CONTROLS))]
         recording.events.append(dict(recording.identity(55), type="control_request", operation="model_action",
-            request_id=1, catalog="action_catalog_v3", binary=bits, mouse=60, wheel=1,
+            request_id=1, catalog=CATALOG, binary=bits, mouse=60, wheel=1,
             requested_ticks=55, sent_count=0 if fault == "partial_send" else 1, requested_count=1, succeeded=True))
         recording.input(55 if fault == "boundary" else 65, held=["MouseLeft"], down=[] if fault == "missing_down" else ["MouseLeft"],
                         up=[], delta=[0, 0], wheel=0)
@@ -97,7 +99,7 @@ def test_game_reset_and_numpad_identity_keep_actual_inputs(tmp_path, reset_logge
         recording.metadata["diagnostic_mode"] = True
         recording.input(0, held=[], down=[], up=[], delta=[0, 0], wheel=0)
         recording.events.append(dict(recording.identity(55), type="control_request", operation="model_action",
-            request_id=1, catalog="action_catalog_v3", binary=[int(i == 6) for i in range(20)], mouse=60, wheel=1,
+            request_id=1, catalog=CATALOG, binary=[int(i == 6) for i in range(len(CONTROLS))], mouse=60, wheel=1,
             requested_ticks=55, sent_count=1, requested_count=1, succeeded=True))
         recording.input(65, held=["T"], down=["T"], up=[], delta=[0, 0], wheel=0)
         if reset_logged:

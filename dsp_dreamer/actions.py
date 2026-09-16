@@ -6,13 +6,13 @@ from .contract import CATALOG, CONTROLS, require
 
 
 SCANCODES = [0x01, 0x02, 0x03, 0x0F, 0x11, 0x13, 0x14, 0x1D,
-             0x1E, 0x1F, 0x20, 0x21, 0x2A, 0x2D, 0x2E, None, None, None, 0x39, 0x12]
+             0x1E, 0x1F, 0x20, 0x21, 0x2A, 0x2D, 0x2E, None, None, None, 0x39, 0x12, 0x30]
 ACTION_CODEC: dict[str, Any] = dict(version="dsp-action/1", catalog=CATALOG, controls=CONTROLS,
-                    binary_width=20, scan_codes=SCANCODES,
+                    binary_width=len(CONTROLS), scan_codes=SCANCODES,
                     unity_names=["Alpha1" if k == "Digit1" else "Alpha2" if k == "Digit2" else k for k in CONTROLS],
                     observed_to_pixel_scale=[20.0, 20.0], maxval=10, binsize=2, mu=5,
                     mouse_classes=121, mouse_order="x*11+y", wheel_classes=[-1, 0, 1],
-                    rounding="numpy.rint", noop=dict(binary=[0] * 20, mouse=60, wheel=1))
+                    rounding="numpy.rint", noop=dict(binary=[0] * len(CONTROLS), mouse=60, wheel=1))
 
 
 def validate_action_contract(contract):

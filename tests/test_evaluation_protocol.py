@@ -14,7 +14,24 @@ from dsp_dreamer.training_index import TrainingIndex
 from test_training_index import fixture, registry
 
 
-PROTOCOL = Path('protocols/evaluation-v1.json')
+PROTOCOL = Path('protocols/evaluation-v2.json')
+
+
+def test_build_control_revision_preserves_frozen_v1_contract():
+    old = load('protocols/evaluation-v1.json')
+    from dsp_dreamer.contract import file_info
+    from dsp_dreamer.evaluation_protocol import verify_seal
+    verify_seal(old)
+    for name, info in old['files'].items():
+        assert file_info(Path('protocols') / name) == info
+    current = read_protocol(PROTOCOL)
+    assert current['supersedes'] == old['artifact_id']
+    assert current['action_codec']['controls'] == old['action_codec']['controls'] + ['B']
+    assert current['action_codec']['binary_width'] == 21
+    for key in ('thresholds', 'seeds', 'trials_id', 'trial_counts', 'episode_seconds'):
+        assert current[key] == old[key]
+    with pytest.raises(InvalidRecording, match='action catalog'):
+        read_protocol('protocols/evaluation-v1.json')
 
 
 def test_protocol_preparation_keeps_missing_evidence_pending(tmp_path):

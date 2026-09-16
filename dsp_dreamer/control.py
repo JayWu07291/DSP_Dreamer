@@ -62,7 +62,7 @@ def inspect_control(dataset):
         before = set(previous["held"]) if previous is not None else set()
         action = aggregate(samples, start, end, sorted(before))
         delta, wheel = action["delta"], action["wheel"]
-        actual = encode_action(dict(binary=[0] * 20, delta=delta, wheel=wheel,
+        actual = encode_action(dict(binary=[0] * len(CONTROLS), delta=delta, wheel=wheel,
                                     ambiguous=False, unsupported=False, forbidden=False))
         downs = {key for s in samples for key in s["down"]}
         ups = {key for s in samples for key in s["up"]}
@@ -123,7 +123,7 @@ def publish_calibration(dataset, destination):
             "Calibration requires live diagnostic evidence")
     require(report["gate_passed"], "Control observations/releases did not pass")
     require(bool(report["identity_probes"]), "Missing Numpad1 distinction probe")
-    require({i for r in requests for i, bit in enumerate(r["binary"]) if bit} == set(range(20)),
+    require({i for r in requests for i, bit in enumerate(r["binary"]) if bit} == set(range(len(CONTROLS))),
             "Incomplete control coverage")
     require({r["mouse"] // 11 for r in requests if r["mouse"] % 11 == 5} == set(range(11))
             and {r["mouse"] % 11 for r in requests if r["mouse"] // 11 == 5} == set(range(11))

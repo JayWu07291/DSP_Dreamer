@@ -8,7 +8,7 @@ import pytest
 
 from dsp_dreamer import Recording, InvalidRecording, compile_recording, open_dataset, open_model_view
 from dsp_dreamer.actions import ACTION_CODEC, decode_action, encode_action, validate_action_contract
-from dsp_dreamer.contract import file_info
+from dsp_dreamer.contract import CONTROLS, file_info
 from dsp_dreamer.dataset import aggregate, table_contract
 
 
@@ -106,7 +106,7 @@ def test_legal_combinations(keys):
     assert set(decode_action(encode_action(aggregate([], 0, 100, keys)))["held"]) == set(keys)
 
 
-@pytest.mark.parametrize("key", ["Numpad1", "Keypad1", "RightControl", "RightShift", "Mouse3", "CapsLock", "F8", "unknown"])
+@pytest.mark.parametrize("key", ["Numpad1", "Keypad1", "RightControl", "RightShift", "Mouse3", "CapsLock", "F8", "LeftCommand", "unknown"])
 def test_unsupported_inputs_remain_evidence(key):
     action = aggregate([dict(sample(10, [key], [key]), sequence_number=42)], 0, 100, [])
     assert action["unsupported"] and action["down_counts"][key] == 1 and action["sample_refs"] == [42]
@@ -116,13 +116,13 @@ def test_unsupported_inputs_remain_evidence(key):
 def test_quantizer_roundtrips_all_classes_and_unique_noop():
     for mouse in range(121):
         for wheel in range(3):
-            code = dict(binary=[0] * 20, mouse=mouse, wheel=wheel)
+            code = dict(binary=[0] * len(CONTROLS), mouse=mouse, wheel=wheel)
             decoded = decode_action(code)
             actual = aggregate([dict(sample(0, delta=decoded["observed_delta"], wheel=decoded["wheel"]), sequence_number=0)], 0, 100, [])
             assert encode_action(actual) == code
             assert (decoded["pixel_delta"] == [0, 0] and decoded["wheel"] == 0) == (mouse == 60 and wheel == 1)
     assert ACTION_CODEC["scan_codes"][1] == 0x02 and ACTION_CODEC["unity_names"][1] == "Alpha1"
-    for old in ("action_catalog_v1", "action_catalog_v2"):
+    for old in ("action_catalog_v1", "action_catalog_v2", "action_catalog_v3"):
         with pytest.raises(InvalidRecording, match="legacy checkpoints"):
             validate_action_contract(dict(ACTION_CODEC, catalog=old, binary_width=17))
 

@@ -115,7 +115,7 @@ class ModelView:
         loss_mask = valid_mask & (np.arange(length) >= burn_in)
         inputs = dict(observation=np.zeros((length, 3, 360, 640), dtype=np.float32),
                       task_condition=np.zeros((length, 17), dtype=np.float32),
-                      binary=np.zeros((length, 20), dtype=np.int64),
+                      binary=np.zeros((length, ACTION_CODEC["binary_width"]), dtype=np.int64),
                       mouse=np.full(length, 60, dtype=np.int64), wheel=np.ones(length, dtype=np.int64))
         targets = dict(next_observation=np.zeros_like(inputs["observation"]),
                        reward_vector=np.zeros((length, 16), dtype=np.uint8), reward=np.zeros(length, dtype=np.float32),

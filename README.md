@@ -64,11 +64,11 @@ FFmpeg 執行檔必須符合 SHA-256 `04e1307997530f9cf2fe35cba2ca7e8875ca91da02
 
 編譯器只接受已驗證的四檔錄製證據。動作區間為 `[requested_ticks_t, requested_ticks_next)`，事件依 `(ticks, sequence_number)` 排序。資料保留按住狀態、按住時間比例、按下與放開次數、observed delta／wheel 總和及原始取樣引用。不支援、有歧義、禁止的動作，以及漏幀區間，皆標為無效。2026-09-10 使用者新增 Space（跳躍）及 E（單獨開關背包），動作契約升為 `action_catalog_v3`，共 20 維。原本 18 個 index 保持不變，Space 追加在 index 18、E 在 index 19，Digit1 仍在 index 1；不使用 Unity enum 數值代替硬體 scan code。
 
-這項使用者決議修訂 #12 的 v2／18 維設定。後續模型視圖、action encoder 與 policy head 應使用 v3／20 維，尚未實作的模型模組不宣稱已更新。完整控制順序以 `dsp_dreamer/contract.py` 的 `CONTROLS` 為準，並存入每份 dataset metadata 供 loader 核對。
+2026-09-16 使用者確認 B 用於開關建築模式，X 用於開關拆除模式。控制目錄升為 `action_catalog_v4`／21 維，B 追加在 index 20，scan code=0x30；原 20 個 index 與 X 的 index 13 不變。後續模型視圖、action encoder 與 policy head 應使用 v4／21 維，尚未實作的模型模組不宣稱已更新。完整控制順序以 `dsp_dreamer/contract.py` 的 `CONTROLS` 為準，並存入每份 dataset metadata 供 loader 核對。
 
 RGB 以 uint8 HWC 格式存入 Zarr v3，每個 chunk 一幀，使用 Blosc/Zstd 壓縮。編譯寫入與載入器像素核對每批最多 32 幀，RGB 暫存約 21 MiB，仍逐幀保存並驗證 SHA-256；這不包含既有事件／轉移 metadata 或 codec 的記憶體。Parquet 表使用 Zstd，每個 row group 最多 1,024 列。RGB 只存一次，相鄰觀測透過索引引用。檔案校驗碼、陣列配置、來源 ID 與工具版本都會在原子發布 `COMPLETED` 前保存；載入器先檢查檔案清單與校驗碼，再回傳資料。
 
-資料集格式為 `dsp-transitions/4`，catalog 為 `action_catalog_v3`。舊 `/1`、`/2`、`/3` 或 catalog v2 資料集必須從原始 evidence 重編譯到新目錄。raw evidence v2／v3 皆可驗證，重編譯從原始輸入產生新版動作並保存 `source_catalog`。缺 lifecycle 的舊 evidence 不推測終止結果，bootstrap mask 為 0；缺進度事實時 `progress_available=false`，不推測任務或 reward。
+資料集格式為 `dsp-transitions/4`，catalog 為 `action_catalog_v4`。舊 `/1`、`/2`、`/3` 或 catalog v2／v3 資料集必須從原始 evidence 重編譯到新目錄。raw evidence v2／v3／v4 皆可驗證，重編譯從原始輸入產生新版動作並保存 `source_catalog`。舊 dataset、校正與 checkpoint 不直接當成新契約使用。缺 lifecycle 的舊 evidence 不推測終止結果，bootstrap mask 為 0；缺進度事實時 `progress_available=false`，不推測任務或 reward。
 
 ```python
 from dsp_dreamer import open_dataset
@@ -144,17 +144,17 @@ for sample in samples:
 
 ## 凍結評估協定
 
-[#22 協定 v1](protocols/evaluation-v1.md)固定抽樣、標註格式、baseline、門檻與揭露規則；[版本與 checksum](protocols/evaluation-v1.json)、[10 development／30 final manifests](protocols/evaluation-trials-v1.json)及[含保留組的 registry](protocols/evaluation-registry-v1.json)一併保存。後續補錄必須在 registry 增加 demonstration，保留原 40 份試驗登錄，凍結新資料版本；不要再只用 #19 的單一示範 registry。
+[#22 協定 v2](protocols/evaluation-v2.md)追加 B 控制，保留 v1 的抽樣、標註格式、baseline、門檻與揭露規則；[版本與 checksum](protocols/evaluation-v2.json)、[10 development／30 final manifests](protocols/evaluation-trials-v1.json)及[含保留組的 registry](protocols/evaluation-registry-v1.json)一併保存。v1 及其綁定檔案保持原樣。工具必須明確傳入 `--protocol protocols/evaluation-v2.json`；保留工具的舊預設值是為了維持 v1 的原始檔案 checksum，重現 v1 須使用當時的程式版本，例如 `5c13232`。不能把 v3 資料與 v4 資料混用。後續補錄在 registry 增加 demonstration，保留原 40 份試驗登錄，凍結新資料版本。
 
 第一次使用人工標註時，先看[兩題引導練習](docs/validation/annotation-lesson.md)：指定位置與局部放大、結構化問題、影片前後對照及逐格查看。練習答案與正式標註分開保存。
 
 目前接續使用[指定位置的引導標註](docs/validation/guided-annotation.md)。工具帶入來源與框選，人工只答物品、完整數字或無法判讀；可保存、續填與匯出。局部草稿不等於整張圖已確認或資料已凍結。
 
 ```powershell
-.\.venv\Scripts\python.exe tools/prepare-evaluation.py --source runs/live/issue18-full-flow-v4 runs/live/issue18-retry-v4 --registry protocols/evaluation-registry-v1.json --out runs/evaluation-inputs.json
+.\.venv\Scripts\python.exe tools/prepare-evaluation.py --protocol protocols/evaluation-v2.json --source runs/catalog-v4/corpus/source-0.schedule-v4.dataset runs/catalog-v4/second-batch.dataset --registry runs/issue22-preparation/recording-registry.json --out runs/catalog-v4/example-evaluation-inputs.json
 ```
 
-工具重驗 dataset 與來源 checksum，核對保留 manifests／偏航／seeds 隔離，只從 validation 取重建候選，baseline 只用 train。預測人工分類恢復後，以 `--candidates` 傳入已封存、綁定 protocol_id／index_id 的候選，格式見協定。候選分類與區域尚未完成時，四類各缺 50 段；重建的 200 張總數也不能替代每 task quota。輸出不覆寫，人工狀態為 pending、training_authorized=false，不能據此跳過資料或模型 gate。實際結果見 [#22 驗證紀錄](docs/validation/issue-22.md)。
+上述命令示範兩份來源；完整語料的來源、索引與結果見 [catalog v4 驗證紀錄](docs/validation/catalog-v4.md)。工具重驗 dataset 與來源 checksum，核對保留 manifests／偏航／seeds 隔離，只從 validation 取重建候選，baseline 只用 train。預測人工分類恢復後，以 `--candidates` 傳入已封存、綁定 protocol_id／index_id 的候選，格式見協定。候選分類與區域尚未完成時，四類各缺 50 段；重建的 200 張總數也不能替代每 task quota。輸出不覆寫，人工狀態為 pending、training_authorized=false，不能據此跳過資料或模型 gate。
 
 ## 驗證
 
