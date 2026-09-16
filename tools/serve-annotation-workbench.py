@@ -61,4 +61,5 @@ if __name__ == '__main__':
     root = Path(sys.argv[1]).resolve(strict=True)
     if not (root / 'export.json').is_file():
         raise SystemExit('Expected completed annotation workbench')
-    ThreadingHTTPServer(('127.0.0.1', 8823), partial(Handler, directory=str(root))).serve_forever()
+    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8823
+    ThreadingHTTPServer(('127.0.0.1', port), partial(Handler, directory=str(root))).serve_forever()

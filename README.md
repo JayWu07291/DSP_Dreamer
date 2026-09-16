@@ -146,6 +146,8 @@ for sample in samples:
 
 [#22 協定 v1](protocols/evaluation-v1.md)固定抽樣、標註格式、baseline、門檻與揭露規則；[版本與 checksum](protocols/evaluation-v1.json)、[10 development／30 final manifests](protocols/evaluation-trials-v1.json)及[含保留組的 registry](protocols/evaluation-registry-v1.json)一併保存。後續補錄必須在 registry 增加 demonstration，保留原 40 份試驗登錄，凍結新資料版本；不要再只用 #19 的單一示範 registry。
 
+第一次使用人工標註時，先看[兩題引導練習](docs/validation/annotation-lesson.md)：指定位置與局部放大、結構化問題、影片前後對照及逐格查看。練習答案與正式標註分開保存。
+
 ```powershell
 .\.venv\Scripts\python.exe tools/prepare-evaluation.py --source runs/live/issue18-full-flow-v4 runs/live/issue18-retry-v4 --registry protocols/evaluation-registry-v1.json --out runs/evaluation-inputs.json
 ```

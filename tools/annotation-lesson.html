@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>兩題看懂人工標註 · DSP</title>
+<style>
+:root{color-scheme:light;font:17px/1.65 system-ui,sans-serif;color:#1d343a;background:#f3f5f3}*{box-sizing:border-box}body{max-width:1180px;margin:auto;padding:32px 24px 72px}h1{font-size:32px;line-height:1.25;margin:8px 0 16px}h2{font-size:23px;line-height:1.4;margin:0 0 12px}h3{font-size:18px;margin:0 0 8px}p{margin:8px 0 16px}button,input,select,textarea{font:inherit}button{cursor:pointer;padding:10px 18px;border:1px solid #bccbc7;background:white;border-radius:8px;color:inherit}button:hover{background:#edf5f1}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #db8b2e;outline-offset:3px}button[aria-current=step],.primary{background:#176456;border-color:#176456;color:white}button:disabled{cursor:default;opacity:.55}nav,.controls{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.eyebrow{color:#47685b;font-size:14px;letter-spacing:.08em}.muted,small{color:#536b68;font-size:14px}.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:24px}.card{background:white;border:1px solid #d7e0dc;border-radius:12px;padding:22px;min-width:0}.target{position:relative;line-height:0}.target img{width:100%;height:auto}.mark{position:absolute;border:2px solid #ffe257;box-shadow:0 0 0 1px #27352c;pointer-events:none}.crop{display:block;width:100%;height:auto;image-rendering:pixelated;background:#172f30;border-radius:4px}.crop-wrap{padding:14px;background:#ecf1ee;margin:16px 0;border-radius:8px}.crop-wrap canvas{max-width:492px}.prompt{border-left:4px solid #176456;padding:4px 0 4px 14px;margin-bottom:22px}label{display:block;font-weight:600;margin:16px 0 6px}input,select,textarea{width:100%;padding:10px;border:1px solid #a9bcb5;border-radius:6px;background:white;color:inherit}input[type=range]{padding:0;accent-color:#176456}fieldset{border:0;padding:0;margin:0}fieldset:disabled{opacity:.55}details{margin:20px 0}summary{cursor:pointer;color:#176456;font-weight:600}details p{padding-top:10px}.feedback{white-space:pre-line;border-radius:8px;background:#edf5f0;padding:12px 16px;margin-top:16px}.feedback:empty{display:none}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:16px}.comparison .crop{margin:10px 0}.timeline{max-width:720px;margin:20px auto}.timeline .target{margin:12px 0}video{display:block;width:100%;max-height:460px;background:#132625}.status{padding:14px 18px;border:1px solid #c9d9d1;border-radius:10px;margin-top:24px}.note{background:#fff6df;padding:12px 16px;border-radius:8px}[hidden]{display:none!important}@media(max-width:850px){body{padding:22px 16px}.layout,.comparison{grid-template-columns:1fr}h1{font-size:28px}.card{padding:16px}}
+</style>
+<header><span class="eyebrow">DSP · 標註練習</span><h1>看一個位置，回答一個問題。</h1>
+<p>先用兩題理解標註。你只需辨認指定內容，位置已經框好，不必描述整張畫面。</p>
+<p class="muted">這是練習。示範判讀可供對照，回答不會計入正式評估；原有標註草稿不受影響。</p></header>
+<nav aria-label="練習題目"><button id="tab-picture" aria-current="step">1　圖片：認出物品與數量</button><button id="tab-sequence">2　影片：看出前後變化</button></nav>
+<section id="picture">
+<div class="layout"><div class="card"><h2>只看黃色框內這一行</h2><p class="muted">讀物品名稱和右側較大的數字。名稱下的小字不在這題範圍。</p>
+<div class="target"><img src="picture.png" alt="原始遊戲畫面，黃色框標出左側物品提示中的一行"><span class="mark" id="picture-mark"></span></div>
+<div class="crop-wrap"><h3>同一位置，放大看</h3><canvas id="picture-crop" class="crop" role="img" aria-label="黃色框內的原始像素放大"></canvas><small>只放大原始像素，沒有補字或增強內容。</small></div>
+<p><strong>這份答案能檢查什麼？</strong><br>以後看模型重建的同一位置，核對物品和完整數字是否都保留下來。</p></div>
+<form class="card" id="picture-form"><div class="prompt"><h2>這是什麼物品？右側的大數字是多少？</h2><p>只讀黃色框這一行，不用理會其他面板。</p></div>
+<label for="clarity">你看得清楚嗎？</label><select id="clarity" required><option value="">請選擇</option><option value="clear">看得清楚，可以填答</option><option value="unclear">看不清楚，無法可靠判斷</option></select>
+<fieldset id="item-fields"><label for="item">物品名稱</label><select id="item"><option value="">請選擇</option><option value="iron">鐵塊</option><option value="copper">銅塊</option><option value="magnet">磁鐵</option><option value="other">其他物品／無法辨認</option></select>
+<label for="count">這一行右側的完整大數字</label><input id="count" type="number" min="0" max="999999" step="1" inputmode="numeric" placeholder="照畫面填入，例如 10"></fieldset>
+<button class="primary" type="submit" style="margin-top:24px">確認這題的回答</button><div id="picture-feedback" class="feedback" role="status"></div>
+<details id="picture-reference"><summary>還是不知道怎麼填？看示範判讀</summary><p>這一行是「鐵塊」，右側大字顯示「10」。因此示範答案為物品＝鐵塊、顯示數字＝10。本題只記指定位置的可見內容，不要求判斷它代表庫存或增減量。</p><p>這是依原圖提出的示範。若你無法從圖中辨認，請照實選「看不清楚」，不必照抄。</p></details>
+<button type="button" id="go-sequence">接著看影片題 →</button></form></div></section>
+<section id="sequence" hidden>
+<div class="prompt"><h2>右上角的製造佇列，從空格變成有物品了嗎？</h2><p>只看最左邊的第一個方格。這題檢查「有沒有出現待製造物品」，不用辨認配方、數量，也不代表已經製造完成。</p></div>
+<div class="comparison"><div class="card"><h3>操作前 · 0.0 秒</h3><canvas id="queue-before" class="crop" role="img" aria-label="操作前的製造佇列第一格"></canvas></div><div class="card"><h3>操作後 · 1.5 秒</h3><canvas id="queue-after" class="crop" role="img" aria-label="1.5 秒後的製造佇列第一格"></canvas></div></div>
+<div class="layout" style="margin-top:24px"><div class="card"><h3>播放這一小段，或逐格查看</h3><video id="video" src="sequence.mp4" controls preload="metadata" muted aria-label="製造佇列操作的原始影片導覽"></video>
+<div class="controls"><button id="play-future">播放要看的 1.5 秒</button><button id="play-all">加上前面 6.4 秒</button><label style="margin:0">速度 <select id="speed" style="width:auto"><option value="1">正常</option><option value="0.5">半速</option></select></label></div>
+<small>影片供理解過程；下方逐格圖是無損原圖，判讀以它為準。</small>
+<div class="timeline"><div class="controls"><button id="previous-frame" aria-label="前一格">← 前一格</button><button id="frame-zero">操作前</button><button id="frame-five">0.5 秒</button><button id="frame-fifteen">1.5 秒</button><button id="next-frame" aria-label="後一格">後一格 →</button></div>
+<label for="frame-slider">原圖時間：<output id="frame-time">0.0 秒 · 操作前</output></label><input type="range" id="frame-slider" min="0" max="15" step="1" value="0">
+<div class="target"><img id="frame-image" alt="目前時間點的完整原始畫面"><span id="queue-mark" class="mark"></span></div><canvas id="queue-current" class="crop" role="img" aria-label="目前時間點的製造佇列放大"></canvas></div></div>
+<form class="card" id="sequence-form"><h2>把你看到的前後狀態記下來</h2>
+<label for="before">操作前，第一格有物品圖示嗎？</label><select id="before" required><option value="">請選擇</option><option value="empty">沒有，是空格</option><option value="present">有物品圖示</option><option value="unclear">看不清楚／無法判定</option></select>
+<label for="after">1.5 秒後，第一格有物品圖示嗎？</label><select id="after" required><option value="">請選擇</option><option value="empty">沒有，是空格</option><option value="present">有物品圖示</option><option value="unclear">看不清楚／無法判定</option></select>
+<label for="category">這段主要在做哪一類操作？</label><select id="category" required><option value="">請選擇</option><option value="movement">移動／轉動視角</option><option value="ui">操作 UI 面板</option><option value="interaction">在場景中建造／與物品互動</option><option value="waiting">等待</option><option value="unclear">無法判定</option></select>
+<p class="muted">這是在記錄實際發生的事，不是在猜下一步。分類看這段的主要可見操作。</p>
+<button class="primary" type="submit">確認這題的回答</button><div id="sequence-feedback" class="feedback" role="status"></div>
+<details id="sequence-reference"><summary>查看示範判讀與用途</summary><p>操作前第一格是空的；1.5 秒後有物品圖示。示範分類是「操作 UI 面板」。這裡只確認佇列的可見變化，沒有宣稱物品已製造完成。</p><p>日後若模型的 1.5 秒後畫面仍是空佇列，就漏掉了這項變化。但這一題無法證明它預測的其他物品、數量或整段動作都正確。</p></details></form></div></section>
+<footer class="status"><p id="progress" aria-live="polite">已確認 0 / 2 題。先做圖片題即可。</p><button id="download" disabled>匯出練習答案</button><p class="muted">確認後可匯出 JSON。答案只留在這個分頁，離開前請下載或複製備份。也可以直接告訴我哪一題仍看不懂。</p>
+<div id="export-panel" hidden><p id="export-status" role="status">已產生下方 JSON 並嘗試下載。如果沒有出現下載檔，請按「複製練習答案」，貼回對話即可。</p><label for="export-text">本次匯出的練習答案</label><textarea id="export-text" readonly rows="6"></textarea><button id="copy" type="button">複製練習答案</button></div>
+<details><summary>這兩題的素材來源</summary><p id="provenance" class="muted"></p><p class="muted">題目由原始 validation 畫面挑選，只用來試用填答方式。示範答案由助理查看原圖後提出，尚未經使用者確認；不加入正式標註或品質分數。</p></details></footer>
+<script src="lesson-data.js"></script><script>
+const $=id=>document.getElementById(id), answers={picture:null,sequence:null}, referenceSeen={picture:false,sequence:false}, pendingEdits=new Set();
+let frame=0, dirty=false;
+const images=LESSON.frames.map(row=>{const img=new Image();img.src=row.image;return img});
+function pictureAnswer(clarity,item,count){
+ if(clarity==='unclear')return {clarity,item:null,count:null};
+ if(clarity!=='clear'||!['iron','copper','magnet','other'].includes(item)||!/^[0-9]{1,6}$/.test(count))throw Error('請選物品並填完整整數；無法辨認時，請選「看不清楚」。');
+ return {clarity,item,count:Number(count)};
+}
+function sequenceAnswer(before,after,category){
+ if(![before,after].every(v=>['empty','present','unclear'].includes(v))||!['movement','ui','interaction','waiting','unclear'].includes(category))throw Error('請回答操作前、操作後及操作類別；不確定可以選「無法判定」。');
+ return {before,after,category};
+}
+function stepIndex(value){return Math.max(0,Math.min(15,Math.round(value)))}
+function mark(id,b){Object.assign($(id).style,{left:b[0]/640*100+'%',top:b[1]/360*100+'%',width:(b[2]-b[0])/640*100+'%',height:(b[3]-b[1])/360*100+'%'})}
+function crop(canvas,img,b){canvas.dataset.source=img.src;const draw=()=>{if(canvas.dataset.source!==img.src)return;canvas.width=b[2]-b[0];canvas.height=b[3]-b[1];canvas.getContext('2d').drawImage(img,b[0],b[1],canvas.width,canvas.height,0,0,canvas.width,canvas.height)};if(img.complete&&img.naturalWidth)draw();else img.addEventListener('load',draw,{once:true})}
+function show(mode){for(const name of ['picture','sequence']){$(name).hidden=name!==mode;$('tab-'+name).setAttribute('aria-current',name===mode?'step':'false')}$('video').pause();window.scrollTo(0,0)}
+function updateProgress(){const n=Object.values(answers).filter(Boolean).length;$('progress').textContent=`已確認 ${n} / 2 題。${pendingEdits.size?'還有未確認的修改，請先按該題的確認按鈕再匯出。':n===2?'可以匯出答案，告訴我這樣是否容易回答。':'確認一題後就能匯出，不必一次做完。'}`;$('download').disabled=!n||pendingEdits.size>0}
+function showFrame(value,seek=true){frame=stepIndex(value);$('frame-slider').value=frame;$('frame-time').textContent=`${(frame/10).toFixed(1)} 秒 · ${frame===0?'操作前':'操作後第 '+frame+' 格'}`;$('frame-image').src=images[frame].src;crop($('queue-current'),images[frame],LESSON.queue_box);$('previous-frame').disabled=frame===0;$('next-frame').disabled=frame===15;if(seek){$('video').pause();$('video').currentTime=LESSON.boundary_seconds+frame/10}}
+$('tab-picture').onclick=()=>show('picture');$('tab-sequence').onclick=$('go-sequence').onclick=()=>show('sequence');
+$('clarity').onchange=()=>{$('item-fields').disabled=$('clarity').value==='unclear'};
+for(const mode of ['picture','sequence']){
+ $(mode+'-reference').addEventListener('toggle',()=>{if($(mode+'-reference').open){referenceSeen[mode]=true;if(answers[mode]){dirty=true;$('export-panel').hidden=true}}});
+ $(mode+'-form').addEventListener('input',()=>{answers[mode]=null;pendingEdits.add(mode);dirty=true;$('export-panel').hidden=true;$(mode+'-feedback').textContent='回答已修改，請重新確認。';updateProgress()});
+}
+$('picture-form').onsubmit=e=>{e.preventDefault();try{const a=pictureAnswer($('clarity').value,$('item').value,$('count').value);answers.picture=a;pendingEdits.delete('picture');dirty=true;if(a.clarity==='clear')referenceSeen.picture=true;const names={iron:'鐵塊',copper:'銅塊',magnet:'磁鐵',other:'其他物品／無法辨認'};$('picture-feedback').textContent=a.clarity==='unclear'?'已記錄「看不清楚」。這是一個有效的回答；不把猜測當成正確答案。':`你的答案：${names[a.item]}，${a.count}。\n`+(a.item===LESSON.reference.item&&a.count===LESSON.reference.count?'與示範判讀一致。以後就用這個位置的物品與完整數字，檢查模型是否保留了細節。':'與示範「鐵塊，10」不同。請回看放大圖；你的回答已保留，沒有被自動改成示範答案。');updateProgress()}catch(err){$('picture-feedback').textContent=err.message}};
+$('sequence-form').onsubmit=e=>{e.preventDefault();try{const a=sequenceAnswer($('before').value,$('after').value,$('category').value);answers.sequence=a;pendingEdits.delete('sequence');dirty=true;if(!Object.values(a).includes('unclear'))referenceSeen.sequence=true;const labels={empty:'空格',present:'有物品圖示',unclear:'無法判定'};$('sequence-feedback').textContent=`你記錄的變化：${labels[a.before]} → ${labels[a.after]}。\n`+(Object.values(a).includes('unclear')?'已保留不確定的判讀，不會強迫你猜。':a.before===LESSON.reference.before&&a.after===LESSON.reference.after&&a.category===LESSON.reference.category?'與示範判讀一致。這能檢查模型是否保留「佇列出現物品」這個變化，不能代表整段畫面都正確。':'與示範判讀不同。可以再比較操作前與 1.5 秒後的第一格；你的答案已保留。');updateProgress()}catch(err){$('sequence-feedback').textContent=err.message}};
+$('previous-frame').onclick=()=>showFrame(frame-1);$('next-frame').onclick=()=>showFrame(frame+1);$('frame-zero').onclick=()=>showFrame(0);$('frame-five').onclick=()=>showFrame(5);$('frame-fifteen').onclick=()=>showFrame(15);$('frame-slider').oninput=e=>showFrame(Number(e.target.value));
+async function play(start){$('video').currentTime=start;try{await $('video').play()}catch(err){$('frame-time').textContent='影片無法播放，仍可使用下方無損逐格圖。'}}
+$('play-future').onclick=()=>play(LESSON.boundary_seconds);$('play-all').onclick=()=>play(0);$('speed').onchange=()=>{$('video').playbackRate=Number($('speed').value)};
+$('video').ontimeupdate=()=>{if($('video').currentTime>=LESSON.boundary_seconds+1.5){$('video').pause();showFrame(15,false)}else if(!$('video').paused)showFrame(($('video').currentTime-LESSON.boundary_seconds)*10,false)};
+$('download').onclick=()=>{const data={schema:'dsp-annotation-practice/1',status:'practice',training_authorized:false,lesson_workbench_id:LESSON.workbench_id,evaluation_inputs_id:LESSON.evaluation_inputs_id,sources:{picture:LESSON.picture,sequence:LESSON.sequence},answers,reference_seen:referenceSeen,exported_at:new Date().toISOString()};$('export-text').value=JSON.stringify(data,null,2);$('export-panel').hidden=false;const a=document.createElement('a'),url=URL.createObjectURL(new Blob([$('export-text').value],{type:'application/json'}));a.href=url;a.download='dsp-annotation-practice.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('export-text').value);$('export-status').textContent='已複製練習答案，可貼回對話。';dirty=false}catch(err){$('export-text').focus();$('export-text').select();$('export-status').textContent='請按 Ctrl+C 複製已選取的 JSON，再貼回對話。'}};
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+const still=new Image();still.src='picture.png';crop($('picture-crop'),still,LESSON.picture_box);crop($('queue-before'),images[0],LESSON.queue_box);crop($('queue-after'),images[15],LESSON.queue_box);mark('picture-mark',LESSON.picture_box);mark('queue-mark',LESSON.queue_box);showFrame(0,false);
+$('provenance').textContent=`圖片 ${LESSON.picture.id}，capture ${LESSON.picture.capture_id}；影片 ${LESSON.sequence.id}，來源 ${LESSON.sequence.artifact_id}，原影片 ${LESSON.sequence.begin.toFixed(1)}–${LESSON.sequence.end.toFixed(2)} 秒。逐格圖來自原始模型視圖，間隔 0.1 秒。`;
+</script></html>
