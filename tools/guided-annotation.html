@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DSP 指定位置標註</title>
+<style>
+body{font:17px system-ui,sans-serif;line-height:1.65;color:#20313f;background:#f2f5f6;max-width:1120px;margin:32px auto;padding:0 24px}h1,h2{line-height:1.3}button,input,select,textarea{font:inherit;padding:10px;box-sizing:border-box;max-width:100%}button{cursor:pointer;border:1px solid #8b9da6;border-radius:6px;background:white}button:disabled{cursor:default;opacity:.5}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #008a9a;outline-offset:2px}.primary{background:#075e70;color:white;border-color:#075e70}.layout{display:grid;grid-template-columns:minmax(0,640px) minmax(280px,1fr);gap:24px}.card{background:white;padding:20px;border:1px solid #d0dce0;border-radius:10px}.target{position:relative;line-height:0}.target img{width:100%}.mark{position:absolute;border:2px solid #ffca00;box-shadow:0 0 0 1px #142734;box-sizing:border-box;pointer-events:none}canvas{display:block;image-rendering:pixelated;max-width:100%;height:auto;background:#172a33;margin:16px auto}label{display:block;margin:16px 0 5px}input,select,textarea{width:100%}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.row button{flex:none}.muted{font-size:14px;color:#536571}.notice{padding:12px 16px;background:#fff3cc;border-radius:6px}fieldset{border:0;margin:0;padding:0}#feedback,#storage-warning{white-space:pre-line}nav,footer{margin:24px 0}#counter{margin-right:auto}[hidden]{display:none!important}@media(max-width:850px){.layout{grid-template-columns:1fr}body{padding:0 16px;margin:20px auto}}
+</style>
+<h1>看黃色框，回答兩個細節</h1>
+<p>每題只問指定位置的物品和完整數字。位置、來源與格式由工具記錄，你不用填座標。</p>
+<p class="notice">這批沒有示範答案。不確定就選「看不清楚」，框錯了就選「框的位置不對」。回答只確認這個小項目，整張圖與完整評估仍待後續確認。</p>
+<nav class="row"><span id="counter" aria-live="polite"></span><button id="prev">上一題</button><button id="next">下一題</button></nav>
+<div class="layout"><section class="card"><h2 id="target"></h2><div class="target"><img id="original" alt="原始遊戲畫面，黃色框標出本題位置"><span id="mark" class="mark"></span></div>
+<h3>黃色框的放大圖</h3><canvas id="crop" role="img" aria-label="指定位置的原始像素放大圖"></canvas>
+<p class="muted">只有放大原圖，沒有補字。若有大小兩組數字，只回答右側的大字；背包題則回答該格右下角數字。</p>
+<details><summary>這份答案的用途</summary><p>日後比較模型重建的同一位置，檢查它是否保留物品身分與完整數字。這一項無法代表整張圖正確。</p><p id="source" class="muted"></p></details></section>
+<form class="card" id="form"><h2>你在框內看到什麼？</h2>
+<label for="reviewer">判讀者名稱</label><input id="reviewer" maxlength="80" autocomplete="name" placeholder="填名字或固定暱稱即可" required>
+<label for="status">這個位置可以判讀嗎？</label><select id="status" required><option value="">請選擇</option><option value="readable">框的位置正確，物品和數字都看得清楚</option><option value="unreadable">框的位置正確，但物品或數字看不清楚</option><option value="wrong_target">框的位置不對，或題目與畫面不符</option></select>
+<fieldset id="fields"><label for="item">物品名稱</label><select id="item"><option value="">請選擇</option></select><label id="other-label" for="other" hidden>其他物品名稱</label><input id="other" maxlength="80" hidden>
+<label for="count">完整數字</label><input id="count" inputmode="numeric" maxlength="6" placeholder="照圖填寫，不加單位"></fieldset>
+<button id="confirm" class="primary" type="submit" style="margin-top:24px">確認並儲存這題</button><p id="feedback" role="status"></p>
+<p class="muted">沒有「與標準答案一致」的提示。儲存你實際看到的內容即可。</p></form></div>
+<footer class="card"><p id="progress" aria-live="polite"></p><p id="storage-warning" role="status"></p><div class="row"><button id="export" class="primary">匯出目前回答</button><button id="copy" hidden>複製回答</button></div>
+<div id="backup" hidden><label for="json">若沒有下載檔，複製這段 JSON 貼回對話</label><textarea id="json" readonly rows="6"></textarea></div>
+<p class="muted">每題確認後會嘗試存到這個瀏覽器，可稍後續填。仍請匯出或複製備份，避免瀏覽器資料被清除。</p>
+<details><summary>載入先前的回答</summary><label for="import-json">貼上這一批的回答 JSON</label><textarea id="import-json" rows="5"></textarea><button id="import">載入並取代本頁已保存的回答</button></details></footer>
+<script src="batch.js"></script><script>
+const $=id=>document.getElementById(id), storageKey='dsp-guided:'+BATCH.artifact_id;
+function validateAnswers(d){
+ if(!d||Object.keys(d).sort().join(',')!=='answers,batch_id,schema,status,training_authorized'||d.schema!=='dsp-guided-annotation-answers/1'||d.batch_id!==BATCH.artifact_id||d.status!=='pending'||d.training_authorized!==false||!d.answers||typeof d.answers!=='object'||Array.isArray(d.answers))throw Error('回答格式錯誤，或不是這一批題目。');
+ for(const [id,a] of Object.entries(d.answers)){
+  if(!BATCH.questions.some(q=>q.id===id)||!a||Object.keys(a).sort().join(',')!=='answered_at,count,item,reviewer,status'||typeof a.reviewer!=='string'||!a.reviewer.trim()||a.reviewer.length>80||typeof a.answered_at!=='string'||!/(Z|[+-]\d{2}:\d{2})$/.test(a.answered_at)||!Number.isFinite(Date.parse(a.answered_at))||!['readable','unreadable','wrong_target'].includes(a.status))throw Error('回答缺題號、判讀者、時間或有效狀態。');
+  if(a.status==='readable'?(typeof a.item!=='string'||!a.item.trim()||a.item.length>80||typeof a.count!=='string'||!/^\d{1,6}$/.test(a.count)):(a.item!==null||a.count!==null))throw Error('請填物品和完整整數；不能判讀時不保留猜測值。');
+ }return d;
+}
+let data={schema:'dsp-guided-annotation-answers/1',batch_id:BATCH.artifact_id,status:'pending',training_authorized:false,answers:{}},pos=0,dirty=false,imageReady=false,needsBackup=false;
+try{const saved=localStorage.getItem(storageKey);if(saved)data=validateAnswers(JSON.parse(saved))}catch(e){$('storage-warning').textContent='既有瀏覽器回答無法讀取，請使用匯出備份。'}
+for(const name of [...BATCH.item_options,'其他物品']){const option=document.createElement('option');option.value=name;option.textContent=name;$('item').append(option)}
+function persist(){try{localStorage.setItem(storageKey,JSON.stringify(data));needsBackup=false;$('storage-warning').textContent='已存到這個瀏覽器。'}catch(e){needsBackup=true;$('storage-warning').textContent='瀏覽器無法自動保存，請立刻匯出或複製備份。'}}
+function fields(){$('fields').disabled=$('status').value!=='readable';$('other').hidden=$('other-label').hidden=$('item').value!=='其他物品'}
+function progress(){const n=Object.keys(data.answers).length,repair=Object.values(data.answers).filter(a=>a.status==='wrong_target').length;$('progress').textContent=`已保存 ${n} / ${BATCH.questions.length} 題${repair?'；其中 '+repair+' 題需要我重新框選':''}。${dirty?'本題有修改，請先確認再匯出或換題。':''}`;$('export').disabled=!n||dirty;$('prev').disabled=pos===0||dirty;$('next').disabled=pos===BATCH.questions.length-1||dirty}
+function render(){
+ const q=BATCH.questions[pos],a=data.answers[q.id];dirty=false;imageReady=false;$('confirm').disabled=true;$('counter').textContent=`第 ${pos+1} / ${BATCH.questions.length} 題`;$('target').textContent=q.target;$('source').textContent=`來源 ${q.source.id}，capture ${q.source.capture_id}；原始影像 SHA-256 ${q.image_sha256}`;
+ $('status').value=a?.status||'';$('item').value=a?.item?(BATCH.item_options.includes(a.item)?a.item:'其他物品'):'';$('other').value=a?.item&&!BATCH.item_options.includes(a.item)?a.item:'';$('count').value=a?.count||'';if(a)$('reviewer').value=a.reviewer;fields();
+ $('feedback').textContent=a?'這題已保存。若修改，請重新確認。':'請看放大圖，依序選狀態、物品並填數字。';const b=q.box;
+ Object.assign($('mark').style,{left:b[0]/640*100+'%',top:b[1]/360*100+'%',width:(b[2]-b[0])/640*100+'%',height:(b[3]-b[1])/360*100+'%'});
+ const img=$('original'),canvas=$('crop');canvas.width=b[2]-b[0];canvas.height=b[3]-b[1];canvas.style.width=Math.min(540,canvas.width*6)+'px';
+ img.onload=()=>{imageReady=img.naturalWidth===640&&img.naturalHeight===360;$('confirm').disabled=!imageReady;if(imageReady)canvas.getContext('2d').drawImage(img,b[0],b[1],canvas.width,canvas.height,0,0,canvas.width,canvas.height);else $('feedback').textContent='原圖尺寸不符，請告訴我，不要填答。'};
+ img.onerror=()=>{imageReady=false;$('confirm').disabled=true;$('feedback').textContent='原圖載入失敗，請告訴我；這不算看不清楚。'};img.src=q.source.image;progress();
+}
+$('form').addEventListener('input',()=>{dirty=true;$('backup').hidden=$('copy').hidden=true;fields();progress()});
+$('form').onsubmit=e=>{e.preventDefault();try{
+ if(!imageReady)throw Error('請先等待原圖載入。');const readable=$('status').value==='readable';const a={status:$('status').value,item:readable?($('item').value==='其他物品'?$('other').value.trim():$('item').value):null,count:readable?$('count').value.trim():null,reviewer:$('reviewer').value.trim(),answered_at:new Date().toISOString()};
+ data=validateAnswers({...data,answers:{...data.answers,[BATCH.questions[pos].id]:a}});dirty=false;persist();$('feedback').textContent=a.status==='wrong_target'?'已記錄需要重新框選，不會把這題當作可排除項目。':a.status==='unreadable'?'已記錄原圖無法可靠辨識。':'已保存你的物品名稱與完整數字。';progress();
+ }catch(e){$('feedback').textContent=e.message}};
+$('prev').onclick=()=>{if(!dirty&&pos>0){pos--;render()}};$('next').onclick=()=>{if(!dirty&&pos<BATCH.questions.length-1){pos++;render()}};
+$('export').onclick=()=>{if(dirty||!Object.keys(data.answers).length)return;$('json').value=JSON.stringify(validateAnswers(data),null,2);$('backup').hidden=$('copy').hidden=false;const a=document.createElement('a'),url=URL.createObjectURL(new Blob([$('json').value],{type:'application/json'}));a.href=url;a.download='dsp-guided-answers.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('json').value);needsBackup=false;$('storage-warning').textContent='已複製回答，可貼回對話。'}catch(e){$('json').focus();$('json').select();$('storage-warning').textContent='請按 Ctrl+C 複製已選取的回答。'}};
+$('import').onclick=()=>{try{if(dirty)throw Error('請先確認目前這題，再載入備份。');data=validateAnswers(JSON.parse($('import-json').value));persist();pos=0;$('backup').hidden=$('copy').hidden=true;render()}catch(e){$('storage-warning').textContent=e.message}};
+window.addEventListener('beforeunload',e=>{if(dirty||needsBackup){e.preventDefault();e.returnValue=''}});render();
+</script></html>

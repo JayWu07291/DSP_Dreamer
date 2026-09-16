@@ -11,11 +11,7 @@ contract = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'dsp_dreamer
 atomic_save, file_info, load, require, sha = (contract[k] for k in ('atomic_save', 'file_info', 'load', 'require', 'sha'))
 
 
-def export_lesson(workbench, out, ffmpeg):
-    workbench, out = (p.resolve() for p in (workbench, out))
-    require(out != workbench and out not in workbench.parents and workbench not in out.parents,
-            'Lesson output must not overlap its sources')
-    require(not out.exists(), 'Refusing lesson overwrite')
+def verified_workbench(workbench):
     receipt = load(workbench / 'export.json')
     expected_seal = '61aa26a1ff81fbd9e4ca832228d104aa8d58bc8734c31f4ec702a561c774d8c9'
     require(receipt['artifact_id'] == expected_seal == sha(json.dumps(
@@ -24,6 +20,15 @@ def export_lesson(workbench, out, ffmpeg):
     require(file_info(workbench / 'data.js') == receipt['files']['data.js'], 'Workbench data changed')
     raw = (workbench / 'data.js').read_text(encoding='utf-8')
     work = json.loads(raw.removeprefix('const WORK = ').strip().removesuffix(';'))
+    return receipt, work
+
+
+def export_lesson(workbench, out, ffmpeg):
+    workbench, out = (p.resolve() for p in (workbench, out))
+    require(out != workbench and out not in workbench.parents and workbench not in out.parents,
+            'Lesson output must not overlap its sources')
+    require(not out.exists(), 'Refusing lesson overwrite')
+    receipt, work = verified_workbench(workbench)
     picture = next(r for r in work['reconstruction'] if r['id'] == 'R021')
     sequence = next(r for r in work['prediction'] if r['id'] == 'P002')
     # These two questions describe these exact reviewed captures, not arbitrary R021/P002 rows.

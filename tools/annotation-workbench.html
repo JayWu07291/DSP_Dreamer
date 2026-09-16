@@ -30,7 +30,7 @@ let draft={schema:'dsp-annotation-draft/1',protocol_id:WORK.protocol_id,index_id
 function validateDraft(d){
 if(!d||d.schema!=='dsp-annotation-draft/1'||d.evaluation_inputs_id!==WORK.evaluation_inputs_id||d.protocol_id!==WORK.protocol_id||d.index_id!==WORK.index_id||d.training_authorized!==false||d.status!=='pending'||typeof d.reviewer!=='string'||!d.records||typeof d.records!=='object'||Array.isArray(d.records))throw Error('草稿格式錯誤或不屬於這份輸入包。');
 for(const [k,r] of Object.entries(d.records)){
-if(!r||!['reconstruction','prediction'].includes(r.mode)||typeof r.reviewed!=='boolean'||!Array.isArray(r.items)||!r.source||k!==r.mode+':'+r.source.id||!WORK[r.mode].some(source=>JSON.stringify(source)===JSON.stringify(r.source)))throw Error('草稿紀錄與原始輸入不符。');
+if(!r||!['reconstruction','prediction'].includes(r.mode)||typeof r.reviewed!=='boolean'||!Array.isArray(r.items)||!r.source||k!==r.mode+':'+r.source.id||!WORK[r.mode].some(source=>Object.keys(source).length===Object.keys(r.source).length&&Object.entries(source).every(([key,value])=>Object.hasOwn(r.source,key)&&JSON.stringify(value)===JSON.stringify(r.source[key]))))throw Error('草稿紀錄與原始輸入不符。');
 if(!Array.isArray(r.ui_regions)||r.ui_regions.some(b=>!validBox(b)))throw Error('UI 區域格式錯誤。');
 if(typeof r.note!=='string'||typeof r.reviewer!=='string'||!r.reviewer.trim()||typeof r.reviewed_at!=='string'||!Number.isFinite(Date.parse(r.reviewed_at))||r.region!==null&&!validBox(r.region))throw Error('草稿判讀者、時間或區域格式錯誤。');
 if(r.mode==='prediction'&&typeof r.candidate_exclusion==='string'&&r.candidate_exclusion.trim()&&!r.reviewed)continue;

@@ -148,6 +148,8 @@ for sample in samples:
 
 第一次使用人工標註時，先看[兩題引導練習](docs/validation/annotation-lesson.md)：指定位置與局部放大、結構化問題、影片前後對照及逐格查看。練習答案與正式標註分開保存。
 
+目前接續使用[指定位置的引導標註](docs/validation/guided-annotation.md)。工具帶入來源與框選，人工只答物品、完整數字或無法判讀；可保存、續填與匯出。局部草稿不等於整張圖已確認或資料已凍結。
+
 ```powershell
 .\.venv\Scripts\python.exe tools/prepare-evaluation.py --source runs/live/issue18-full-flow-v4 runs/live/issue18-retry-v4 --registry protocols/evaluation-registry-v1.json --out runs/evaluation-inputs.json
 ```
