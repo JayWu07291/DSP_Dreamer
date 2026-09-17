@@ -70,3 +70,13 @@ task 11 的下一個補錄方案仍需讓製造科技供料與熔爐自動接線
 針對性檢查通過，涵蓋合法片段不足、非 active 完成、可用正例、媒體不可讀時仍可診斷，以及轉移表遭改動時拒絕輸出。原始拆解無正例的重現仍應失敗，因為沒有改寫第八批資料；修正效果須由下一個實機回合確認。
 
 完整 pytest 157 項通過，194.22 秒，紀錄在 `tmp/coverage-diagnosis-tests.xml`。mypy 檢查 Python 套件與本次工具共 19 檔通過。第九批 recorder 設定 SHA-256 仍為 `b408e796addd01713c538b1e674a334daeb35e79eb245a9bfd258941c68072e7`，本次沒有部署操作。
+
+## Standards
+
+獨立審查無待修問題。工具只讀封存表格，保留 checksum、ModelView 起點比對及不可覆寫輸出防護，沒有改動編譯器、loader、protocol、DLL 或 action catalog。
+
+## Spec
+
+獨立審查指出舊第八批報告仍直接要求兩回合，可能與本次一回合試錄衝突。已在該頁頂端及操作段落改為指向本安排，主要 catalog 入口亦直接連到本頁。其餘計數、64-step、gap 排除、非 active 不計及固定 split 核對通過。
+
+Standards 0 項；Spec 原有 1 項操作入口衝突，已修正。
