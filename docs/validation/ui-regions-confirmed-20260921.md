@@ -4,7 +4,9 @@ Jay 回覆「1A、1B、2A、2B 都正確」，四個框已記為人工確認：R
 
 四個框已加入 `runs/catalog-v4/corpus-integration-20260921/annotations-with-ui-regions-01-draft.json`。原 15 個局部項目與 Q05 澄清內容逐項保持一致，來源仍為 7 張原圖；其中 2 張有已確認 UI 範圍。UI 範圍確認不會將整圖標成完成，整圖確認仍為 0。
 
-## 下一步
+## 第二批準備紀錄（已完成確認）
+
+更新：Jay 已回覆「3A、4A、4B、5A 都正確」，四項確認保存於 [第二批確認收據](ui-regions-02-confirmed-20260921.json)。以下保留當時題目；目前下一步為 [五段影片分類](ui-coverage-and-sequence-classification-20260921.md)。
 
 開啟 <http://127.0.0.1:8833/>，確認尚缺的三類 UI：
 
