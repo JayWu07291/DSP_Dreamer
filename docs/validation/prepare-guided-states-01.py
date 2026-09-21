@@ -1,4 +1,4 @@
-"""Build five state questions using exported validation PNGs only."""
+"""Revise states-01 into states-02; the prior version is retained in commit 1dc97c8."""
 import json
 from pathlib import Path
 import runpy
@@ -17,11 +17,12 @@ require(file_info(workbench / 'data.js') == receipt['files']['data.js'], 'Workbe
 workbench_data = json.loads((workbench / 'data.js').read_text(encoding='utf-8').removeprefix('const WORK = ').strip().removesuffix(';'))
 rows = {r['id']:r for r in workbench_data['reconstruction']}
 require(read_protocol('protocols/evaluation-v2.json')['artifact_id'] == workbench_data['protocol_id'], 'Protocol mismatch')
+cursor_prompt = '黃色框有沒有圈對這張圖的游標？游標是否清楚、完整，沒有被框切掉？若都符合，填「框選正確，游標清楚完整」。沒圈對或沒圈完整，請選「框的位置不對」；看不清楚，請選「無法可靠判斷」。這題記錄游標位置，供日後檢查模型有沒有把它畫錯位置；不用再描述顏色、形狀或朝向，也不用填座標。'
 locations = [
     ('Q01', 'R031', 'cursor', [452,253,469,273], '畫面右下側的游標',
-     '框內游標是什麼形狀、顏色？朝哪個方向？只描述游標，不用填座標。'),
+     cursor_prompt),
     ('Q02', 'R091', 'cursor', [364,150,383,171], '合成器配方列表旁的游標',
-     '框內游標是什麼形狀、顏色？朝哪個方向？只描述游標，不用填座標。'),
+     cursor_prompt),
     ('Q03', 'R021', 'recipe', [413,261,466,340], '合成器下方的配方詳情',
      '合成器目前選中的配方叫什麼？請只寫配方名稱，不寫製造佇列。'),
     ('Q04', 'R111', 'connection', [373,211,456,256], '下方採礦機與旁邊熔爐的連接',
@@ -43,7 +44,7 @@ guided = runpy.run_path('tools/guided-annotation.py')
 empty = dict(schema='dsp-guided-annotation-answers/2', batch_id=batch['artifact_id'], status='pending', training_authorized=False, answers={})
 draft = guided['checked_answers'](batch, empty)
 require(len(draft['pending_questions']) == 5 and draft['whole_frames_reviewed'] == 0, 'Empty answers must remain pending')
-out = integration_root / 'guided-states-01'
+out = integration_root / 'guided-states-02'
 out.mkdir(exist_ok=False)
 for relative in {q['source']['image'] for q in questions}:
     target = out / relative
