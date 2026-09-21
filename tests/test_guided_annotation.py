@@ -71,3 +71,44 @@ def test_export_rejects_source_overlap_before_writing(tmp_path):
         with pytest.raises(ValueError, match='overlap'):
             guided['export_batch'](tmp_path, out)
     assert not list(tmp_path.iterdir())
+
+
+def test_state_answers_keep_item_types_and_uncertainty_without_approving_frames(tmp_path):
+    source = dict(id='R081', artifact_id='original', observation_index=3442, image='images/original.png')
+    batch = guided['seal'](dict(schema='dsp-guided-annotation-batch/2', protocol_id='protocol',
+        index_id='index', evaluation_inputs_id='inputs', questions=[dict(id=f'Q0{i}', source=source,
+        box=[10, 20, 50, 60], target='指定位置', type=kind, prompt='框內的狀態是什麼？')
+        for i, kind in enumerate(('cursor', 'recipe', 'connection', 'connection'), 1)]))
+    answer = dict(status='readable', expected='黃色箭頭，指向配方圖示', reviewer='human', answered_at='2026-09-21T15:00:00Z')
+    submission = dict(schema='dsp-guided-annotation-answers/2', batch_id=batch['artifact_id'],
+        status='pending', training_authorized=False, answers={'Q01': answer,
+        'Q02': dict(answer, expected='磁鐵'), 'Q03': dict(answer, status='unreadable', expected=None),
+        'Q04': dict(answer, status='wrong_target', expected=None)})
+    draft = guided['checked_answers'](batch, submission)
+    row = draft['records']['reconstruction:R081']
+    assert [(i['type'], i['eligible']) for i in row['items']] == [('cursor', True), ('recipe', True), ('connection', False)]
+    assert row['items'][0]['expected'] == answer['expected'] and row['items'][1]['expected'] == '磁鐵'
+    assert row['source'] == source and row['reviewed'] is False and row['items'][2]['exclusion_reason']
+    assert draft['pending_questions'] == [dict(question_id='Q04', reason='需要重新框選或修改題目')]
+    assert draft['whole_frames_reviewed'] == 0 and draft['training_authorized'] is False
+    for change in (lambda s:s.update(schema='dsp-guided-annotation-answers/1'),
+                   lambda s:s['answers']['Q01'].update(expected=''),
+                   lambda s:s['answers']['Q01'].update(expected='x'*801),
+                   lambda s:s['answers']['Q03'].update(expected='猜測'),
+                   lambda s:s['answers']['Q01'].update(item='磁鐵')):
+        bad = copy.deepcopy(submission)
+        change(bad)
+        with pytest.raises(ValueError):
+            guided['checked_answers'](batch, bad)
+    bad = copy.deepcopy(batch)
+    bad.pop('artifact_id')
+    bad['questions'][0]['type'] = 'imagined'
+    bad = guided['seal'](bad)
+    with pytest.raises(ValueError):
+        guided['checked_answers'](bad, dict(submission, batch_id=bad['artifact_id']))
+    node = shutil.which('node')
+    if node:
+        payload = tmp_path / 'state-browser-import.json'
+        payload.write_text(json.dumps(dict(work=dict(protocol_id='protocol', index_id='index', evaluation_inputs_id='inputs',
+            reconstruction=[source], prediction=[]), draft=draft)), encoding='utf-8')
+        subprocess.run([node, 'tests/check-annotation-draft.cjs', str(payload)], check=True, capture_output=True)
