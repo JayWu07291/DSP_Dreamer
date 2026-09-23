@@ -1,5 +1,7 @@
 # 首組影片分類收件
 
+2026-09-23 更新：P006–P015 的十段描述已收件，原七個不確定分類也已由 Jay 澄清確認，見 [第二組分類澄清及下一組](sequence-classification-clarification-20260923.md)。
+
 Jay 的五個回答已完整保存，沒有待補的分類題。原文、來源、保存時間及草稿 checksum 見 [收件收據](sequence-classification-01-received-20260922.json)。保存時間是收件時間，沒有冒充逐題作答時間。
 
 | 題目 | 分類 | 使用者原文 |
@@ -14,7 +16,7 @@ P001 保留等待分類及正在拆除的補充，沒有把它改寫為畫面靜
 
 原始回答位於 `runs/annotation-submissions/20260922-sequence-classification-01-answers.json`；對應草稿為 `runs/catalog-v4/corpus-integration-20260921/sequence-classification-01-received-draft.json`。每筆保留原題包來源、人工回答與確認 ID。
 
-## 下一步
+## 第二組的操作說明（已收件）
 
 開啟 <http://127.0.0.1:8835/>，查看 P006–P015。沿用移動／視角、UI、建造／物品、等待四類，回覆「P006：類別＋簡短說明」至「P015：類別＋簡短說明」。可分次回答；不確定可附原因，不用填座標、匯出 JSON 或重新錄製。
 
