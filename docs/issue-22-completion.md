@@ -1,6 +1,6 @@
 # Issue #22 完成核對
 
-2026-09-24 重新讀取 [Issue #22](https://github.com/JayWu07291/DSP_Dreamer/issues/22) 的六項驗收條件，並核對本機 `0f3a9be` 的交付。**本票的協定、評估資料準備與凍結工作已完成。依使用者要求，Issue 保持 OPEN，未修改勾選、標籤或留言。**
+2026-09-25 重新讀取 [Issue #22](https://github.com/JayWu07291/DSP_Dreamer/issues/22) 的最新要求，逐條核對協定及 `data/evaluation/` 的凍結交付。**六項驗收條件均已完成，依使用者指示結案。** 前置 Issue #19 已關閉，資料覆蓋 gate 亦已通過。先前依要求暫時保持開啟的狀態已解除。
 
 | 驗收條件 | 證據與結果 |
 | --- | --- |
@@ -13,7 +13,11 @@
 
 資料凍結 ID 為 `57d8fbadf60c6a00ece0500dc5f3c14abc5e1ac546aed2edc11c88fd6390775f`，protocol v2 ID 為 `40167e30d83bab5b60b19498ac45380899cd942d8f87fc347db37cae893a9e42`。整理資料夾時必須保留這些 artifact 的原始位元組與身分。
 
-本次重新執行凍結工具的輕量 `--check` 通過，沒有重讀整批影像。此前完整測試為 158 項通過，mypy 18 檔通過；Standards 與 Spec 獨立複核均無待修問題。
+2026-09-24 凍結工具的輕量 `--check` 通過，沒有重讀整批影像。此前完整測試為 158 項通過，mypy 18 檔通過；Standards 與 Spec 獨立複核均無待修問題。
+
+2026-09-25 僅讀取小型 JSON 核對現況，確認重建 200 圖且 17 個 task 各至少 10 圖、預測四類各 50 段、各段具已確認區域與關鍵狀態及對照配對、baseline 僅來自 train、10 development／30 final manifests、凍結檔案的 ID 引用一致。現有 47 個完整有效回合分為 train 38、validation 4、offline-test 5；241 個人工候選中固定選出 200 段。沒有重新抽樣、改寫凍結檔案、重讀錄像或重跑完整測試。
+
+資料夾整理與封存已完成，本機暫存副本已清理；參考論文、反編譯檔案及參考程式碼保留。位置與還原方式見 [資料位置](data-layout.md)及[封存紀錄](archive.md)。
 
 ## 後續工作
 
