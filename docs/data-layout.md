@@ -9,9 +9,10 @@
 | `data/prediction-candidates.json` | 241 列完整人工候選，正式使用其中 200 段 |
 | `data/evaluation/` | 正式評估輸入、annotations、provenance、動作對照與 data freeze |
 | `data/runtime/calibration.json` | 目前核准的校正檔，遊戲設定已同步更新路徑 |
-| `data/maintenance/20260924/` | 這次整理的搬移紀錄、封存進度及操作腳本，封存完成後可再移出 |
 
 [data-catalog.json](data-catalog.json)是目前位置表。每份資料保留 `artifact_id`、`split`、原路徑 `previous_path` 與來源 COMPLETED 身分；新的位置表不取代原 TrainingIndex 或 data freeze。
+
+這次整理的搬移紀錄、清單與一次性腳本已移至[封存資料夾](archive.md)下的 `maintenance-20260924/`，本機不再保留 `data/maintenance/`。
 
 實際需要載入完整語料時，可使用現有介面：
 

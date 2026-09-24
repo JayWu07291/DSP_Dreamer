@@ -284,7 +284,10 @@
   "archive": {
     "path": "G:\\我的雲端硬碟\\DSP_Dreamer_Archive\\2026-09-24-before-cleanup",
     "folder_url": "https://drive.google.com/drive/folders/1A6Fl6IRDOuen8wRIqsi4lWNm0m_U_OkD",
-    "local_staging": "E:\\DSP_Dreamer_Archive_Staging\\2026-09-24",
+    "local_staging": null,
+    "maintenance_path": "G:\\我的雲端硬碟\\DSP_Dreamer_Archive\\2026-09-24-before-cleanup\\maintenance-20260924",
+    "cloud_sync_confirmed_by": "user",
+    "completed_on": "2026-09-25",
     "baseline_commit": "0f3a9be"
   },
   "note": "Only filesystem locations changed. Frozen artifacts, source bytes, source IDs and splits retain their existing identities."
