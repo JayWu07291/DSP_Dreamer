@@ -2,14 +2,14 @@
 
 使用者要求將歷史測試內容封存搬離本機工作目錄，並明確要求單純搬運封裝，不進行逐包 SHA-256 或完整內容重讀。
 
-目前封存工作仍在進行。**repo 已完成主要分類搬移，G 槽寫入與 Google Drive 同步尚未宣告完成；原件繼續保留。**
+2026-09-24 21:36（Asia/Taipei），**47 個封存包已全部寫入 G 槽，共 407,990,240,557 bytes（約 380.0 GiB）。repo 分類搬移與封裝完成；Google Drive 同步尚待完成，原件繼續保留。**
 
 | 位置 | 用途 |
 | --- | --- |
 | `G:\我的雲端硬碟\DSP_Dreamer_Archive\2026-09-24-before-cleanup` | 45 個主要封存包、2 個暫存補充包及內容清單 |
 | [Google Drive 封存資料夾](https://drive.google.com/drive/folders/1A6Fl6IRDOuen8wRIqsi4lWNm0m_U_OkD) | 雲端位置 |
 | `E:\DSP_Dreamer_Archive_Staging\2026-09-24` | 同步完成前保留的全部歷史原件 |
-| `data/maintenance/20260924/packing-status.json` | 封裝程序目前進度 |
+| `data/maintenance/20260924/packing-status.json` | 45 個主要包已完成；另有 2 個補充包，合計 47 包 |
 | `data/maintenance/20260924/package-receipts/` | 已寫出的封存檔名稱、大小及包含的原路徑 |
 
 盤點的邏輯檔案大小合計約 538.7 GiB，其中正式資料集約 158.5 GiB 保留在 `data/datasets/`，約 380 GiB 列入封存。這些是檔案長度加總，不是去除硬連結後的磁碟占用；尚未釋放的暫存空間不計為已回收。
@@ -38,3 +38,7 @@
 第一包有 10 個 Windows 拒絕讀取的舊 `tmp/issue18-*` 測試目錄，已改由原本有讀取權限的程序封裝成 `046-protected-test-cache.7z`。原 `.pytest_cache` 已封裝成 `047-pytest-cache.7z`，兩包均已寫入 G 槽，沒有改動檔案權限。它們補足第一包收據所列的略過項目；需要時分別還原到 `tmp/` 及 `.pytest_cache/`。
 
 原 `.pytest_cache` 已移出 repo 根目錄，暫存於 `data/maintenance/20260924/source-pytest-cache/`。其他原件仍在 repo 外暫存。同步完成前不移除暫存原件，不能將本頁視為 380 GiB 已經釋放的證明。
+
+## 剩餘收尾
+
+保持電腦與 Google Drive 運作，等待上傳完成。確認 Drive 顯示同步完成後，再移除 `E:\DSP_Dreamer_Archive_Staging\2026-09-24` 與上述 pytest 暫存的本機副本；G 槽封存包保留。這一步尚未執行，不需要逐包驗證或重新讀取錄像。
