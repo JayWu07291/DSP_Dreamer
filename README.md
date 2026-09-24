@@ -25,7 +25,7 @@
 
 24 份正式資料集約 158.5 GiB，位於 `data/datasets/<artifact_id>/`。共有 47 個完整有效回合，train 38、validation 4、offline-test 5；各微任務的 20／3／3 個正例配額已滿足。
 
-Issue #23 的[交付核對與覆蓋統計](docs/issue-23-status.md)已補齊。資料覆蓋與凍結身分通過；人工工時未記錄，正常／恢復工時比例及恢復情境覆蓋仍無法驗收。
+Issue #23 的[交付核對與覆蓋統計](docs/issue-23-status.md)已完成。資料覆蓋與凍結身分通過，六段恢復示範已人工確認；歷史工時保持未知，依使用者核准的[本批驗收例外](protocols/evaluation-v2.0.1-issue23.md)完成交付。
 
 - `data/training-index.json`：原有已凍結索引。
 - `data/evaluation/`：200 張重建圖片的名單、四類各 50 段預測序列、annotations、baseline 與資料凍結紀錄。

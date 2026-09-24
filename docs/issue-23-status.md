@@ -1,21 +1,21 @@
 # Issue #23 示範資料交付核對
 
-2026-09-25 核對 [Issue #23](https://github.com/JayWu07291/DSP_Dreamer/issues/23)。既有示範的資料覆蓋與凍結身分檢查通過。使用者已確認六段失誤恢復示範；本票仍有人工工時的證據缺口，不能宣稱六項驗收全部完成。
+2026-09-25 完成 [Issue #23](https://github.com/JayWu07291/DSP_Dreamer/issues/23) 本批資料交付驗收。使用者確認六段失誤恢復示範，並明確回覆「同意工時例外」。六項條件依[本批修訂 2.0.1](../protocols/evaluation-v2.0.1-issue23.md)完成驗收；歷史工時與比例仍缺測，工時條款以核准例外處理，沒有改稱原要求全部實測達標。
 
 使用者本日明確回覆人工工時「未紀錄」。初錄、補錄、正常流程與失誤恢復工時均記為未知，不以影片長度、完整回合時數、標註時間或原先預算代填，也不宣稱已達 3＋7 小時及 70／30 比例。
 
-後續已完成既有 train／validation 事件搜尋，使用者在本對話逐段確認 R1–R6 均為「失誤後修正」，回答與來源另存於[人工確認紀錄](issue-23-recovery-confirmation.json)。目前只需使用者決定工時缺測如何驗收，待核准草案見[人工接手事項](issue-23-handoff.md)。沒有新增「必須錄到固定數量失敗回合」的要求。
+使用者在本對話逐段確認 R1–R6 均為「失誤後修正」，回答與來源另存於[人工確認紀錄](issue-23-recovery-confirmation.json)。後續工時例外核准另存於[修訂封印](../protocols/evaluation-v2.0.1-issue23.json)，適用本批 TrainingIndex 與 data freeze。沒有新增「必須錄到固定數量失敗回合」的要求，本票已無待使用者處理事項。
 
 ## 逐條核對
 
 | #23 驗收條件 | 結果與證據 |
 | --- | --- |
-| 使用者人工示範、初錄分析後補錄及工時比例 | 人工示範與按缺口補錄已有歷史證據；工時未記錄，比例無法驗證。第八批診斷後沿固定 seed 順序補到第十八批。 |
-| 四檔驗證、編譯與來源追溯，保留失敗／恢復 | 正式資料沿用歷史驗證，24 份唯一錄製來源與 manifest checksum、COMPLETED、metadata 可追溯。保留 8 個無效回合及合法前綴；另有 6 段經使用者確認的失誤恢復示範。unknown_control 或 invalid 仍不當成遊戲失敗標註，片段內無效轉移維持原判定。 |
+| 使用者人工示範、初錄分析後補錄及工時比例 | 依核准例外驗收。人工示範與按缺口補錄已有歷史證據；第八批診斷後沿固定 seed 順序補到第十八批。工時與比例永久保留未知，不宣稱符合原 3＋7 小時及 70／30。 |
+| 四檔驗證、編譯與來源追溯，保留失敗／恢復 | 完成。正式資料沿用歷史驗證，24 份唯一錄製來源與 manifest checksum、COMPLETED、metadata 可追溯。保留 8 個無效回合及合法前綴；另有 6 段經使用者確認的失誤恢復示範。unknown_control 或 invalid 仍不當成遊戲失敗標註，片段內無效轉移維持原判定，人工示範不列為代理成果。 |
 | 逐微任務 20／3／3 正例與全部覆蓋 | 通過。16 項微任務、3 個 split 的 48 個缺口皆為 0，完整統計見下表及機器報告。 |
 | 重試、衍生片段不跨 split，隔離保留試驗 | 通過既有索引及本次身分核對。每份錄製僅保留一個正式衍生版本，按 group hash 重算 split 一致；40 份 development／final 的身分、group、seed、偏航與示範隔離。 |
-| 凍結資料、split、artifact IDs、checksums 與協定 | 已凍結，沿用 9 月 24 日 data freeze，未重抽 split 或改寫資料。正例 gate 已通過；未追認工時預算是否用盡。 |
-| 分開工時、capture、完整回合、合法前綴及容量；模型判讀獨立 | 資料時數與容量已分列，人工工時未知。模型品質仍 pending，training_authorized 與 offline_test_disclosure_authorized 均為 false。 |
+| 凍結資料、split、artifact IDs、checksums 與協定 | 完成。沿用 9 月 24 日 data freeze 及基礎 v2 原 bytes，另附限定本批的 2.0.1 驗收修訂；未重抽 split 或改寫資料。正例 gate 已通過，沒有工時用盡而配額不足的待辦；未追認實際工時是否用盡。 |
+| 分開工時、capture、完整回合、合法前綴及容量；模型判讀獨立 | 完成分列，人工工時缺測依核准例外保留未知。資料時數與容量見下文；容量不足停止新增、不自刪 evidence 的要求保留。模型品質仍 pending，training_authorized 與 offline_test_disclosure_authorized 均為 false。 |
 
 ## 覆蓋與時數
 
@@ -65,6 +65,7 @@
 | TrainingIndex | `7301b78d7d5caaa63b2f600201c9c41d0890123bfe47f1d264cc1e7aa3b2ba21` |
 | Data freeze | `57d8fbadf60c6a00ece0500dc5f3c14abc5e1ac546aed2edc11c88fd6390775f` |
 | Evaluation v2 | `40167e30d83bab5b60b19498ac45380899cd942d8f87fc347db37cae893a9e42` |
+| 本批驗收修訂 2.0.1 | `8959ecfd5fa8826dfe570c2afc126fdd624d829282bfa90606280b5538e7e1d6` |
 
 目前位置見 [data-catalog.json](data-catalog.json)，凍結原始路徑保留歷史身分。24 份 dataset 的 COMPLETED 宣告檔案長度加上 COMPLETED 本身，共 170,194,324,393 bytes，約 158.51 GiB；這不是本次重掃磁碟的實際占用量，也不包含封存 evidence、舊 dataset 或暫存峰值。
 
@@ -86,11 +87,15 @@
 
 工具核對凍結檔案與程式 checksum、來源集合、COMPLETED、metadata、轉移表、錄製與 episode 唯一性、固定 split、40 份保留試驗隔離、索引配額算術，並輸出來源及全部覆蓋統計。這是搬移後的輕量核對，不重讀 RGB／原始錄影，不重算 active reward 或合法起點，不能取代正式 `TrainingIndex.open` 的完整內容驗證。實際開始載入資料時仍按[正式資料位置](data-layout.md)執行正式 loader。
 
-本次機器報告為 [issue-23-audit.json](issue-23-audit.json)，保留當時狀態。後續恢復行為的人工確認另存，資料 gate 通過及六段確認均不能補證工時。#23 保持未全數完成；模型判讀、訓練授權、recipe freeze、offline-test 揭露及試驗輸入設定核對各自維持既有待辦狀態。
+本次機器報告為 [issue-23-audit.json](issue-23-audit.json)，保留當時狀態。恢復行為確認及工時例外核准均另存，舊報告的未檢查欄位不倒填。本批依修訂完成交付；模型判讀、訓練授權、recipe freeze、offline-test 揭露及試驗輸入設定核對各自維持既有待辦狀態。
 
 ## 本次驗證
 
 真實資料的輕量核對通過；工具拒絕 checksum 已改動的索引，不產生報告，也拒絕覆寫既有報告，原檔 bytes 保持一致。mypy 檢查套件與工具共 19 檔通過。
+
+工時例外核准後再次執行輕量核對，本機 `tmp/issue23-final-audit.json` 與原報告內容相同，artifact ID 仍為 `dd3a4a4cfdd98e6a82bd41ef315fe671c5e30dd6cc7953072b2919f383da9ffa`。此次只新增版本化驗收修訂及更新文件，沒有改動產品程式或重跑既有完整測試。
+
+修訂封印、8 個來源檔案 checksum、六段人工回答關聯及核准原文均通過核對；7 個既有 evaluation 凍結檔案與 catalog checksum 一致。原協定、候選、人工確認及機器報告 bytes 與 `91574f6` 相同。修改修訂內授權欄位但未重算封印的副本遭拒絕，原始檔案未變。
 
 完整 pytest 首輪為 128 passed、30 failed，失敗原因是整理後 .NET 測試專案缺少 `project.assets.json`。還原既有六個專案的依賴後，只重跑這 30 項，全部通過。合計 158 項通過，並非單輪 158 passed。兩輪 JUnit 位於本機 `tmp/issue23/pytest.xml`、`tmp/issue23/pytest-retry.xml`。沒有部署插件或改動遊戲設定。
 
@@ -100,6 +105,6 @@
 
 ## Spec
 
-獨立複核未發現新增待修問題或範圍擴張。當時 #23 的人工工時與失誤恢復證據仍不足。後續使用者確認六段恢復行為，剩餘工時條款維持未驗收，沒有宣稱六項條件全數通過。
+先前獨立複核未發現新增待修問題或範圍擴張。當時的兩類缺口已分別由使用者確認六段恢復行為，以及核准本批工時驗收例外處理。歷史工時缺測的事實仍保留。
 
-Standards 0 項待修；Spec 0 項新增待修。人工確認後，目前剩 1 類已揭露的驗收證據缺口，即歷史工時及比例缺測；驗收例外尚未核准。
+工時例外修訂的收尾複核亦通過：Standards 0 項待修；Spec 0 項新增待修。本批資料交付不再有未核准的驗收缺口；模型 gate 仍獨立待驗證。
