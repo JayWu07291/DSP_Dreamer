@@ -1,5 +1,7 @@
 # Dreamer 4 多任務訓練與 VPT 鍵鼠動作表示
 
+2026-09-24 整理說明：本文保留研究當時的引用路徑。`papers/` 與 `reference_codes/` 已移至[專案封存](../archive.md)，需要對照原文或參考碼時可按原路徑取回。
+
 ## 結論先行
 
 Dreamer 4 的 Minecraft 實驗其實很接近本專題目前選定的做法。它用一個共享模型學 20 個帶 `task_id` 的小任務，訓練時從完整遊玩資料抽取與各任務相關的片段，評估時則從空背包、隨機世界開始一個 60 分鐘 episode，依照固定 prompt sequence 逐步切換 task，並統計沿途取得的 milestone。論文沒有為 20 個任務各建一個獨立起始存檔，也沒有報告 20 組獨立 episodic success rate。

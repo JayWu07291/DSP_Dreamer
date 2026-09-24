@@ -1,1 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="5.395" timestamp="2026-09-13T17:16:50.986509+00:00" hostname="runnervmbkp6f"><testcase classname="tests.test_control" name="test_native_action_contract_matches_model_codec" time="5.284" /></testsuite></testsuites>
