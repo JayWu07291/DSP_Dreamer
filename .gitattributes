@@ -10,3 +10,4 @@ tools/freeze-evaluation-trials.ps1 text eol=lf
 # The state-completion handoff records these input files' raw hashes.
 docs/validation/prepare-ui-interaction-state-completion.py text eol=lf
 docs/validation/ui-interaction-state-proposals-20260924.json text eol=lf
+docs/validation/freeze-reviewed-evaluation.py text eol=lf
