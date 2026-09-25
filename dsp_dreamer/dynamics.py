@@ -70,6 +70,9 @@ class Dynamics(nn.Module):
         return function(value)
 
     def forward(self, noisy, actions, levels, step_size):
+        return self.latent_out(self.hidden(noisy, actions, levels, step_size)[:, :, :64])
+
+    def hidden(self, noisy, actions, levels, step_size):
         require(noisy.ndim == 4 and tuple(noisy.shape[2:]) == (64, 32)
                 and noisy.shape[0] > 0 and noisy.shape[1] > 0 and torch.isfinite(noisy).all().item(),
                 '不相容的 dynamics latent')
@@ -101,7 +104,7 @@ class Dynamics(nn.Module):
                 value = tokens.permute(0, 2, 1, 3).flatten(0, 1)
                 value = self._checkpoint(lambda x, layer=temporal: layer(x, src_mask=mask), value)
                 tokens = value.reshape(batch, count, steps, -1).permute(0, 2, 1, 3)
-        return self.latent_out(self.norm(tokens[:, :, :64]))
+        return self.norm(tokens)
 
     @torch.no_grad()
     def rollout(self, history, history_actions, future_actions, *, seed):

@@ -8,6 +8,8 @@ Issue #24 的 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/t
 
 Issue #25 的 [dynamics 訓練、恢復與配對預測評估工具](docs/dynamics.md)已完成修訂後五項工程驗收，逐項證據見[驗證紀錄](docs/issue-25-validation.md)。工程測試使用合成 fixtures；正式 A／B 訓練與實際品質驗收由 #31 執行，第一階段 B 仍須先通過重建 gate，尚無正式預測品質結果。
 
+Issue #26 的[任務條件微調、恢復與 policy/reward 評估工具](docs/agent.md)使用同源第一階段 checkpoint，並合併 reward、policy 與同一模型的 dynamics gate。[工程驗證](docs/issue-26-validation.md)使用合成 fixtures，產物為 `engineering_only`；正式第二階段訓練及候選資格仍由 #32 驗收。
+
 ## 專案結構
 
 | 路徑 | 用途 |
