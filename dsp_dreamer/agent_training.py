@@ -20,11 +20,18 @@ from .dynamics_training import (DynamicsTrainingConfig, load_tokenizer, read_dyn
 @dataclass(frozen=True)
 class AgentTrainingConfig(DynamicsTrainingConfig):
     max_seconds: float = 21600
+    world_learning_rate: float = 1e-5
+    dynamics_weight: float = 1.
+    policy_weight: float = 1.
+    reward_weight: float = 1.
 
     def __post_init__(self):
         super().__post_init__()
-        require(self.max_seconds <= 21600 and self.microbatch * self.accumulation % 2 == 0,
-                '第二階段需 50/50 batch，且最多 6 小時')
+        require(self.microbatch * self.accumulation % 2 == 0, '第二階段需 50/50 batch')
+        require(math.isfinite(self.world_learning_rate) and self.world_learning_rate > 0
+                and all(math.isfinite(v) and v >= 0 for v in
+                        (self.dynamics_weight, self.policy_weight, self.reward_weight))
+                and self.dynamics_weight + self.policy_weight + self.reward_weight > 0, 'Invalid agent learning setting')
 
 
 def require_stage_one(path, prediction, provenance):
@@ -133,9 +140,9 @@ class AgentTrainer:
             for decay in (True, False):
                 parameters = [p for n, p in self.model.named_parameters()
                               if n.startswith('dynamics.') == is_world and (p.ndim >= 2 and not n.endswith('bias')) == decay]
-                groups.append(dict(params=parameters, lr=1e-5 if is_world else 1e-4,
-                                   peak_lr=1e-5 if is_world else 1e-4, weight_decay=.01 if decay else 0.))
-        self.optimizer = torch.optim.AdamW(groups, betas=(.9, .999), eps=1e-8)
+                lr = config.world_learning_rate if is_world else config.learning_rate
+                groups.append(dict(params=parameters, lr=lr, peak_lr=lr, weight_decay=config.weight_decay if decay else 0.))
+        self.optimizer = torch.optim.AdamW(groups, betas=(config.beta1, config.beta2), eps=config.epsilon)
         self.pools = {length: sequence_pools(index, length) for length in {config.short_length, config.long_length}}
         require(all(p for pools in self.pools.values() for p in pools.values()), 'Train 缺少 uniform/relevant 合法 sequence')
         self.step, self.elapsed_seconds = 0, 0.
@@ -143,7 +150,7 @@ class AgentTrainer:
         self.history = []
 
     def samples(self, step):
-        length = self.config.long_length if step % 4 == 3 else self.config.short_length
+        length = self.config.long_length if step % self.config.long_every == self.config.long_every - 1 else self.config.short_length
         rng = random.Random(self.config.seed + step)
         samples = []
         for pool in ('uniform', 'relevant'):
@@ -159,9 +166,7 @@ class AgentTrainer:
         deadline = min(deadline or float('inf'), started + cfg.max_seconds - self.elapsed_seconds)
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
-        warmup = max(1, math.ceil(cfg.updates * .05))
-        factor = ((self.step + 1) / warmup if self.step < warmup else
-                  .1 + .9 * (1 + math.cos(math.pi * (self.step - warmup + 1) / max(1, cfg.updates - warmup))) / 2)
+        factor = cfg.lr_factor(self.step)
         for group in self.optimizer.param_groups:
             group['lr'] = group['peak_lr'] * factor
         length, samples = self.samples(self.step)
@@ -190,7 +195,8 @@ class AgentTrainer:
                     with torch.no_grad():
                         clean = self.tokenizer.encode(rgb).float()
                     if uniform:
-                        total, _, _ = shortcut_loss(self.model.dynamics, clean, past)
+                        _, flow, bootstrap = shortcut_loss(self.model.dynamics, clean, past)
+                        total = cfg.dynamics_weight * (cfg.flow_weight * flow + cfg.bootstrap_weight * bootstrap)
                         totals['dynamics'] += total.detach().item() * weight
                     else:
                         tasks = torch.from_numpy(np.stack([b['inputs']['task_condition'] for b in batches])).to(self.device)
@@ -200,13 +206,13 @@ class AgentTrainer:
                         tau = levels[..., None, None]
                         outputs = self.model(tau * clean + (1 - tau) * torch.randn_like(clean), past, tasks, levels)
                         losses = mtp_loss(outputs, actual, rewards, tasks, valid, valid)
-                        total = losses['total']
+                        total = cfg.policy_weight * losses['policy'] + cfg.reward_weight * losses['reward']
                         for key in ('policy', 'reward'):
-                            totals[key] += losses[key].detach().item() * weight
+                            totals[key] += getattr(cfg, key + '_weight') * losses[key].detach().item() * weight
                         counts = [a + b for a, b in zip(counts, losses['counts'])]
                 require(torch.isfinite(total).item(), '非有限 loss，停止訓練')
                 (total * weight).backward()
-        norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1., error_if_nonfinite=True)
+        norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
         if time.monotonic() >= deadline:
             raise TimeoutError('已達預算，未完成的 accumulation 不更新權重')
         self.optimizer.step()

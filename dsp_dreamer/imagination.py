@@ -36,10 +36,27 @@ TOOL_VERSIONS = dict(python=platform.python_version(), torch=str(torch.__version
 @dataclass(frozen=True)
 class ImaginationConfig(AgentTrainingConfig):
     max_seconds: float = 14400
+    policy_learning_rate: float = 3e-5
+    horizon: int = 15
+    gamma: float = .997
+    lambda_: float = .95
+    alpha: float = .5
+    kl_weight: float = .3
+    value_weight: float = 1.
 
     def __post_init__(self):
         super().__post_init__()
-        require(self.max_seconds <= 14400, '第三階段最多 4 小時')
+        require(type(self.horizon) is int and 1 <= self.horizon <= 15
+                and math.isfinite(self.policy_learning_rate) and self.policy_learning_rate > 0
+                and all(math.isfinite(v) and 0 <= v <= 1 for v in (self.gamma, self.lambda_, self.alpha))
+                and all(math.isfinite(v) and v >= 0 for v in (self.kl_weight, self.value_weight)),
+                'Invalid imagination learning setting')
+
+
+def imagination_recipe(config):
+    return dict(IMAGINATION_CONFIG, horizon=config.horizon, gamma=config.gamma, lambda_=config.lambda_,
+                alpha=config.alpha, beta=config.kl_weight,
+                policy_lr=config.policy_learning_rate, value_lr=config.learning_rate)
 
 
 def policy_distributions(logits):
@@ -86,18 +103,17 @@ def lambda_returns(rewards, values, *, gamma=.997, lambda_=.95):
     return torch.stack(result[::-1], -1).detach()
 
 
-def imagination_loss(logits, prior, actions, value_logits, returns, values):
+def imagination_loss(logits, prior, actions, value_logits, returns, values, *, alpha=.5, kl_weight=.3, value_weight=1.):
     policy = policy_distributions(logits)
     reference = policy_distributions({k: v.detach() for k, v in prior.items()})
     log_prob = action_log_prob(policy, actions)
     positive = (returns - values).detach() >= 0
     negative = ~positive
     # Empty sets contribute zero; counts are over the whole effective batch and horizon.
-    pmpo = .5 * (log_prob[negative].sum() / negative.sum().clamp_min(1)
-                 - log_prob[positive].sum() / positive.sum().clamp_min(1))
+    pmpo = (1 - alpha) * log_prob[negative].sum() / negative.sum().clamp_min(1) - alpha * log_prob[positive].sum() / positive.sum().clamp_min(1)
     kl = torch.stack([kl_divergence(policy[k], reference[k]) for k in policy]).sum(0).mean()
     value = -(twohot(returns.detach()) * value_logits.float().log_softmax(-1)).sum(-1).mean()
-    return dict(total=pmpo + .3 * kl + value, policy=pmpo, kl=kl, value=value,
+    return dict(total=pmpo + kl_weight * kl + value_weight * value, policy=pmpo, kl=kl, value=value,
                 positive=int(positive.sum()), negative=int(negative.sum()))
 
 
@@ -125,7 +141,7 @@ def require_stage_two(path, index, inputs, proof, provenance):
 
 
 def validate_imagination_checkpoint(value):
-    require(value['imagination_config'] == IMAGINATION_CONFIG, '不相容想像訓練配方')
+    require(value['imagination_config'] == imagination_recipe(ImaginationConfig(**value['training_config'])), '不相容想像訓練配方')
     require(value['tool_versions'] == TOOL_VERSIONS, '不相容訓練工具版本')
     source = value['stage_two_source']
     require(file_info(source['path']) == source['checkpoint'], '第二階段 checkpoint 已改變')
@@ -188,12 +204,12 @@ class ImaginationTrainer:
         for key in self.prior:
             self.model.heads[key].requires_grad_(True)
         groups = []
-        for module, lr in ((self.model, 3e-5), (self.value, 1e-4)):
+        for module, lr in ((self.model, config.policy_learning_rate), (self.value, config.learning_rate)):
             for decay in (True, False):
                 parameters = [p for n, p in module.named_parameters() if p.requires_grad
                               and (p.ndim >= 2 and not n.endswith('bias')) == decay]
-                groups.append(dict(params=parameters, lr=lr, peak_lr=lr, weight_decay=.01 if decay else 0.))
-        self.optimizer = torch.optim.AdamW(groups, betas=(.9, .999), eps=1e-8)
+                groups.append(dict(params=parameters, lr=lr, peak_lr=lr, weight_decay=config.weight_decay if decay else 0.))
+        self.optimizer = torch.optim.AdamW(groups, betas=(config.beta1, config.beta2), eps=config.epsilon)
         self.pools = {length: sequence_pools(index, length)['uniform'] for length in {config.short_length, config.long_length}}
         require(all(self.pools.values()), 'Train 缺少合法 context')
         self.step, self.elapsed_seconds = 0, 0.
@@ -217,14 +233,14 @@ class ImaginationTrainer:
         past = {k: v[:, -64:] for k, v in past.items()}
         task = torch.from_numpy(np.stack([b['inputs']['task_condition'][-1] for b in batches])).to(self.device)
         features, sampled = [], []
-        for t in range(16):
+        for t in range(self.config.horizon + 1):
             if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError('已達預算，想像 rollout 未完成')
             noisy = .1 * history + .9 * torch.randn_like(history)
             h = self.model.features(noisy, past, task[:, None].expand(-1, history.shape[1], -1),
                                     torch.full(history.shape[:2], .1, device=self.device))[:, -1]
             features.append(h.float())
-            if t == 15:
+            if t == self.config.horizon:
                 break
             action = sample_action(self.policy_logits(h.float()))
             sampled.append(action)
@@ -233,7 +249,7 @@ class ImaginationTrainer:
             history = torch.cat((history, following), 1)[:, -64:]
             past = {k: torch.cat((v, action[k][:, None]), 1)[:, -64:] for k, v in past.items()}
         return dict(features=torch.stack(features, 1), actions={k: torch.stack([a[k] for a in sampled], 1) for k in past},
-                    tasks=task.argmax(-1)[:, None].expand(-1, 16))
+                    tasks=task.argmax(-1)[:, None].expand(-1, self.config.horizon + 1))
 
     def policy_logits(self, features, *, prior=False):
         heads = self.prior if prior else self.model.heads
@@ -246,7 +262,7 @@ class ImaginationTrainer:
         require(self.frozen_hashes() == self.frozen, '凍結參數已改變')
         started = time.monotonic()
         deadline = min(deadline or float('inf'), started + cfg.max_seconds - self.elapsed_seconds)
-        length = cfg.long_length if self.step % 4 == 3 else cfg.short_length
+        length = cfg.long_length if self.step % cfg.long_every == cfg.long_every - 1 else cfg.short_length
         rng = random.Random(cfg.seed + self.step)
         samples = [rng.choice(self.pools[length]) for _ in range(cfg.microbatch * cfg.accumulation)]
         trajectories = []
@@ -259,20 +275,19 @@ class ImaginationTrainer:
         actions = {k: torch.cat([t['actions'][k] for t in trajectories]) for k in ('binary', 'mouse', 'wheel')}
         tasks = torch.cat([t['tasks'] for t in trajectories])
         with torch.no_grad():
-            rewards = reward_expectation(self.model.heads['reward'](features[:, :-1]).reshape(len(samples), 15, 9, 255)[:, :, 0])
+            rewards = reward_expectation(self.model.heads['reward'](features[:, :-1]).reshape(len(samples), cfg.horizon, 9, 255)[:, :, 0])
             rewards = torch.where(tasks[:, :-1] == 16, 0., rewards)
             values = reward_expectation(self.value(features))
-            returns = lambda_returns(rewards, values)
+            returns = lambda_returns(rewards, values, gamma=cfg.gamma, lambda_=cfg.lambda_)
             prior = self.policy_logits(features[:, :-1], prior=True)
         losses = imagination_loss(self.policy_logits(features[:, :-1]), prior, actions,
-                                  self.value(features[:, :-1]), returns, values[:, :-1])
+                                  self.value(features[:, :-1]), returns, values[:, :-1],
+                                  alpha=cfg.alpha, kl_weight=cfg.kl_weight, value_weight=cfg.value_weight)
         require(torch.isfinite(losses['total']).item(), '非有限 loss，停止訓練')
         losses['total'].backward()
         parameters = [p for group in self.optimizer.param_groups for p in group['params']]
-        norm = torch.nn.utils.clip_grad_norm_(parameters, 1., error_if_nonfinite=True)
-        warmup = max(1, math.ceil(cfg.updates * .05))
-        factor = ((self.step + 1) / warmup if self.step < warmup else
-                  .1 + .9 * (1 + math.cos(math.pi * (self.step - warmup + 1) / max(1, cfg.updates - warmup))) / 2)
+        norm = torch.nn.utils.clip_grad_norm_(parameters, cfg.grad_clip, error_if_nonfinite=True)
+        factor = cfg.lr_factor(self.step)
         for group in self.optimizer.param_groups:
             group['lr'] = group['peak_lr'] * factor
         if time.monotonic() >= deadline:
@@ -281,7 +296,7 @@ class ImaginationTrainer:
         require(self.frozen_hashes() == self.frozen, '凍結參數已改變')
         self.step += 1
         self.elapsed_seconds += time.monotonic() - started
-        result = dict(step=self.step, length=length, samples=samples, horizon=15, task_ids=tasks[:, 0].tolist(),
+        result = dict(step=self.step, length=length, samples=samples, horizon=cfg.horizon, task_ids=tasks[:, 0].tolist(),
             **{k: v.item() if torch.is_tensor(v) else v for k, v in losses.items()}, grad_norm=norm.item(),
             learning_rates=[g['lr'] for g in self.optimizer.param_groups], frozen=self.frozen)
         self.history.append(result)
@@ -292,7 +307,7 @@ class ImaginationTrainer:
         state = np.random.get_state(legacy=True)
         assert isinstance(state, tuple)
         payload = dict(self.source)
-        payload.update(schema='dsp-imagination-checkpoint/1', imagination_config=IMAGINATION_CONFIG,
+        payload.update(schema='dsp-imagination-checkpoint/1', imagination_config=imagination_recipe(self.config),
             tool_versions=TOOL_VERSIONS,
             stage_two_source=self.stage_two_source, stage_two_proof=self.proof, evaluation_inputs=self.inputs,
             prior=self.prior.state_dict(), value=self.value.state_dict(), frozen=self.frozen,

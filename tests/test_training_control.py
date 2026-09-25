@@ -18,7 +18,7 @@ def test_cli_records_frozen_identity_rejection_before_gpu_work(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     shutil.copytree(repo / 'dsp_dreamer', tmp_path / 'dsp_dreamer',
                     ignore=shutil.ignore_patterns('__pycache__'))
-    for name in ('tools/train.py', 'docs/issue-24-results.json', 'docs/training-history.json'):
+    for name in ('tools/train.py', 'training_config.py', 'docs/issue-24-results.json', 'docs/training-history.json'):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(repo / name, path)
@@ -33,6 +33,17 @@ def test_cli_records_frozen_identity_rejection_before_gpu_work(tmp_path):
     assert attempt['status'] == 'failed' and attempt['seconds'] >= 0
     assert sum(a['seconds'] for a in budget['attempts'] if a['stage'] == 'A') == 2305.2320443573
     assert budget['stages']['A']['updates'] == 0 and not (tmp_path / 'plan.json').exists()
+    result = subprocess.run([sys.executable, '-X', 'utf8', str(tmp_path / 'tools/train.py'),
+        'A', 'run', '--restart', '--catalog', 'catalog.json', '--protocol', str(repo / 'protocols/evaluation-v2.json'),
+        '--output', 'retry'], cwd=tmp_path, capture_output=True, text=True, encoding='utf-8', timeout=30)
+    assert result.returncode != 0
+    assert (tmp_path / 'retry').is_dir()  # Plan parent must exist before expensive benchmark work.
+    assert load(tmp_path / 'retry.logs/previous-budget.json')['attempts'] == budget['attempts']
+    current = load(tmp_path / 'runs/training-budget.json')
+    assert len(current['attempts']) == 3  # Two unrelated imported preflights plus this failed attempt.
+    assert current['attempts'][-1]['status'] == 'failed'
+    assert load(tmp_path / 'retry.logs/status.json')['status'] == 'failed'
+    assert 'Protocol identity mismatch' in (tmp_path / 'retry.logs/console.log').read_text(encoding='utf-8')
 
 
 def test_budget_failure_retry_and_throughput_plan(tmp_path):

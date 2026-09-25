@@ -14,7 +14,7 @@ from dsp_dreamer.training_index import TrainingIndex
 FFMPEG = Path(r"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe")
 
 
-def fixture(path, *, group="trial", retries=1, gap=False, fault=False):
+def fixture(path, *, group="trial", retries=1, gap=False, fault=False, pixel_value=0):
     with Recording.synthetic(path / "source", FFMPEG) as recording:
         recording.metadata.update(progress_version=1, progress_tech_ids=[1001, 1002, 1003, 1004, 1005])
         for attempt in range(retries):
@@ -33,7 +33,7 @@ def fixture(path, *, group="trial", retries=1, gap=False, fault=False):
                 if ticks == 600:
                     recording.end_episode(offset + 599, None if fault else "timeout", "recorder_fault" if fault else None)
                 request = recording.request(offset + ticks, ticks, ticks)
-                recording.complete(request, np.zeros((360, 640, 4), dtype=np.uint8))
+                recording.complete(request, np.full((360, 640, 4), pixel_value, dtype=np.uint8))
     evidence = recording.publish(path / "evidence")
     return compile_recording(evidence, path / "dataset", FFMPEG)
 

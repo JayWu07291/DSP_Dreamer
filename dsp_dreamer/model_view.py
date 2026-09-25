@@ -132,5 +132,5 @@ class ModelView:
                     source=[item["source"] for item in items])
 
 
-def open_model_view(path):
-    return ModelView(open_dataset(path))
+def open_model_view(path, *, verify_rgb=True):
+    return ModelView(open_dataset(path, verify_rgb=verify_rgb))

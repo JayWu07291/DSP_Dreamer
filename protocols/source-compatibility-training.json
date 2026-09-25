@@ -1,0 +1,55 @@
+{
+  "files": {
+    "dsp_dreamer/actions.py": {
+      "compatible": {
+        "bytes": 2885,
+        "sha256": "bf2807a968ef8d46c7ab5f0eb2f3284317b45b57483213857d1a95502666a67b"
+      },
+      "frozen": {
+        "bytes": 2874,
+        "sha256": "eef5084bbd63ad98efb3ed97c7d5a58c666c5307e0fd9e8df2e2042285a7f420"
+      },
+      "reason": "互斥群組改寫；完整 ACTION_CODEC 與合法控制組合不變。"
+    },
+    "dsp_dreamer/dataset.py": {
+      "compatible": {
+        "bytes": 24749,
+        "sha256": "99dbb541635ed665a175a5122fbfb060f7d1b19ebddf88a0b7e9dbd76b7c9b32"
+      },
+      "frozen": {
+        "bytes": 24557,
+        "sha256": "f638eb3bd6a987cc9dd9a103eb3468bd65a8b3dfbb68af4e3915a9f17ef4f47a"
+      },
+      "reason": "Read-only immutable-RGB loading option; full verification stays the default public loader behavior. Model view and index contents remain identical."
+    },
+    "dsp_dreamer/model_view.py": {
+      "compatible": {
+        "bytes": 8694,
+        "sha256": "a114ab70bc607ceea7bd87c56fafa7751e4b234c4394f991a87109d5ac926438"
+      },
+      "frozen": {
+        "bytes": 8651,
+        "sha256": "853b5b81597fc14c0c7b5df9a60b15e3b3fc9096db53e7aa17aea986bc6a4a8b"
+      },
+      "reason": "Read-only immutable-RGB loading option; full verification stays the default public loader behavior. Model view and index contents remain identical."
+    },
+    "dsp_dreamer/training_index.py": {
+      "compatible": {
+        "bytes": 11988,
+        "sha256": "6ac3f724846552fad519657e36e49193f56a09c6b6417e3212064c03816afc73"
+      },
+      "frozen": {
+        "bytes": 11905,
+        "sha256": "5c81e14e382330c0851776bc30530c31e5b4aee05dd6c7809fe9e8b2f4cbaff3"
+      },
+      "reason": "Read-only immutable-RGB loading option; full verification stays the default public loader behavior. Model view and index contents remain identical."
+    }
+  },
+  "index_id": "7301b78d7d5caaa63b2f600201c9c41d0890123bfe47f1d264cc1e7aa3b2ba21",
+  "note": "Frozen dataset, split and evaluation files are unchanged; this record permits exact implementation fingerprints only.",
+  "previous_compatibility": "7bb58ba946fc69b3b4f7e8fb4475f74e2a578a1921fa571abece27e88656eef6",
+  "request": "User requests immutable data/datasets reuse without full RGB verification for manual A retraining.",
+  "schema": "dsp-source-compatibility/1",
+  "source_freeze_id": "e8e53f0f8761b3a12522c3a31b10fc71ac38af8ccdc3c9906e4e14d757597131",
+  "artifact_id": "c0995c70f3296c52f5f64a73f20537997fc3d69c41fe4bafc8eec05b23b5a7a0"
+}

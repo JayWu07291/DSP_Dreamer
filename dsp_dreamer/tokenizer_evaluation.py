@@ -45,9 +45,9 @@ def read_frozen_evaluation(catalog_path, protocol_path):
     return catalog, inputs, annotations, freeze
 
 
-def open_frozen_corpus(catalog_path, protocol_path):
+def open_frozen_corpus(catalog_path, protocol_path, *, verify_rgb=True):
     catalog, inputs, annotations, freeze = read_frozen_evaluation(catalog_path, protocol_path)
-    index = TrainingIndex.open(catalog['training_index'], [s['path'] for s in catalog['sources']])
+    index = TrainingIndex.open(catalog['training_index'], [s['path'] for s in catalog['sources']], verify_rgb=verify_rgb)
     require(index.report['artifact_id'] == freeze['index_id'] == inputs['index_id']
             and index.report['coverage_gate_passed'], "資料覆蓋 gate 未通過或 index 不符")
     require(inputs['sources'] == [dict(artifact_id=s['artifact_id'], split=s['split'], model_view=s['model_view'])
@@ -133,7 +133,10 @@ def evaluate_reconstruction(checkpoint_path, index, loss, inputs, annotations, o
             filename = f'R{number:03d}-{name}.png'
             Image.fromarray((tensor.permute(1, 2, 0).cpu().numpy() * 255).round().astype(np.uint8)).save(output / filename)
             images[name] = dict(path=filename, **file_info(output / filename))
+        def spatial_std(tensor):
+            return tensor.reshape(3, 18, 20, 32, 20).mean((2, 4)).std((1, 2)).mean().item()
         rows.append(dict(sample=sample, context_start=start, context_length=end-start+1,
+                         source_spatial_std=spatial_std(target), reconstruction_spatial_std=spatial_std(predicted),
                          mse=mse, lpips=perceptual, ui_mse=ui_mse, ui_pixels=pixels, images=images))
         del batch, frames, decoded, target, predicted
     report = seal(dict(schema='dsp-reconstruction-metrics/1', recipe_id=recipe['artifact_id'],
@@ -146,7 +149,29 @@ def evaluate_reconstruction(checkpoint_path, index, loss, inputs, annotations, o
     atomic_save(output / 'judgments-template.json', judgments)
     result = score_reconstruction(report, inputs, annotations)
     atomic_save(output / 'gate.json', result)
+    write_reconstruction_review(output, rows, annotations)
     return result
+
+
+def write_reconstruction_review(output, rows, annotations):
+    lines = ['# Reconstruction review', '',
+             'Originals and reconstructions below. Human judgments remain in judgments-template.json.',
+             'Spatial variation is a diagnostic only; it does not replace the frozen recognition gate.', '']
+    for number, row in enumerate(rows, 1):
+        sample = row['sample']
+        items = [item for item in annotations['items'] if item['eligible'] and
+                 (item['artifact_id'], item['observation_index']) == (sample['artifact_id'], sample['observation_index'])]
+        if not items and number > 8:
+            continue
+        lines.extend([f'## R{number:03d}', '', f"MSE: {row['mse']:.6f}, LPIPS: {row['lpips']:.6f}", '',
+            f"Patch-mean spatial std: original {row['source_spatial_std']:.6f}, reconstruction {row['reconstruction_spatial_std']:.6f}", ''])
+        for kind in ('source', 'reconstruction'):
+            path = (output / row['images'][kind]['path']).resolve().as_posix()
+            lines.extend([f'![{kind}](<{path}>)', ''])
+        for item in items:
+            lines.append(f"- {item['sample_id']}: {item['type']}, expected {item['expected']}, box {item['box']}")
+        lines.append('')
+    (output / 'human-review.md').write_text('\n'.join(lines), encoding='utf-8')
 
 
 def score_reconstruction(metrics, inputs, annotations, judgments=None):

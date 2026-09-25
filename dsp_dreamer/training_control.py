@@ -21,10 +21,11 @@ from .evaluation_protocol import seal, verify_seal
 STAGE_SECONDS = dict(preflight=7200, A=14400, B=57600, second=21600, third=14400)
 
 
-def plan_updates(seconds, durations):
+def plan_updates(seconds, durations, *, fraction=.9):
     require(math.isfinite(seconds) and seconds > 0 and len(durations) >= 4 and len(durations) % 4 == 0
             and all(math.isfinite(v) and v > 0 for v in durations), '測速需完整四次更新及有限時間')
-    return math.floor(.9 * seconds * len(durations) / sum(durations))
+    require(math.isfinite(fraction) and 0 < fraction < 1, 'Invalid update fraction')
+    return math.floor(fraction * seconds * len(durations) / sum(durations))
 
 
 class TrainingBudget:
@@ -93,8 +94,34 @@ class TrainingBudget:
 
     def remaining(self, stage):
         require(stage in STAGE_SECONDS, '未知預算階段')
-        return max(0., min(STAGE_SECONDS[stage] - sum(a['seconds'] for a in self.state['attempts']
-            if a['stage'] == stage), sum(STAGE_SECONDS.values()) - sum(a['seconds'] for a in self.state['attempts'])))
+        limits = self.state.get('limits', STAGE_SECONDS)
+        return max(0., min(limits[stage] - sum(a['seconds'] for a in self.state['attempts']
+            if a['stage'] == stage), sum(limits.values()) - sum(a['seconds'] for a in self.state['attempts'])))
+
+    def configure_limits(self, limits):
+        require(set(limits) == set(STAGE_SECONDS) and all(math.isfinite(v) and v > 0 for v in limits.values()),
+                'Invalid stage budgets')
+        require(not self.formal or all(v <= STAGE_SECONDS[k] for k, v in limits.items()), '超過正式階段預算上限')
+        old = self.state.get('limits', STAGE_SECONDS)
+        require(all(old[k] == v or not any(a['stage'] == k for a in self.state['attempts']) for k, v in limits.items()),
+                '已使用的預算不能直接更改；先明確 --restart 封存該階段')
+        self.state['limits'] = dict(limits)
+        self.save()
+
+    def restart_stage(self, stage, archive):
+        require(self.active is None and stage in ('A', 'B', 'second', 'third'), 'Cannot restart active/unknown stage')
+        descendants = list(('A', 'B', 'second', 'third'))
+        descendants = descendants[descendants.index(stage) + 1:]
+        require(not any(a.get('target', a['stage']) in descendants for a in self.state['attempts']),
+                '下游已有訓練紀錄，不能單獨重設上游')
+        snapshot = copy.deepcopy(self.state)
+        atomic_save(archive, snapshot)
+        self.state.setdefault('restarts', []).append(dict(stage=stage, started=self.wall_clock(),
+            reason='User invoked --restart for fresh training', archive=str(Path(archive).resolve()), file=file_info(archive)))
+        self.state['attempts'] = [a for a in self.state['attempts'] if a.get('target', a['stage']) != stage]
+        for key in (stage, *descendants):
+            self.state['stages'].pop(key, None)
+        self.save()
 
     def progress(self, stage):
         return self.state['stages'].setdefault(stage, dict(updates=0, validation_seconds=0.,
@@ -218,26 +245,29 @@ def synchronize(trainer):
         torch.cuda.synchronize(trainer.device)
 
 
-def benchmark(trainer, budget, stage, output, *, update_limit=None):
+def benchmark(trainer, budget, stage, output, *, update_limit=None, fraction=.9, event=None):
     require(budget.active is not None and budget.active['stage'] == 'preflight'
             and budget.active['target'] == stage, '測速必須計入前置預算')
-    require(trainer.step == 0 and trainer.config.updates >= 4, '測速需要新的四步訓練器')
+    count = math.lcm(4, trainer.config.long_every)
+    require(trainer.step == 0 and trainer.config.updates >= count, '測速需要新的完整長短週期訓練器')
     if budget.formal:
         trainer.config.validate_formal()
         require(trainer.device.type == 'cuda' and all(s['source_kind'] == 'live' for s in trainer.index.report['sources'])
                 and getattr(trainer, 'formal', True), '合成 smoke 不可估計正式 throughput')
         torch.cuda.reset_peak_memory_stats(trainer.device)
     durations = []
-    for _ in range(4):
+    for _ in range(count):
         synchronize(trainer)
         started = budget.clock()
-        trainer.update(deadline=budget.deadline)
+        result = trainer.update(deadline=budget.deadline)
         synchronize(trainer)
         durations.append(budget.clock() - started)
+        if event:
+            event('benchmark_update', stage=stage, seconds=durations[-1], **result)
         budget.tick()
     progress = budget.progress(stage)
     require(progress['plan'] is None, '已有固定計畫，不可重新測速追加更新數')
-    ceiling = progress['updates'] + plan_updates(budget.remaining(stage), durations)
+    ceiling = progress['updates'] + plan_updates(budget.remaining(stage), durations, fraction=fraction)
     if 'update_ceiling' in progress:
         ceiling = min(ceiling, progress['update_ceiling'])
     if update_limit is not None:
@@ -250,7 +280,7 @@ def benchmark(trainer, budget, stage, output, *, update_limit=None):
         gpu=torch.cuda.get_device_name(trainer.device) if trainer.device.type == 'cuda' else None,
         peak_allocated_gib=torch.cuda.max_memory_allocated(trainer.device) / 2**30 if trainer.device.type == 'cuda' else None,
         peak_reserved_gib=torch.cuda.max_memory_reserved(trainer.device) / 2**30 if trainer.device.type == 'cuda' else None,
-        updates=ceiling, update_fraction=.9, remaining_seconds=budget.remaining(stage)))
+        updates=ceiling, update_fraction=fraction, remaining_seconds=budget.remaining(stage)))
     atomic_save(output, plan)
     progress['plan'] = plan
     progress['update_ceiling'] = ceiling
@@ -270,7 +300,7 @@ def preserve_rng(trainer):
         np.random.set_state(numpy)
 
 
-def run_training(trainer, budget, stage, output, evaluate):
+def run_training(trainer, budget, stage, output, evaluate, *, validation_seconds=1800, validation_updates=0, event=None):
     """evaluate(checkpoint, directory, full, deadline) 回傳既有評分器的 gate。"""
     require(budget.active is not None and budget.active['stage'] == stage, '訓練需要本階段預算')
     progress = budget.progress(stage)
@@ -294,6 +324,7 @@ def run_training(trainer, budget, stage, output, evaluate):
         action_codec=ACTION_CODEC, provenance=trainer.provenance)))
     status = 'completed'
     checkpoint_path = None
+    last_validation_step = progress.get('validation_step', 0)
 
     def save_checkpoint(label):
         nonlocal checkpoint_path
@@ -306,9 +337,15 @@ def run_training(trainer, budget, stage, output, evaluate):
         trainer.save(checkpoint_path)
         progress['latest'] = dict(path=str(checkpoint_path.resolve()), file=file_info(checkpoint_path), id=checkpoint_id)
         budget.tick()
+        if event:
+            event('checkpoint', stage=stage, step=trainer.step, path=str(checkpoint_path.resolve()), label=label,
+                  checkpoint=progress['latest']['file'])
         return checkpoint_path
 
     def validate(full):
+        nonlocal last_validation_step
+        if event:
+            event('validation_started', stage=stage, step=trainer.step, full=full)
         path = save_checkpoint('candidate' if full else f'validation-{progress["updates"]}')
         with preserve_rng(trainer):
             gate = evaluate(path, output / ('gate' if full else f'validation-{progress["updates"]}'), full, budget.deadline)
@@ -319,7 +356,11 @@ def run_training(trainer, budget, stage, output, evaluate):
                 progress['candidate'] = copy.deepcopy(progress['latest'])
         else:
             progress['validation_seconds'] = sum(a['seconds'] for a in budget.state['attempts'] if a['stage'] == stage)
+            progress['validation_step'] = last_validation_step = trainer.step
         budget.save()
+        if event:
+            event('validation_completed', stage=stage, step=trainer.step, full=full, gate=gate,
+                  path=str(output / ('gate' if full else f'validation-{progress["updates"]}')))
 
     try:
         save_checkpoint('start')
@@ -328,13 +369,18 @@ def run_training(trainer, budget, stage, output, evaluate):
             if budget.clock() >= budget.deadline or trainer.elapsed_seconds >= trainer.config.max_seconds:
                 raise TimeoutError('已達階段時數預算')
             spent = sum(a['seconds'] for a in budget.state['attempts'] if a['stage'] == stage)
-            if spent - progress['validation_seconds'] >= 1800:
+            if spent - progress['validation_seconds'] >= validation_seconds or (
+                    validation_updates and trainer.step - last_validation_step >= validation_updates):
                 validate(False)
             # 先記帳。強制終止或失敗的更新也消耗一次上限，不因舊 checkpoint 退回。
             progress['updates'] += 1
             budget.save()
             trainer.elapsed_seconds = sum(a['seconds'] for a in budget.state['attempts'] if a['stage'] == stage)
-            trainer.update(deadline=budget.deadline)
+            started = budget.clock()
+            result = trainer.update(deadline=budget.deadline)
+            if event:
+                event('update', stage=stage, seconds=budget.clock() - started, planned_updates=plan['updates'],
+                      remaining_seconds=max(0., budget.deadline - budget.clock()), **result)
         if budget.clock() >= budget.deadline:
             raise TimeoutError('已達階段時數預算')
         validate(True)
@@ -358,6 +404,9 @@ def run_training(trainer, budget, stage, output, evaluate):
             checkpoint=str(checkpoint_path) if checkpoint_path else None, updates=trainer.step, charged_updates=progress['updates'],
             planned_updates=plan['updates'], budget=copy.deepcopy(budget.state), gate=progress['gate']))
         atomic_save(output / 'run.json', report)
+        if event:
+            event('training_completed', stage=stage, status=status, step=trainer.step, planned_updates=plan['updates'],
+                  quality_status=report['quality_status'], path=str(output / 'run.json'))
     return report
 
 

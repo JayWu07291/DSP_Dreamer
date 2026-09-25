@@ -14,6 +14,7 @@ from torch.utils.checkpoint import checkpoint
 from .actions import ACTION_CODEC, validate_action_contract
 from .contract import atomic_save, file_info, load, require
 from .tokenizer import CausalTokenizer, TokenizerConfig
+from .optimization import OptimizerConfig
 
 
 class ReconstructionLoss:
@@ -38,18 +39,20 @@ class ReconstructionLoss:
             perceptual = self.metric(prediction * 2 - 1, target * 2 - 1).flatten()
         return torch.stack((mse, perceptual), dim=-1)
 
-    def __call__(self, prediction, target):
+    def __call__(self, prediction, target, *, mse_weight=1., lpips_weight=.2):
+        require(all(math.isfinite(v) and v >= 0 for v in (mse_weight, lpips_weight))
+                and mse_weight + lpips_weight > 0, 'Invalid reconstruction loss weights')
         prediction, target = prediction.flatten(0, 1), target.flatten(0, 1)
         # Keep the full native-resolution loss, recomputing AlexNet one frame at a time.
         values = [checkpoint(self.per_frame, p[None], t[None], use_reentrant=False)
                   if torch.is_grad_enabled() else self.per_frame(p[None], t[None])
                   for p, t in zip(prediction, target)]
         mse, perceptual = torch.cat(values).mean(0).unbind()
-        return mse + .2 * perceptual, mse, perceptual
+        return mse_weight * mse + lpips_weight * perceptual, mse, perceptual
 
 
 @dataclass(frozen=True)
-class TrainingConfig:
+class TrainingConfig(OptimizerConfig):
     updates: int
     seed: int = 2202
     microbatch: int = 2
@@ -58,16 +61,23 @@ class TrainingConfig:
     long_length: int = 80
     learning_rate: float = 1e-4
     max_seconds: float = 14400
+    mask_max_probability: float = .9
+    mse_weight: float = 1.
+    lpips_weight: float = .2
 
     def __post_init__(self):
+        super().__post_init__()
         require(all(type(v) is int and v > 0 for v in (self.updates, self.microbatch,
             self.accumulation, self.short_length, self.long_length)), "無效訓練步數或 batch")
-        require(math.isfinite(self.max_seconds) and 0 < self.max_seconds <= 14400
-                and self.learning_rate == 1e-4 and type(self.seed) is int, "無效訓練預算或配方")
+        require(math.isfinite(self.max_seconds) and self.max_seconds > 0
+                and math.isfinite(self.learning_rate) and self.learning_rate > 0 and type(self.seed) is int,
+                "無效訓練預算或配方")
+        require(math.isfinite(self.mask_max_probability) and 0 <= self.mask_max_probability <= 1
+                and all(math.isfinite(v) and v >= 0 for v in (self.mse_weight, self.lpips_weight))
+                and self.mse_weight + self.lpips_weight > 0, 'Invalid tokenizer loss/masking setting')
 
     def validate_formal(self):
-        require((self.microbatch, self.accumulation) in ((2, 8), (1, 16))
-                and (self.short_length, self.long_length) == (32, 80), "正式配方需 batch 16 及 32/80 steps")
+        require((self.microbatch, self.accumulation) in ((2, 8), (1, 16)), "正式配方需 batch 16")
 
 
 def read_checkpoint(path):
@@ -93,8 +103,9 @@ class TokenizerTrainer:
         no_decay: list[torch.nn.Parameter] = []
         for name, parameter in self.model.named_parameters():
             (no_decay if parameter.ndim < 2 or name.endswith("bias") else decay).append(parameter)
-        self.optimizer = torch.optim.AdamW([dict(params=decay, weight_decay=.01),
-            dict(params=no_decay, weight_decay=0.)], lr=config.learning_rate, betas=(.9, .999), eps=1e-8)
+        self.optimizer = torch.optim.AdamW([dict(params=decay, weight_decay=config.weight_decay),
+            dict(params=no_decay, weight_decay=0.)], lr=config.learning_rate,
+            betas=(config.beta1, config.beta2), eps=config.epsilon)
         self.step, self.elapsed_seconds = 0, 0.
         self.control: dict | None = None
         self.provenance = provenance or {}
@@ -105,7 +116,7 @@ class TokenizerTrainer:
         require(all(self.pools.values()), "Train 缺少合法 sequence")
 
     def samples(self, step):
-        length = self.config.long_length if step % 4 == 3 else self.config.short_length
+        length = self.config.long_length if step % self.config.long_every == self.config.long_every - 1 else self.config.short_length
         rng = random.Random(self.config.seed + step)
         return length, [rng.choice(self.pools[length])
                         for _ in range(self.config.microbatch * self.config.accumulation)]
@@ -117,10 +128,7 @@ class TokenizerTrainer:
         deadline = min(deadline or float('inf'), started + cfg.max_seconds - self.elapsed_seconds)
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
-        warmup = max(1, math.ceil(cfg.updates * .05))
-        factor = ((self.step + 1) / warmup if self.step < warmup else
-                  .1 + .9 * (1 + math.cos(math.pi * (self.step - warmup + 1) /
-                            max(1, cfg.updates - warmup))) / 2)
+        factor = cfg.lr_factor(self.step)
         for group in self.optimizer.param_groups:
             group['lr'] = cfg.learning_rate * factor
         length, samples = self.samples(self.step)
@@ -138,13 +146,14 @@ class TokenizerTrainer:
             # Mask RNG is independent of parameter count: the 64/96 runs see identical masks.
             generator = torch.Generator(device=self.device).manual_seed(cfg.seed + self.step * 16 + offset)
             with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.device.type == 'cuda'):
-                _, prediction = self.model(inputs, generator=generator)
-                total, mse, perceptual = self.loss(prediction, inputs)
+                _, prediction = self.model(inputs, generator=generator, mask_max_probability=cfg.mask_max_probability)
+                total, mse, perceptual = self.loss(prediction, inputs, mse_weight=cfg.mse_weight,
+                                                  lpips_weight=cfg.lpips_weight)
             require(torch.isfinite(total).item(), "非有限 loss，停止訓練")
             (total / cfg.accumulation).backward()
             totals += [value.detach().item() / cfg.accumulation for value in (total, mse, perceptual)]
             del inputs, prediction, total, mse, perceptual
-        norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1., error_if_nonfinite=True)
+        norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
         if time.monotonic() >= deadline:
             raise TimeoutError('已達訓練時數，未完成的 accumulation 不更新權重')
         self.optimizer.step()

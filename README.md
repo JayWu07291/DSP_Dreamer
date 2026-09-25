@@ -72,6 +72,8 @@ dotnet build src/DSPDreamer.Recorder/DSPDreamer.Recorder.csproj
 .venv/Scripts/python.exe -m mypy dsp_dreamer
 ```
 
+手動訓練的參數集中在 [training_config.py](training_config.py)。以 `tools/train.py A show-config` 檢視配方，`tools/train.py A run --restart` 封存舊紀錄後重訓 A；完整指令、log 與恢復方式見 [訓練說明](docs/training.md)。Agent 不會代為啟動或持續監看這次重訓。
+
 `tools/deploy-recorder.ps1` 用於部署；`tools/verify-control.py` 用於校正。重新部署會改變插件指紋，需要重新核准；本次整理沒有重新部署。插件校正路徑已改為 `data/runtime/calibration.json`，校正內容、核准值及其他設定未變。
 
 ## 評估協定

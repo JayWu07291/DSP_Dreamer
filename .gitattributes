@@ -5,5 +5,8 @@ docs/validation/*.ndjson text eol=lf
 # Frozen evaluation protocol hashes include these exact file bytes.
 protocols/* text eol=lf
 dsp_dreamer/evaluation_protocol.py text eol=lf
+dsp_dreamer/dataset.py text eol=lf
+dsp_dreamer/model_view.py text eol=lf
+dsp_dreamer/training_index.py text eol=lf
 tools/prepare-evaluation.py text eol=lf
 tools/freeze-evaluation-trials.ps1 text eol=lf

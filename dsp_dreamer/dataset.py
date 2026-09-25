@@ -191,14 +191,17 @@ def compile_recording(source, destination, ffmpeg):
 
 
 class Dataset:
-    def __init__(self, path, *, _completed=None):
+    def __init__(self, path, *, _completed=None, verify_rgb=True):
         self.path = Path(path)
         completed = load(self.path / "COMPLETED") if _completed is None else _completed
         require(completed["schema"] == "dsp-completed/1", "Unknown completion schema")
-        actual = {p.relative_to(self.path).as_posix() for p in self.path.rglob("*") if p.is_file()} - {"COMPLETED"}
-        require(actual == set(completed["files"]), "Dataset file inventory mismatch")
+        if verify_rgb:
+            actual = {p.relative_to(self.path).as_posix() for p in self.path.rglob("*") if p.is_file()} - {"COMPLETED"}
+            require(actual == set(completed["files"]), "Dataset file inventory mismatch")
         for name, info in completed["files"].items():
-            require(file_info(self.path / name) == info, f"Dataset checksum mismatch: {name}")
+            # Immutable training corpus: retain table/metadata checks, read RGB lazily.
+            if verify_rgb or not name.startswith('observations.zarr/rgb/c/'):
+                require(file_info(self.path / name) == info, f"Dataset checksum mismatch: {name}")
         self.metadata = load(self.path / "dataset.json")
         require({"schema", "catalog", "artifact_id", "source_artifact_id", "source_manifest", "source_kind",
                  "recording_session_id", "attempt_id", "episode_id", "ticks_frequency", "frame_count", "rgb_sha256",
@@ -317,10 +320,11 @@ class Dataset:
         if version == 4:
             require(reschedule_rows(self.rows, 4) == self.rows, "Progress v4 schedule mismatch")
         require(len(self.metadata["rgb_sha256"]) == self.metadata["frame_count"], "Missing RGB checksums")
-        for start in range(0, self.metadata["frame_count"], 32):
-            for offset, pixels in enumerate(np.asarray(self.rgb[start:start + 32])):
-                require(sha(pixels.tobytes()) == self.metadata["rgb_sha256"][start + offset],
-                        "Compiled RGB checksum mismatch")
+        if verify_rgb:
+            for start in range(0, self.metadata["frame_count"], 32):
+                for offset, pixels in enumerate(np.asarray(self.rgb[start:start + 32])):
+                    require(sha(pixels.tobytes()) == self.metadata["rgb_sha256"][start + offset],
+                            "Compiled RGB checksum mismatch")
 
     def __len__(self):
         return len(self.rows)
@@ -347,9 +351,9 @@ class Dataset:
                        for row in self.rows[start:start + length])]
 
 
-def open_dataset(path):
+def open_dataset(path, *, verify_rgb=True):
     try:
-        return Dataset(path)
+        return Dataset(path, verify_rgb=verify_rgb)
     except (KeyError, TypeError, IndexError) as error:
         from .contract import InvalidRecording
         raise InvalidRecording(f"Missing or invalid dataset field: {error}") from error

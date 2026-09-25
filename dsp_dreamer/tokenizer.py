@@ -60,7 +60,7 @@ class CausalTokenizer(nn.Module):
         latents, _ = self.encoder_cross(queries, patches, patches, need_weights=False)
         return self.encoder_norm(latents + queries)
 
-    def encode(self, frames, *, generator=None):
+    def encode(self, frames, *, generator=None, mask_max_probability=.9):
         require(frames.ndim == 5 and tuple(frames.shape[2:]) == (3, 360, 640),
                 "觀測必須為 B,T,3,360,640，不裁切、縮放或補邊")
         require(frames.is_floating_point() and torch.isfinite(frames).all().item()
@@ -69,7 +69,8 @@ class CausalTokenizer(nn.Module):
         mask = torch.zeros((batch * steps, 576, 1), device=frames.device, dtype=torch.bool)
         if self.training:
             # Dreamer 4 §3.1: per-image U(0,.9), replace patches, do not drop positions.
-            probability = .9 * torch.rand((batch * steps, 1, 1), device=frames.device, generator=generator)
+            require(0 <= mask_max_probability <= 1, 'Invalid mask probability')
+            probability = mask_max_probability * torch.rand((batch * steps, 1, 1), device=frames.device, generator=generator)
             mask = torch.rand(mask.shape, device=frames.device, generator=generator) < probability
         latents = self._checkpoint(self._encode_frames, frames.flatten(0, 1), mask)
         n = self.config.latent_tokens
@@ -96,6 +97,6 @@ class CausalTokenizer(nn.Module):
         pixels = self._checkpoint(self._decode_frames, latents.flatten(0, 1))
         return pixels.reshape(*latents.shape[:2], 3, 360, 640)
 
-    def forward(self, frames, *, generator=None):
-        latents = self.encode(frames, generator=generator)
+    def forward(self, frames, *, generator=None, mask_max_probability=.9):
+        latents = self.encode(frames, generator=generator, mask_max_probability=mask_max_probability)
         return latents, self.decode(latents)

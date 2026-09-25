@@ -15,10 +15,11 @@ from .dynamics import Dynamics, DynamicsConfig, shortcut_loss
 from .tokenizer import CausalTokenizer, TokenizerConfig
 from .tokenizer_training import read_checkpoint
 from .tokenizer_evaluation import score_reconstruction
+from .optimization import OptimizerConfig
 
 
 @dataclass(frozen=True)
-class DynamicsTrainingConfig:
+class DynamicsTrainingConfig(OptimizerConfig):
     updates: int
     seed: int = 2203
     microbatch: int = 2
@@ -27,16 +28,20 @@ class DynamicsTrainingConfig:
     long_length: int = 80
     learning_rate: float = 1e-4
     max_seconds: float = 57600
+    flow_weight: float = 1.
+    bootstrap_weight: float = 1.
 
     def __post_init__(self):
+        super().__post_init__()
         require(all(type(v) is int and v > 0 for v in (self.updates, self.microbatch,
                 self.accumulation, self.short_length, self.long_length)), '無效訓練步數或 batch')
-        require(type(self.seed) is int and self.learning_rate == 1e-4
-                and math.isfinite(self.max_seconds) and 0 < self.max_seconds <= 57600, '無效訓練預算或配方')
+        require(type(self.seed) is int and math.isfinite(self.learning_rate) and self.learning_rate > 0
+                and math.isfinite(self.max_seconds) and self.max_seconds > 0, '無效訓練預算或配方')
+        require(all(math.isfinite(v) and v >= 0 for v in (self.flow_weight, self.bootstrap_weight))
+                and self.flow_weight + self.bootstrap_weight > 0, 'Invalid dynamics loss weights')
 
     def validate_formal(self):
-        require((self.microbatch, self.accumulation) in ((2, 8), (1, 16))
-                and (self.short_length, self.long_length) == (32, 80), '正式配方需 batch 16 及 32/80 steps')
+        require((self.microbatch, self.accumulation) in ((2, 8), (1, 16)), '正式配方需 batch 16')
 
 
 def require_reconstruction(proof, tokenizer_sha256, provenance):
@@ -120,8 +125,9 @@ class DynamicsTrainer:
         no_decay: list[torch.nn.Parameter] = []
         for name, parameter in self.model.named_parameters():
             (no_decay if parameter.ndim < 2 or name.endswith('bias') else decay).append(parameter)
-        self.optimizer = torch.optim.AdamW([dict(params=decay, weight_decay=.01),
-            dict(params=no_decay, weight_decay=0.)], lr=config.learning_rate, betas=(.9, .999), eps=1e-8)
+        self.optimizer = torch.optim.AdamW([dict(params=decay, weight_decay=config.weight_decay),
+            dict(params=no_decay, weight_decay=0.)], lr=config.learning_rate,
+            betas=(config.beta1, config.beta2), eps=config.epsilon)
         self.step, self.elapsed_seconds = 0, 0.
         self.control: dict | None = None
         self.history = []
@@ -131,7 +137,7 @@ class DynamicsTrainer:
         require(all(self.pools.values()), 'Train 缺少合法 sequence')
 
     def samples(self, step):
-        length = self.config.long_length if step % 4 == 3 else self.config.short_length
+        length = self.config.long_length if step % self.config.long_every == self.config.long_every - 1 else self.config.short_length
         rng = random.Random(self.config.seed + step)
         return length, [rng.choice(self.pools[length]) for _ in range(self.config.microbatch * self.config.accumulation)]
 
@@ -142,9 +148,7 @@ class DynamicsTrainer:
         deadline = min(deadline or float('inf'), started + cfg.max_seconds - self.elapsed_seconds)
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
-        warmup = max(1, math.ceil(cfg.updates * .05))
-        factor = ((self.step + 1) / warmup if self.step < warmup else
-                  .1 + .9 * (1 + math.cos(math.pi * (self.step - warmup + 1) / max(1, cfg.updates - warmup))) / 2)
+        factor = cfg.lr_factor(self.step)
         for group in self.optimizer.param_groups:
             group['lr'] = cfg.learning_rate * factor
         length, samples = self.samples(self.step)
@@ -171,10 +175,11 @@ class DynamicsTrainer:
                     clean = self.tokenizer.encode(rgb).float()
                 del rgb
                 total, flow, bootstrap = shortcut_loss(self.model, clean, actions)
+                total = cfg.flow_weight * flow + cfg.bootstrap_weight * bootstrap
             require(torch.isfinite(total).item(), '非有限 loss，停止訓練')
             (total / cfg.accumulation).backward()
             totals += [v.detach().item() / cfg.accumulation for v in (total, flow, bootstrap)]
-        norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1., error_if_nonfinite=True)
+        norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
         if time.monotonic() >= deadline:
             raise TimeoutError('已達預算，未完成的 accumulation 不更新權重')
         self.optimizer.step()

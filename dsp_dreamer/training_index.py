@@ -15,7 +15,7 @@ COVERAGE_REQUIREMENTS = {"train": 20, "validation": 3, "offline-test": 3}
 
 
 class TrainingIndex:
-    def __init__(self, paths, registry, *, length=64):
+    def __init__(self, paths, registry, *, length=64, verify_rgb=True):
         require(type(length) is int and length > 0, "Invalid sequence length")
         require(isinstance(registry, dict) and registry.get("schema") == "dsp-split-registry/1"
                 and isinstance(registry.get("manifests"), list), "Invalid split registry")
@@ -39,7 +39,7 @@ class TrainingIndex:
                             active_activations=0, active_reward_episodes=0, live_active_reward_episodes=0,
                             non_active_completions=0, required=threshold, deficit=threshold, passed=False)
                             for i, name in enumerate(TASKS[:16])]) for split, threshold in COVERAGE_REQUIREMENTS.items()}
-        views = sorted((open_model_view(path) for path in paths), key=lambda v: v.metadata["source_artifact_id"])
+        views = sorted((open_model_view(path, verify_rgb=verify_rgb) for path in paths), key=lambda v: v.metadata["source_artifact_id"])
         versions = {v.dataset.metadata['progress_version'] for v in views}
         require(4 not in versions or versions == {4}, "Cannot mix v4 and legacy task schedules")
         for view in views:
@@ -172,13 +172,13 @@ class TrainingIndex:
         atomic_save(path, self.report)
 
     @classmethod
-    def open(cls, path, sources):
+    def open(cls, path, sources, *, verify_rgb=True):
         report = load(path)
         require(isinstance(report, dict) and report.get("schema") == "dsp-training-index/1"
                 and all(k in report for k in ("artifact_id", "registry", "sequence_length")), "Invalid training index")
         payload = {k: v for k, v in report.items() if k != "artifact_id"}
         require(report["artifact_id"] == sha(json.dumps(payload, sort_keys=True, allow_nan=False).encode()),
                 "Training index checksum mismatch")
-        index = cls(sources, report["registry"], length=report["sequence_length"])
+        index = cls(sources, report["registry"], length=report["sequence_length"], verify_rgb=verify_rgb)
         require(index.report == report, "Training index differs from verified sources")
         return index

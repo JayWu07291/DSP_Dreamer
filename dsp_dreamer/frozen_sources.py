@@ -5,7 +5,7 @@ from .contract import file_info, load, require
 from .evaluation_protocol import verify_seal
 
 
-COMPATIBILITY = Path(__file__).resolve().parents[1] / 'protocols/source-compatibility-issue31.json'
+COMPATIBILITY = Path(__file__).resolve().parents[1] / 'protocols/source-compatibility-training.json'
 
 
 def verify_frozen_implementation(files, source_freeze_id):
