@@ -173,6 +173,8 @@ def compile_recording(source, destination, ffmpeg):
                     diagnostic_mode=manifest.get("diagnostic_mode", False))
     metadata.update(progress_version=manifest.get("progress_version"), tasks=TASKS, milestones=MILESTONES)
     metadata["recovery"] = manifest.get("recovery")
+    if "runner" in manifest:
+        metadata["runner"] = manifest["runner"]
     metadata.update(action_codec=ACTION_CODEC, capture_hz=20, runtime=manifest.get("runtime"),
                     array_metadata=rgb.metadata.to_dict(),
                     tables={name: table_contract(destination / name) for name in ("transitions.parquet", "events.parquet")})

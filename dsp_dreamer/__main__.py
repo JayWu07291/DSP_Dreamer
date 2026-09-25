@@ -43,6 +43,15 @@ def main():
             compile_recording(evidence, dataset, args.ffmpeg)
         result = open_dataset(dataset)
         require(result.metadata["source_manifest"] == file_info(evidence / "manifest.json"), "Different dataset source")
+        if result.metadata.get('runner'):
+            from .runner import episode_result
+            from .contract import atomic_save
+            report = args.source.with_name(args.source.name + '.result.json')
+            expected = episode_result(result)
+            if report.exists():
+                require(load(report) == expected, '既有回合結果不符')
+            else:
+                atomic_save(report, expected)
         print(json.dumps(dict(evidence=str(evidence), dataset=str(dataset), transitions=len(result),
                               source_kind=result.metadata["source_kind"])))
     elif args.command == "recover":

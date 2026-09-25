@@ -61,6 +61,7 @@ namespace DSPDreamer.Recorder
             repository = Config.Bind("Recording", "Repository", "", "Production dsp_dreamer package directory.");
             ConfigureEpisodes();
             ConfigureControl();
+            ConfigureRunner();
             harmony = new Harmony("tw.jaywu.dspdreamer.recorder");
             harmony.PatchAll(typeof(RecorderPlugin).Assembly);
             StartCoroutine(CaptureLoop());
@@ -82,7 +83,9 @@ namespace DSPDreamer.Recorder
             hashes["UnityPlayer"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "UnityPlayer.dll"));
             hashes["DSPGAME"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "DSPGAME.exe"));
             hashes["globalgamemanagers"] = SegmentWriter.HashFile(Path.Combine(Paths.GameRootPath, "DSPGAME_Data", "globalgamemanagers"));
-            if ((string)hashes["Assembly-CSharp"] != "ae0ba95f75bd879a62aa4ce253b2ab78eaa4fb3c7c595f5e1fee75ebe0e0ef85")
+            if (!new[] { "ae0ba95f75bd879a62aa4ce253b2ab78eaa4fb3c7c595f5e1fee75ebe0e0ef85",
+                         "c43a484f6adf8a9e4b956156047070891b46860d5b5c707ba1377b6a2af25732" }
+                .Contains((string)hashes["Assembly-CSharp"]))
                 throw new InvalidOperationException("Unknown game binary fingerprint");
             if (typeof(BaseUnityPlugin).Assembly.GetName().Version.ToString() != "5.4.23.5" ||
                 typeof(Harmony).Assembly.GetName().Version.ToString() != "2.9.0.0" || IntPtr.Size != 8 ||
@@ -136,7 +139,7 @@ namespace DSPDreamer.Recorder
             metadata["trial_manifest"] = trial;
             metadata["episodes"] = episodes;
             metadata["capture_rate_hz"] = 20;
-            diagnosticMode = diagnostics.Value || mode == "calibration";
+            diagnosticMode = diagnostics.Value || mode == "calibration" || runnerIdentity != null;
             metadata["diagnostic_mode"] = diagnosticMode;
             metadata["control_mode"] = mode;
             metadata["calibration_sha256"] = mode == "calibration" ? null : calibrationApproval.Value;
@@ -187,6 +190,13 @@ namespace DSPDreamer.Recorder
                 row["attempt_id"] = episode["attempt_id"];
             }
             foreach (var pair in fields) row[pair.Key] = pair.Value;
+            if (type == "input" && runnerIdentity != null)
+            {
+                policyInputs.Enqueue(Json.Fields("ticks", row["ticks"], "sequence_number", row["sequence_number"],
+                    "held", row["held"], "down", row["down"], "up", row["up"], "delta", row["delta"],
+                    "wheel", row["wheel"], "horizontal_wheel", row["horizontal_wheel"]));
+                while (policyInputs.Count > 8192) policyInputs.Dequeue();
+            }
             if (!events.TryAdd(Json.Encode(row))) { failed = true; active = false; }
         }
 
@@ -280,6 +290,7 @@ namespace DSPDreamer.Recorder
                             slot.Identity["readback_completed_ticks"] = Stopwatch.GetTimestamp();
                             cursor.Item2(slot.Pixels);
                             CaptureCompleted(slot.Identity);
+                            RunnerCapture(slot);
                             slot.MetadataSnapshot = Json.Encode(metadata);
                             stage = "writer_backpressure";
                             if (!frames.TryAdd(slot)) throw new IOException("Writer queue full");
@@ -421,6 +432,11 @@ namespace DSPDreamer.Recorder
 
         private void Update()
         {
+            if (Input.GetKeyDown(KeyCode.F5) && !active && !stopping)
+            {
+                try { StartRunner(); }
+                catch (Exception ex) { CloseRunner(); Logger.LogError(ex); }
+            }
             if (!active && !stopping && Input.GetKeyDown(KeyCode.F6))
             {
                 try { StartRecording("calibration"); }
@@ -431,6 +447,7 @@ namespace DSPDreamer.Recorder
                 try
                 {
                     if (active) { stopPending = true; EndEpisode(reason: "stopped"); }
+                    else if (runnerStarting) CloseRunner();
                     else if (!stopping) StartRecording();
                 }
                 catch (Exception ex) { Logger.LogError(ex); }
@@ -441,8 +458,18 @@ namespace DSPDreamer.Recorder
                 if (active && Input.GetKeyDown(KeyCode.F9)) { resetPending = true; EndEpisode(reason: "reset"); }
                 EpisodeUpdate();
                 ControlUpdate();
+                RunnerUpdate();
             }
-            catch (Exception ex) { failed = true; Logger.LogError(ex); }
+            catch (Exception ex)
+            {
+                if (policyWorker != null)
+                {
+                    EndEpisode(reason: "injection_failure");
+                    CloseRunner();
+                }
+                else failed = true;
+                Logger.LogError(ex);
+            }
             PumpFinalization();
         }
 
@@ -467,6 +494,7 @@ namespace DSPDreamer.Recorder
 
         internal void StopRecording()
         {
+            CloseRunner();
             if (writer == null || stopping) return;
             // A fatal writer/queue fault may already have disabled capture. Close its episode anyway.
             // Finalize-worker failures occur after stopping and must not rewrite capture outcomes.

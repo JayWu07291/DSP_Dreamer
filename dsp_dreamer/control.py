@@ -26,8 +26,13 @@ def inspect_control(dataset):
     identity_probes = []
     for index, command in enumerate(commands):
         start = command.get("requested_ticks", command["ticks"])
-        end = commands[index + 1].get("requested_ticks", commands[index + 1]["ticks"]) if index + 1 < len(commands) else final_ticks
         first = bisect_left(input_ticks, start)
+        end = commands[index + 1].get("requested_ticks", commands[index + 1]["ticks"]) if index + 1 < len(commands) else final_ticks
+        if command['operation'] == 'model_action' and all(command[k] == v for k, v in ACTION_CODEC['noop'].items()):
+            # Co-submitted no-op/release may share the next sample, but never cross an observed retry.
+            end = next((c.get('requested_ticks', c['ticks']) for c in commands[index + 1:]
+                        if c['operation'] != 'release_all' or
+                        bisect_left(input_ticks, c.get('requested_ticks', c['ticks'])) > first), final_ticks)
         samples = inputs[first:bisect_left(input_ticks, end)]
         submitted = (command.get("succeeded") is True and type(command.get("sent_count")) is int
                      and type(command.get("requested_count")) is int
@@ -36,7 +41,9 @@ def inspect_control(dataset):
             if not requests:
                 continue  # Baseline preparation releases precede the first controllable observation.
             end = next((c.get("requested_ticks", c["ticks"]) for c in commands[index + 1:]
-                        if c["operation"] != "release_all"), final_ticks)
+                        if (c["operation"] != "release_all" or
+                            bisect_left(input_ticks, c.get('requested_ticks', c['ticks'])) > first) and not
+                        (c["operation"] == "model_action" and all(c[k] == v for k, v in ACTION_CODEC['noop'].items()))), final_ticks)
             samples = inputs[first:bisect_left(input_ticks, end)]
             empty = next((s for s in samples if not s["held"]), None)
             releases.append(dict(sequence_number=command["sequence_number"], submitted=submitted,
@@ -106,6 +113,7 @@ def inspect_control(dataset):
         requests.append(dict(request_id=command["request_id"], binary=command["binary"], mouse=command["mouse"],
             wheel=command["wheel"], submitted=submitted, observed=observed, failure_reasons=reasons,
             game_reset_refs=reset_refs, observed_delta=delta,
+            observed_ticks=observed_ticks if observed else None,
             observed_wheel=wheel, sample_refs=[s["sequence_number"] for s in samples],
             latency_ms=(observed_ticks - start) * 1000 / frequency if observed and observed_ticks is not None else None,
             held_ms=held_ms))

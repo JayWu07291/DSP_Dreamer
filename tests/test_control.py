@@ -9,8 +9,8 @@ import pytest
 from dsp_dreamer import Recording, compile_recording, open_dataset
 from dsp_dreamer.control import inspect_control, publish_calibration
 from dsp_dreamer import InvalidRecording
-from dsp_dreamer.actions import SCANCODES, decode_action, forbidden_buttons
-from dsp_dreamer.contract import CATALOG, CONTROLS
+from dsp_dreamer.actions import ACTION_CODEC, SCANCODES, decode_action, forbidden_buttons
+from dsp_dreamer.contract import CATALOG, CONTROLS, sha
 
 
 FFMPEG = Path(r"E:\SubtitleEdit-Windows-x64\SpeechToText\Purfview-Faster-Whisper-XXL\ffmpeg.exe")
@@ -21,6 +21,13 @@ def test_native_action_contract_matches_model_codec():
     subprocess.run(["dotnet", "build", str(project / "ControlReplay.csproj"), "--no-restore"], check=True, capture_output=True)
     result = json.loads(subprocess.check_output([str(project / "bin/Debug/net472/ControlReplay.exe")], text=True))
     assert result["controls"] == CONTROLS
+    assert result['codec_sha256'] == sha(json.dumps(ACTION_CODEC, sort_keys=True).encode())
+    from dsp_dreamer.runner import timing_report
+    cases = [[], [20] * 99 + [101], [80] * 100, [81] * 100, [20] * 500]
+    results = [timing_report([dict(step=i, capture_ticks=i * 1000, requested_ticks=i * 1000 + v,
+                                  missed=v > 100 or case == 4 and i < 5) for i, v in enumerate(values)], 1000)['passed']
+               for case, values in enumerate(cases)]
+    assert result['timing_passed'] == results == [False, True, True, False, False]
     assert result["scan_codes"] == [v or 0 for v in SCANCODES]
     assert result["scan_codes"][1:3] == [2, 3]
     assert result["controls"][13] == "X" and result["controls"][20] == "B"
@@ -58,7 +65,7 @@ def test_requests_never_replace_observed_training_labels(tmp_path):
     assert report["gate_passed"] is False
 
 
-@pytest.mark.parametrize("fault", [None, "partial_send", "missing_down", "stuck_release", "early_up", "rejected", "deadline_miss", "boundary"])
+@pytest.mark.parametrize("fault", [None, "partial_send", "missing_down", "stuck_release", "early_up", "rejected", "deadline_miss", "boundary", "release_noop", "final_noop_release", "retry_release"])
 def test_control_confirmation_and_release_from_compiled_evidence(tmp_path, fault):
     with Recording.synthetic(tmp_path / "source", FFMPEG) as recording:
         recording.metadata["diagnostic_mode"] = True
@@ -73,16 +80,30 @@ def test_control_confirmation_and_release_from_compiled_evidence(tmp_path, fault
             recording.input(85, held=[], down=[], up=["MouseLeft"], delta=[0, 0], wheel=0)
         recording.events.append(dict(recording.identity(175), type="control_request", operation="release_all",
             requested_ticks=175, sent_count=20, requested_count=20, succeeded=True))
-        recording.input(185, held=["MouseLeft"] if fault == "stuck_release" else [], down=[],
-                        up=[] if fault in ("stuck_release", "early_up") else ["MouseLeft"], delta=[0, 0], wheel=0)
+        if fault in ("release_noop", "final_noop_release", "retry_release"):
+            recording.events.append(dict(recording.identity(176), type="control_request", operation="model_action",
+                request_id=2, catalog=CATALOG, **ACTION_CODEC['noop'], requested_ticks=176,
+                sent_count=0, requested_count=0, succeeded=True))
+        if fault == "final_noop_release":
+            recording.events.append(dict(recording.identity(177), type="control_request", operation="release_all",
+                requested_ticks=177, sent_count=21, requested_count=21, succeeded=True))
+        recording.input(185, held=["MouseLeft"] if fault in ("stuck_release", "retry_release") else [], down=[],
+                        up=[] if fault in ("stuck_release", "early_up", "retry_release") else ["MouseLeft"], delta=[0, 0], wheel=0)
         if fault in ("rejected", "deadline_miss"):
             recording.events.append(dict(recording.identity(190), type="control_request", operation=fault))
+        if fault in ("release_noop", "retry_release"):
+            recording.events.append(dict(recording.identity(225), type="control_request", operation="release_all",
+                requested_ticks=225, sent_count=21, requested_count=21, succeeded=True))
+            recording.input(235, held=[], down=[], up=["MouseLeft"] if fault == "retry_release" else [], delta=[0, 0], wheel=0)
         for ticks in (50, 100, 150, 200, 250):
             frame = recording.request(ticks, 1, 1)
             recording.complete(frame, np.zeros((360, 640, 4), dtype=np.uint8))
     dataset = open_dataset(compile_recording(recording.publish(tmp_path / "evidence"), tmp_path / "dataset", FFMPEG))
     report = inspect_control(dataset)
-    assert report["gate_passed"] is (fault in (None, "boundary"))
+    assert report["gate_passed"] is (fault in (None, "boundary", "release_noop", "final_noop_release"))
+    if fault == "retry_release":
+        assert not report['releases'][0]['released'] and report['releases'][1]['released']
+        assert not report['requests'][1]['observed']
     if fault is None:
         assert report["requests"][0]["latency_ms"] == 10
         assert report["requests"][0]["held_ms"] == 120

@@ -137,11 +137,11 @@ namespace DSPDreamer.Recorder
             if (outcome != null && outcome != "success" && outcome != "death" && outcome != "timeout" && outcome != "unrecoverable")
                 throw new ArgumentException("Unknown episode outcome");
             string[] allowed = { "stopped", "focus_loss", "human_intervention", "injection_failure", "recorder_fault",
-                "schema_error", "unknown_control", "fingerprint_mismatch", "reset", "world_unloaded" };
+                "schema_error", "unknown_control", "fingerprint_mismatch", "reset", "world_unloaded", "system_latency" };
             if (reason != null && !allowed.Contains(reason)) throw new ArgumentException("Unknown validity reason");
             if (outcome == null && reason == null) throw new ArgumentException("Missing episode end reason");
             if (!active || episode == null || episode["end_ticks"] != null) return;
-            if (selectedDiagnostic != "full") stopPending = true;
+            if (selectedDiagnostic != "full" || runnerIdentity != null) stopPending = true;
             long now;
             lock (progressGate)
             {
@@ -151,6 +151,7 @@ namespace DSPDreamer.Recorder
             }
             episode["episode_outcome"] = outcome;
             var reasons = (List<string>)episode["validity_reasons"];
+            if (runnerIdentity != null && !RunnerTimingPassed() && !reasons.Contains("system_latency")) reasons.Add("system_latency");
             if (reason != null && !reasons.Contains(reason)) reasons.Add(reason);
             Emit("game_event", Json.Fields("name", "episode_ended", "episode_id", episode["episode_id"],
                 "outcome", outcome, "reason", reason));
@@ -220,8 +221,18 @@ namespace DSPDreamer.Recorder
         private struct MouseInput { public int X, Y; public uint Data, Flags, Time; public UIntPtr Extra; }
         [StructLayout(LayoutKind.Sequential)]
         private struct KeyboardInput { public ushort Key, Scan; public uint Flags, Time; public UIntPtr Extra; }
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
+        private static readonly UIntPtr ControlTag = new UIntPtr(0x44535044);
+        [DllImport("user32.dll", EntryPoint = "SendInput", SetLastError = true)]
+        private static extern uint NativeSendInput(uint count, NativeInput[] inputs, int size);
+        private static uint SendInput(uint count, NativeInput[] inputs, int size)
+        {
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                if (inputs[i].Type == 1) inputs[i].Data.Keyboard.Extra = ControlTag;
+                else inputs[i].Data.Mouse.Extra = ControlTag;
+            }
+            return NativeSendInput(count, inputs, size);
+        }
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int key);
 
@@ -244,11 +255,13 @@ namespace DSPDreamer.Recorder
             failNextRelease = false;
             long requested = Stopwatch.GetTimestamp();
             uint sent = simulated ? 0 : SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput)));
+            long completed = Stopwatch.GetTimestamp();
             int error = sent == inputs.Count ? 0 : Marshal.GetLastWin32Error();
             bool ok = !simulated && sent == inputs.Count;
             if (ok) { injected = new int[ModelAction.Controls.Length]; lastAction = 0; }
             Emit("control_request", Json.Fields("operation", "release_all", "succeeded", ok, "simulated", simulated,
-                "requested_ticks", requested, "requested_count", inputs.Count, "sent_count", sent, "win32_error", error));
+                "requested_ticks", requested, "submission_completed_ticks", completed,
+                "requested_count", inputs.Count, "sent_count", sent, "win32_error", error));
             if (!ok)
             {
                 if (episode != null)

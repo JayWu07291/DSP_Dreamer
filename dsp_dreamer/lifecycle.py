@@ -7,7 +7,7 @@ from .contract import require
 
 OUTCOMES = (None, "success", "death", "timeout", "unrecoverable")
 REASONS = ("stopped", "focus_loss", "human_intervention", "injection_failure", "recorder_fault",
-           "schema_error", "unknown_control", "fingerprint_mismatch", "reset", "world_unloaded")
+           "schema_error", "unknown_control", "fingerprint_mismatch", "reset", "world_unloaded", "system_latency")
 
 
 def validate_lifecycle(metadata, frames, prefix=False):

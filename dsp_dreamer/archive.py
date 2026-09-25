@@ -30,8 +30,10 @@ def validate_metadata(metadata):
         require(runtime["fingerprint_verified"] is True, "Unknown runtime fingerprint")
         for key in ("game_version", "unity_version", "plugin_version", "input_settings_sha256", "binary_hashes"):
             require(bool(runtime[key]), f"Missing runtime {key}")
-        require(runtime["binary_hashes"].get("Assembly-CSharp") ==
-                "ae0ba95f75bd879a62aa4ce253b2ab78eaa4fb3c7c595f5e1fee75ebe0e0ef85", "Unknown game fingerprint")
+        require(runtime["binary_hashes"].get("Assembly-CSharp") in (
+            "ae0ba95f75bd879a62aa4ce253b2ab78eaa4fb3c7c595f5e1fee75ebe0e0ef85",  # 0.10.34.28529
+            "c43a484f6adf8a9e4b956156047070891b46860d5b5c707ba1377b6a2af25732",  # 0.10.35.29088
+        ), "Unknown game fingerprint")
         required = {"Assembly-CSharp", "BepInEx", "0Harmony", "DSPDreamer.Recorder", "UnityPlayer", "DSPGAME",
                     "UnityEngine.InputLegacyModule", "UnityEngine.CoreModule", "UnityEngine.ScreenCaptureModule"}
         require(required <= set(runtime["binary_hashes"]), "Incomplete binary fingerprint")

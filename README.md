@@ -14,6 +14,8 @@ Issue #27 的[固定任務想像訓練與候選匯出](docs/imagination.md)延�
 
 Issue #28 的[統一訓練控制](docs/training.md)提供跨階段預算、完整 loader/loss 測速、30 分鐘存檔與驗證、恢復及 gate 停止。工程測試不授權 #31–#33 的正式訓練。
 
+Issue #29 的[單回合工程 runner](docs/runner.md)接入即時 RGB、checkpoint 推理、10 Hz 控制與每回合時序結果。工程 checkpoint 與錄製不算正式代理成果；實機驗證狀態見 [驗證紀錄](docs/issue-29-validation.md)。
+
 ## 專案結構
 
 | 路徑 | 用途 |

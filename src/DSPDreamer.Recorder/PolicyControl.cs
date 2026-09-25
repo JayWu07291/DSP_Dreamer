@@ -16,6 +16,7 @@ namespace DSPDreamer.Recorder
         private ConfigEntry<double> nativeScaleX, nativeScaleY;
         private string controlMode = "human", frozenSettings;
         private long lastAction, requestId;
+        private long leftDownTicks;
         private int[] injected = new int[ModelAction.Controls.Length];
         private int probe = -1;
         private bool probeRelease;
@@ -94,7 +95,7 @@ namespace DSPDreamer.Recorder
                 throw new InvalidOperationException("Stale/incompatible calibration; revalidate before recording or evaluation");
         }
 
-        // Called on Unity's main thread by the future inference runner. Human sessions cannot switch mode.
+        // Called on Unity's main thread. Human sessions cannot switch mode.
         public void StartPolicyRecording()
         {
             RequireMainThread();
@@ -168,12 +169,15 @@ namespace DSPDreamer.Recorder
                 Mouse = new MouseInput { Data = unchecked((uint)((wheel - 1) * 120)), Flags = 0x800 } } });
             long now = Stopwatch.GetTimestamp();
             uint sent = inputs.Count == 0 ? 0 : SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(NativeInput)));
+            long completed = Stopwatch.GetTimestamp();
             int error = sent == inputs.Count ? 0 : Marshal.GetLastWin32Error();
             lastAction = now;
+            if (injected[15] == 0 && binary[15] == 1) leftDownTicks = now;
             injected = (int[])binary.Clone();
             Emit("control_request", Json.Fields("operation", "model_action", "request_id", ++requestId,
                 "catalog", ModelAction.Catalog, "binary", binary, "mouse", mouse, "wheel", wheel,
                 "native_delta", new[] { dx, dy }, "requested_ticks", now, "capture_ticks", captureTicks,
+                "submission_completed_ticks", completed,
                 "inference_ticks", inferenceTicks, "requested_count", inputs.Count, "sent_count", sent,
                 "succeeded", sent == inputs.Count, "win32_error", error, "mode", controlMode));
             if (sent != inputs.Count) { EndEpisode(reason: "injection_failure"); throw new IOException("SendInput incomplete"); }
@@ -190,6 +194,7 @@ namespace DSPDreamer.Recorder
             long now = Stopwatch.GetTimestamp();
             if (controlMode == "policy")
             {
+                if (runnerIdentity != null) return; // Runner owns its capture-clock deadline and no-op fallback.
                 if (lastAction != 0 && now - lastAction < Stopwatch.Frequency / 10) return;
                 if (pendingAction != null && now - pendingAction.CaptureTicks <= Stopwatch.Frequency / 10)
                 {

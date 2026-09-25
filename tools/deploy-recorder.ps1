@@ -6,8 +6,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 if (Get-Process DSPGAME -ErrorAction SilentlyContinue) { throw 'Exit DSP before deployment.' }
-$expectedGame = 'AE0BA95F75BD879A62AA4CE253B2AB78EAA4FB3C7C595F5E1FEE75EBE0E0EF85'
-if ((Get-FileHash -LiteralPath (Join-Path $DSPRoot 'DSPGAME_Data\Managed\Assembly-CSharp.dll')).Hash -ne $expectedGame) {
+$expectedGame = @('AE0BA95F75BD879A62AA4CE253B2AB78EAA4FB3C7C595F5E1FEE75EBE0E0EF85',
+                  'C43A484F6ADF8A9E4B956156047070891B46860D5B5C707BA1377B6A2AF25732')
+if ((Get-FileHash -LiteralPath (Join-Path $DSPRoot 'DSPGAME_Data\Managed\Assembly-CSharp.dll')).Hash -notin $expectedGame) {
     throw 'Unknown game binary. Revalidate integration points before deployment.'
 }
 if ((Get-FileHash -LiteralPath $FFmpeg).Hash -ne '04E1307997530F9CF2FE35CBA2CA7E8875CA91DA02F89D6C7243DF819C94AD00') {
