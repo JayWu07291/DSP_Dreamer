@@ -4,6 +4,12 @@
 
 本文件描述工程入口，不授權正式 GPU 工作。正式測速、訓練與品質證據由 #31–#33 執行。
 
+## 凍結來源相容性
+
+#31 首次執行因 #27 的互斥群組重構與 #29 的 runner metadata 保留改動，使兩個來源實作 checksum 不符而停止。使用者其後要求修復並訓練，另存 `protocols/source-compatibility-issue31.json`，綁定原 source-freeze ID 與 `actions.py`／`dataset.py` 的精確新舊 bytes、SHA-256。原始資料、split、七份 evaluation 凍結檔案與模型門檻均保留。
+
+正式 loader 與 `verify-data-freeze.py` 共用核對器。原指紋直接接受，只有這兩組相容指紋可替代；不同來源或任何額外修改仍拒絕。帳本會計入來源核對失敗，checkpoint 的 implementation 指紋也包含相容性紀錄。這項相容性不授予模型資格，B 仍須先通過 A 的完整重建 gate。
+
 ## 預算與測速
 
 | 帳目 | 上限 | 用途 |

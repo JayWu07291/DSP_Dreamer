@@ -12,6 +12,7 @@ from .evaluation_protocol import ITEM_TYPES, read_protocol, seal, verify_seal, _
 from .tokenizer import CausalTokenizer, TokenizerConfig
 from .tokenizer_training import read_checkpoint
 from .training_index import TrainingIndex
+from .frozen_sources import verify_frozen_implementation
 
 
 def read_frozen_evaluation(catalog_path, protocol_path):
@@ -34,8 +35,8 @@ def read_frozen_evaluation(catalog_path, protocol_path):
             and inputs['artifact_id'] == catalog['evaluation_inputs_id']
             and annotations['artifact_id'] == catalog['annotations_id']
             and freeze['index_id'] == catalog['index_id'], 'Frozen identity mismatch')
-    for name, expected in artifacts['source-freeze.json']['files'].items():
-        require(file_info(name) == expected, f'Frozen implementation changed: {name}')
+    source_freeze = artifacts['source-freeze.json']
+    verify_frozen_implementation(source_freeze['files'], source_freeze['artifact_id'])
     require(all(value['protocol_id'] == protocol['artifact_id'] for value in (inputs, annotations, freeze))
             and freeze['evaluation_inputs_id'] == inputs['artifact_id']
             and freeze['annotations_id'] == annotations['artifact_id']

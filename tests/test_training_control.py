@@ -9,6 +9,32 @@ torch = pytest.importorskip('torch')
 from dsp_dreamer.contract import InvalidRecording, atomic_save, file_info, load
 
 
+def test_cli_records_frozen_identity_rejection_before_gpu_work(tmp_path):
+    from pathlib import Path
+    import shutil
+    import subprocess
+    import sys
+
+    repo = Path(__file__).resolve().parents[1]
+    shutil.copytree(repo / 'dsp_dreamer', tmp_path / 'dsp_dreamer',
+                    ignore=shutil.ignore_patterns('__pycache__'))
+    for name in ('tools/train.py', 'docs/issue-24-results.json', 'docs/training-history.json'):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(repo / name, path)
+    atomic_save(tmp_path / 'catalog.json', dict(protocol_id='wrong-protocol', evaluation_directory='evaluation'))
+    result = subprocess.run([sys.executable, '-X', 'utf8', str(tmp_path / 'tools/train.py'),
+        'A', 'benchmark', '--catalog', 'catalog.json', '--protocol', str(repo / 'protocols/evaluation-v2.json'),
+        '--output', 'plan.json'], cwd=tmp_path, capture_output=True, text=True, encoding='utf-8', timeout=30)
+    assert result.returncode != 0 and 'Protocol identity mismatch' in result.stderr
+    budget = load(tmp_path / 'runs/training-budget.json')
+    attempt = budget['attempts'][-1]
+    assert attempt['stage'] == 'preflight' and attempt['target'] == 'A'
+    assert attempt['status'] == 'failed' and attempt['seconds'] >= 0
+    assert sum(a['seconds'] for a in budget['attempts'] if a['stage'] == 'A') == 2305.2320443573
+    assert budget['stages']['A']['updates'] == 0 and not (tmp_path / 'plan.json').exists()
+
+
 def test_budget_failure_retry_and_throughput_plan(tmp_path):
     from dsp_dreamer.training_control import TrainingBudget, plan_updates
 

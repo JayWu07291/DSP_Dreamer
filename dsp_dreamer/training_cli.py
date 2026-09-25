@@ -20,6 +20,7 @@ from .tokenizer_training import TokenizerTrainer, TrainingConfig, Reconstruction
 from .tokenizer_evaluation import (open_frozen_corpus, read_frozen_evaluation,
                                     evaluate_reconstruction, score_reconstruction)
 from .training_control import TrainingBudget, benchmark, import_existing_usage, run_training
+from .frozen_sources import COMPATIBILITY
 
 
 def prediction_proof(directory, gate, inputs):
@@ -98,20 +99,6 @@ def main(stage=None):
     args.microbatch = args.microbatch or 2
     if args.stage_two:
         require(read_agent_checkpoint(args.stage_two)['formal'], '工程 checkpoint 不可用於正式執行')
-    _, inputs, annotations, freeze = read_frozen_evaluation(args.catalog, args.protocol)
-    provenance = {k: freeze[k] for k in ('protocol_id', 'evaluation_inputs_id', 'annotations_id')}
-    provenance['data_freeze_id'] = freeze['artifact_id']
-    proof = None
-    if stage == 'B' and not args.checkpoint:
-        require(args.tokenizer and args.reconstruction_metrics and args.reconstruction_gate,
-                '需要 tokenizer 與完整重建 gate 證據')
-        proof = dict(metrics=load(args.reconstruction_metrics), gate=load(args.reconstruction_gate),
-                     inputs=inputs, annotations=annotations)
-        require_reconstruction(proof, file_info(args.tokenizer)['sha256'], provenance)
-    elif stage == 'second' and not args.checkpoint:
-        require(args.stage_one is not None, '需要 --stage-one')
-        proof = prediction_proof(args.prediction_dir, args.prediction_gate, inputs)
-        require_stage_one(args.stage_one, proof, provenance)
     require(args.command != 'benchmark' or args.checkpoint is None, '測速不能恢復訓練 checkpoint')
     require(args.command == 'benchmark' or args.updates is None, '更新上限由 benchmark 固定，恢復時不能重設')
     # 所有 GPU 工作與失敗均在同一把鎖、同一份不可回退的累計帳本下。
@@ -135,6 +122,20 @@ def main(stage=None):
         with (nullcontext(budget) if scoring else budget.attempt(
                 'preflight' if args.command == 'benchmark' else stage, args.command,
                 microbatch=args.microbatch, target=stage)):
+            _, inputs, annotations, freeze = read_frozen_evaluation(args.catalog, args.protocol)
+            provenance = {k: freeze[k] for k in ('protocol_id', 'evaluation_inputs_id', 'annotations_id')}
+            provenance['data_freeze_id'] = freeze['artifact_id']
+            proof = None
+            if stage == 'B' and not args.checkpoint:
+                require(args.tokenizer and args.reconstruction_metrics and args.reconstruction_gate,
+                        '需要 tokenizer 與完整重建 gate 證據')
+                proof = dict(metrics=load(args.reconstruction_metrics), gate=load(args.reconstruction_gate),
+                             inputs=inputs, annotations=annotations)
+                require_reconstruction(proof, file_info(args.tokenizer)['sha256'], provenance)
+            elif stage == 'second' and not args.checkpoint:
+                require(args.stage_one is not None, '需要 --stage-one')
+                proof = prediction_proof(args.prediction_dir, args.prediction_gate, inputs)
+                require_stage_one(args.stage_one, proof, provenance)
             gpu = args.command in ('benchmark', 'train', 'evaluate', 'predict')
             if gpu:
                 require(torch.cuda.is_available() and torch.cuda.is_bf16_supported(), '正式執行需要 BF16 CUDA')
@@ -146,6 +147,7 @@ def main(stage=None):
                 torch.backends.cudnn.deterministic = True
             index, inputs, annotations, provenance = open_frozen_corpus(args.catalog, args.protocol)
             provenance['implementation'] = {str(p): file_info(p) for p in sorted(Path('dsp_dreamer').glob('*.py'))}
+            provenance['implementation'][str(COMPATIBILITY.relative_to(root))] = file_info(COMPATIBILITY)
             if args.command in ('score', 'score-prediction', 'export'):
                 require(args.metrics is not None and args.checkpoint is not None, '需要 --metrics 與 --checkpoint')
                 if stage == 'A':

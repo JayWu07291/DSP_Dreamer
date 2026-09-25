@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dsp_dreamer.contract import atomic_save, file_info, load, require, sha
 from dsp_dreamer.evaluation_protocol import read_protocol, seal, validate_trials, verify_seal
+from dsp_dreamer.frozen_sources import verify_frozen_implementation
 
 
 def main():
@@ -42,8 +43,7 @@ def main():
     source_freeze = artifacts["source-freeze.json"]
     require(source_freeze["index_id"] == index["artifact_id"]
             and source_freeze["registry"] == index["registry"], "Frozen registry mismatch")
-    for name, expected in source_freeze["files"].items():
-        require(file_info(name) == expected, f"Frozen implementation changed: {name}")
+    compatibility_id = verify_frozen_implementation(source_freeze['files'], source_freeze['artifact_id'])
 
     indexed = {s["artifact_id"]: s for s in index["sources"]}
     audited = {s["artifact_id"]: s for s in source_freeze["source_audits"]}
@@ -112,6 +112,7 @@ def main():
             passed &= deficit == 0
     require(index["coverage_gate_passed"] == passed, "Aggregate coverage gate mismatch")
     report = seal(dict(schema="dsp-data-freeze-audit/1", integrity_checks_passed=True,
+                       source_compatibility_id=compatibility_id,
                        coverage_gate_passed=passed, index_id=index["artifact_id"],
                        data_freeze_id=freeze["artifact_id"], protocol_id=protocol["artifact_id"],
                        sources=sources, splits=index["splits"], episode_outcomes=dict(outcomes),
