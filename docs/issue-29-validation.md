@@ -2,6 +2,20 @@
 
 本紀錄對應 [#29](https://github.com/JayWu07291/DSP_Dreamer/issues/29) 的單回合模型閉迴路，並納入使用者核准的 DSP `0.10.35.29088` 相容性重驗。正式候選與同開資源驗收仍屬 #34／#35；本入口只接受 `engineering_only`、`qualified=false`。
 
+## 逐項結案核對
+
+2026-09-25 依 [#12 的工程結案分工](https://github.com/JayWu07291/DSP_Dreamer/issues/12)重查 #29 的五項要求，工程範圍均已完成。這項結論不改寫下列失敗試驗，也不表示正式延遲或模型品質通過。
+
+| #29 要求 | 結案依據 |
+| --- | --- |
+| RGB、實際動作、17 維條件與共用排程 | 真實 checkpoint／子程序測試、跨提示保留歷史及回合重設；插件沿用正式進度判定與 task ID |
+| 10 Hz、100 ms、首步 no-op、逾時釋放及遲到丟棄 | `PolicyRunner` 時槽與單一在途請求；120 ms 延遲實機試驗確認 5 次連續 miss、釋放、no-op 和 2 個遲到回覆丟棄 |
+| 四段時間與每回合門檻檢查 | Python／C# 門檻邊界測試；實機結果分開保留 request 與 observed，超標明列 `system_latency`，未觀測成功明列 `injection_failure` |
+| 基準擾動、30 分鐘、final observation、有效性與四檔 | 同一 manifest 重載與擾動；既有生命週期以 1800 秒截止，測試區分合法 death／timeout 與系統故障；實機最終觀測和封存完整 |
+| 受控 checkpoint 實機閉迴路、逾時及停止 | 表列四份實機證據全部逐幀核對；F8 停止由使用者操作，停止後空按鍵狀態已觀測；所有產物維持工程身分 |
+
+收尾重算六份完整模型試驗，結果與既有衍生結果一致，原始四檔數量、checksum 及資料集來源均相符；校正仍通過。此輪未修改執行程式，沿用下述 187 項完整測試結果。真正仍未通過的正式延遲、30 分鐘同開資源及合格候選試驗，分別由 [#34](https://github.com/JayWu07291/DSP_Dreamer/issues/34)／[#35](https://github.com/JayWu07291/DSP_Dreamer/issues/35)追蹤，不能因 #29 工程結案而啟動。
+
 ## 實作與可重跑檢查
 
 | 要求 | 檢查 |
