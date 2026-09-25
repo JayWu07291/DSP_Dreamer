@@ -6,7 +6,7 @@
 
 2026-09-25 正式工程驗證通過。24 份資料集、355,853 張 RGB 經完整檔案及逐幀 checksum 核對，重建出的模型視圖與凍結 TrainingIndex 一致。RTX 5070 使用原生 640×360、width 512、BF16、activation checkpointing、完整 MSE + 0.2 LPIPS、microbatch 2／accumulation 8，沒有改用容量原型或較小資料集。
 
-結果摘要與完整身分見 [issue-24-results.json](issue-24-results.json)。完整紀錄位於 `runs/issue-24/verification/verification.json`，權重、逐次抽樣、配方、重建 PNG 和人工判讀模板保存在同目錄。大型本機輸出不納入 Git。實作版本為 `fce0e7d`，各配方另存實際執行檔案的 SHA-256。
+工程驗證摘要與完整身分見 [issue-24-results.json](issue-24-results.json)，保留其產生時尚未人工判讀的狀態。後續人工判讀另存 [issue-24-human-review.json](issue-24-human-review.json)，包含兩組完整判讀、逐項回覆證據與封存身分，並引用原工程摘要。完整紀錄位於 `runs/issue-24/verification/verification.json`，權重、逐次抽樣、配方、重建 PNG 和人工判讀模板保存在同目錄。大型本機輸出不納入 Git。實作版本為 `fce0e7d`，各配方另存實際執行檔案的 SHA-256。
 
 | 探測設定 | 更新序列長度 | 含恢復重放的秒數 | peak allocated | peak reserved | 下一次更新完全一致 |
 | --- | --- | ---: | ---: | ---: | --- |
@@ -17,10 +17,12 @@
 
 測速後固定各四次對照更新，兩組重新初始化，共用 seed 2202、資料順序、masking、loss 與凍結標註。64-token 更新耗時 64.19 秒，96-token 為 58.84 秒。兩組均完成固定 200 圖，17 個 task 的圖片配額皆足夠。
 
-| 對照 | 全圖 MSE | LPIPS | UI MSE | 已判讀／全部關鍵項目 | Gate |
-| --- | ---: | ---: | ---: | --- | --- |
-| 64 tokens | 0.079140 | 0.922425 | 0.120983 | 0／15 | pending |
-| 96 tokens | 0.079026 | 0.958881 | 0.119646 | 0／15 | pending |
+| 對照 | 全圖 MSE | LPIPS | UI MSE | 已判讀／全部關鍵項目 | 正確／全部關鍵項目 | Gate |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| 64 tokens | 0.079140 | 0.922425 | 0.120983 | 15／15 | 0／15 | failed |
+| 96 tokens | 0.079026 | 0.958881 | 0.119646 | 15／15 | 0／15 | failed |
+
+2026-09-25，Jay 在本次對話對照七組原圖／重建圖，分別完成兩個候選的 15 個凍結關鍵項目。全部回覆為無法辨識，兩組各為 0% 正確、0 項缺判、0 項排除；游標 0／2、配方 0／1、物品與數字 0／10、連接 0／2，均未達門檻。各組的 `reviewed-gate.json` 由 `score` 命令產生，保存於對應的 `reconstruction-64`／`reconstruction-96` 目錄；原先的 `gate.json`、metrics、判讀模板與 verification 報告保持原封存內容。
 
 UI 來自八個預標區域的聯集，分布在五張圖，共 568,351 pixels；先逐圖平均再對圖等權平均。全部 800 個原圖／重建 PNG、兩個對照 checkpoint 的檔案 hash，以及報告的封存身分均另行比對通過。這些畫面仍未學出場景細節，四次更新不能支持收斂或容量優劣結論。
 
@@ -42,6 +44,6 @@ CPU 整合檢查已驗證原生解析度與因果性、真實 compiler／loader 
 
 ## 驗收界線
 
-凍結 validation 名單、15 個關鍵項目及八個 UI 區域沿用原資料，沒有改動抽樣或標註。重建項目需要人依事前準則判讀；沒有結果的項目保持 null，仍留在分母。尚未宣告重建 gate 通過，也沒有啟動 dynamics 或揭露 offline-test 模型結果。
+凍結 validation 名單、15 個關鍵項目及八個 UI 區域沿用原資料，沒有改動抽樣或標註。人工依事前準則完成判讀後，兩個四次更新候選的重建 gate 均為 failed；此結果不支持收斂後品質或容量優劣的結論。沒有啟動 dynamics 或揭露 offline-test 模型結果。
 
 使用方式、安裝與可重跑指令見 [tokenizer 文件](tokenizer.md)。
