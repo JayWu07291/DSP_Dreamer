@@ -4,11 +4,33 @@
 
 ## 本機驗證
 
-正式 GPU 驗證執行中。結果將由 `runs/issue-24/verification/verification.json` 保存，權重、逐次抽樣、配方、重建 PNG 和人工判讀模板保存在同目錄。大型本機輸出不納入 Git。
+2026-09-25 正式工程驗證通過。24 份資料集、355,853 張 RGB 經完整檔案及逐幀 checksum 核對，重建出的模型視圖與凍結 TrainingIndex 一致。RTX 5070 使用原生 640×360、width 512、BF16、activation checkpointing、完整 MSE + 0.2 LPIPS、microbatch 2／accumulation 8，沒有改用容量原型或較小資料集。
+
+結果摘要與完整身分見 [issue-24-results.json](issue-24-results.json)。完整紀錄位於 `runs/issue-24/verification/verification.json`，權重、逐次抽樣、配方、重建 PNG 和人工判讀模板保存在同目錄。大型本機輸出不納入 Git。實作版本為 `fce0e7d`，各配方另存實際執行檔案的 SHA-256。
+
+| 探測設定 | 更新序列長度 | 含恢復重放的秒數 | peak allocated | peak reserved | 下一次更新完全一致 |
+| --- | --- | ---: | ---: | ---: | --- |
+| 64 tokens | 32、32、32、80 | 96.25 | 2.403 GiB | 4.311 GiB | 是 |
+| 96 tokens | 32、32、32、80 | 99.50 | 2.470 GiB | 3.803 GiB | 是 |
+
+每組在第三次更新後保存 checkpoint，再核對恢復後第四次更新的 loss、資料順序與所有權重。PyTorch allocated／reserved 僅表示本行程，不能作為整卡或閉迴路資源驗收。
+
+測速後固定各四次對照更新，兩組重新初始化，共用 seed 2202、資料順序、masking、loss 與凍結標註。64-token 更新耗時 64.19 秒，96-token 為 58.84 秒。兩組均完成固定 200 圖，17 個 task 的圖片配額皆足夠。
+
+| 對照 | 全圖 MSE | LPIPS | UI MSE | 已判讀／全部關鍵項目 | Gate |
+| --- | ---: | ---: | ---: | --- | --- |
+| 64 tokens | 0.079140 | 0.922425 | 0.120983 | 0／15 | pending |
+| 96 tokens | 0.079026 | 0.958881 | 0.119646 | 0／15 | pending |
+
+UI 來自八個預標區域的聯集，分布在五張圖，共 568,351 pixels；先逐圖平均再對圖等權平均。全部 800 個原圖／重建 PNG、兩個對照 checkpoint 的檔案 hash，以及報告的封存身分均另行比對通過。這些畫面仍未學出場景細節，四次更新不能支持收斂或容量優劣結論。
+
+成功的完整命令耗時 2,250.34 秒，包含全量來源讀回、探測、恢復、對照、存檔與評估。時數紀錄另保留一輪來源核對中斷的 54.89 秒，合計約 38.42 分鐘，未超過第一階段 A 四小時上限。
 
 CPU 整合檢查已驗證原生解析度與因果性、真實 compiler／loader 至完整 LPIPS loss 的更新、checkpoint 恢復後下一次更新完全一致，以及缺判／缺類型／辨識門檻的 gate 行為。CPU 使用小寬度只供回歸，不能替代 GPU 正式架構驗證。
 
 完整 `pytest -q` 為 161 passed，耗時 185.30 秒。`mypy dsp_dreamer tools/train-tokenizer.py` 的 22 檔通過。兩則警告來自 LPIPS 0.1.4 仍使用 torchvision 的舊 pretrained 參數，實際權重身分已固定，沒有更換 metric。
+
+其後補強歷史影格會影響後續輸出，以及 Python／NumPy／PyTorch RNG 恢復的檢查，單檔三項再次通過。
 
 ## Standards
 

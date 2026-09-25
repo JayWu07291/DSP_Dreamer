@@ -2,9 +2,9 @@
 
 在《戴森球計畫》前期受控場景中，研究以低階鍵鼠動作學習多個微任務的 Dreamer 4-inspired 代理。
 
-目前已完成錄製器、轉移資料集、10 Hz 模型視圖、固定 split 與評估協定。Issue #22 的資料及人工標註已凍結，2026-09-25 逐條複核後結案。模型訓練與品質評估尚未執行。詳見 [Issue #22 完成核對](docs/issue-22-completion.md)。
+目前已完成錄製器、轉移資料集、10 Hz 模型視圖、固定 split 與評估協定。Issue #22 的資料及人工標註已凍結，2026-09-25 逐條複核後結案。詳見 [Issue #22 完成核對](docs/issue-22-completion.md)。
 
-Issue #24 新增 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/tokenizer.md)。工程驗證與模型品質 gate 分別記錄，正式 v1 維持 64 latent tokens。
+Issue #24 的 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/tokenizer.md)已通過真實資料與 GPU 少量更新驗證。64／96-token 各四次對照更新及 200 圖評估已完成，15 個關鍵項目待人工判讀，重建品質 gate 保持 pending。正式 v1 維持 64 latent tokens，詳見 [驗證紀錄](docs/issue-24-validation.md)。
 
 ## 專案結構
 
