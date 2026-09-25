@@ -115,8 +115,8 @@ def test_prediction_gate_uses_paired_denominators_and_requires_reviews():
         for i, kind in enumerate(kind for kind in CATEGORIES for _ in range(50))]
     inputs = seal(dict(prediction=dict(selected=selected)))
 
-    def report(samples):
-        return seal(dict(evaluation_inputs_id=inputs['artifact_id'], checkpoint_sha256='abc',
+    def report(samples, frozen_inputs=inputs):
+        return seal(dict(evaluation_inputs_id=frozen_inputs['artifact_id'], checkpoint_sha256='abc',
             formal=False, samples=[dict(sample=s, conditions={c: {str(step): dict(mse=.1, lpips=.2,
                 region_lpips=.8 if c == 'correct' else 1.) for step in (1, 5, 15)}
                 for c in ('correct', 'noop', 'shuffled', 'copy_last')}) for s in samples]))
@@ -129,6 +129,43 @@ def test_prediction_gate_uses_paired_denominators_and_requires_reviews():
             correct=True, reviewer='測試', evidence='fixture') for i in range(200)])
     assert score_prediction(metrics, inputs, judgments)['threshold_status'] == 'passed'
     assert score_prediction(metrics, inputs, judgments)['status'] == 'engineering_only'
+    for category in range(3):
+        correct_counts = [45, 45, 45, 35]
+        correct_counts[category] = 35
+        reviewed = copy.deepcopy(judgments)
+        for i, item in enumerate(reviewed['items']):
+            item['correct'] = i % 50 < correct_counts[i // 50]
+        boundary_gate = score_prediction(metrics, inputs, reviewed)
+        assert boundary_gate['threshold_status'] == 'passed'
+        assert boundary_gate['recognition']['accuracy'] == .8
+        assert boundary_gate['categories'][CATEGORIES[category]]['accuracy'] == .7
+        reviewed['items'][150]['correct'] = False
+        assert score_prediction(metrics, inputs, reviewed)['threshold_status'] == 'failed'
+        reviewed['items'][150]['correct'] = True
+        reviewed['items'][category * 50 + 34]['correct'] = False
+        reviewed['items'][185]['correct'] = True
+        below_category = score_prediction(metrics, inputs, reviewed)
+        assert below_category['recognition']['accuracy'] == .8
+        assert below_category['threshold_status'] == 'failed'
+        for baseline in ('noop', 'shuffled', 'copy_last'):
+            rows = copy.deepcopy(metrics['samples'])
+            for row in rows[category * 50:(category + 1) * 50]:
+                row['conditions'][baseline]['5']['region_lpips'] = .88
+            below_lpips = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'samples': rows})
+            gate = score_prediction(below_lpips, inputs, {**judgments, 'report_id': below_lpips['artifact_id']})
+            assert not gate['comparisons'][CATEGORIES[category]][baseline]['passed']
+            assert gate['threshold_status'] == 'failed'
+    for baseline in ('noop', 'shuffled', 'copy_last'):
+        no_difference = copy.deepcopy(selected)
+        for sample in no_difference[:50]:
+            sample['action_difference'][baseline] = False
+        no_difference_inputs = seal(dict(prediction=dict(selected=no_difference)))
+        gate = score_prediction(report(no_difference, no_difference_inputs), no_difference_inputs)
+        counts = gate['comparisons']['movement'][baseline]
+        assert counts['denominator'] == 0 and counts['no_action_difference'] == 50
+        assert not counts['passed'] and gate['threshold_status'] == 'insufficient_evidence'
+    missing_category = seal(dict(prediction=dict(selected=selected[:150])))
+    assert score_prediction(report(selected[:150], missing_category), missing_category)['threshold_status'] == 'insufficient_evidence'
     boundary_rows = copy.deepcopy(metrics['samples'])
     for row in boundary_rows:
         row['conditions']['correct']['5']['region_lpips'] = .9
@@ -161,6 +198,42 @@ def test_prediction_gate_uses_paired_denominators_and_requires_reviews():
     forged = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'formal': True})
     with pytest.raises(InvalidRecording, match='checkpoint'):
         score_prediction(forged, inputs)
+
+
+def test_reconstruction_gate_requires_passed_matching_evidence():
+    from dsp_dreamer.evaluation_protocol import seal, ITEM_TYPES
+    from dsp_dreamer.tokenizer_evaluation import score_reconstruction
+    from dsp_dreamer.dynamics_training import require_reconstruction
+
+    selected = [dict(artifact_id='fixture', observation_index=i, model_index=i, capture_id=i,
+                     task_id=i % 17) for i in range(200)]
+    inputs = seal(dict(reconstruction=dict(selected=selected)))
+    annotations = seal(dict(items=[dict(sample_id=str(i), artifact_id='fixture', observation_index=i,
+        type=kind, eligible=True) for i, kind in enumerate(ITEM_TYPES)],
+        ui_regions=[dict(ui_type=kind) for kind in ('technology', 'backpack', 'crafting', 'building', 'lab')]))
+    provenance = dict(protocol_id='fixture-protocol', data_freeze_id='fixture-freeze',
+                      evaluation_inputs_id=inputs['artifact_id'], annotations_id=annotations['artifact_id'])
+    metrics = seal(dict(**provenance, checkpoint_sha256='fixture-checkpoint', frames=[dict(
+        sample=s, mse=.2, lpips=.3, ui_mse=.1, ui_pixels=10) for s in selected]))
+    judgments = dict(report_id=metrics['artifact_id'], annotations_id=annotations['artifact_id'],
+        checkpoint_sha256='fixture-checkpoint', items=[dict(sample_id=str(i), correct=True,
+            reviewer='測試', evidence='fixture') for i in range(len(ITEM_TYPES))])
+    proof = dict(metrics=metrics, inputs=inputs, annotations=annotations,
+                 gate=score_reconstruction(metrics, inputs, annotations, judgments))
+    assert require_reconstruction(proof, 'fixture-checkpoint', provenance) == proof['gate']['artifact_id']
+    with pytest.raises(InvalidRecording, match='不屬於此 tokenizer'):
+        require_reconstruction(proof, 'different-checkpoint', provenance)
+    with pytest.raises(InvalidRecording, match='凍結資料'):
+        require_reconstruction(proof, 'fixture-checkpoint', {**provenance, 'data_freeze_id': 'other'})
+    for correct, status in ((False, 'failed'), (None, 'pending')):
+        judgments['items'][0]['correct'] = correct
+        proof['gate'] = score_reconstruction(metrics, inputs, annotations, judgments)
+        assert proof['gate']['status'] == status
+        with pytest.raises(InvalidRecording, match='重建 gate 未通過'):
+            require_reconstruction(proof, 'fixture-checkpoint', provenance)
+        proof['gate'] = seal({**{k: v for k, v in proof['gate'].items() if k != 'artifact_id'}, 'status': 'passed'})
+        with pytest.raises(InvalidRecording, match='重建 gate 未通過'):
+            require_reconstruction(proof, 'fixture-checkpoint', provenance)
 
 
 def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):

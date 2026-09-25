@@ -1,12 +1,12 @@
 # 動作條件 dynamics
 
-Issue #25 的工程入口包含凍結 tokenizer、動作條件訓練、checkpoint 恢復，以及固定 validation 序列的自由預測與配對評分。正式第一階段 B 尚未啟動，因為 #24 的重建 gate 仍為 `failed`。工程 fixtures 的結果只會標成 `engineering_only`，不能作為下一階段的合格模型。
+Issue #25 的工程入口包含凍結 tokenizer、動作條件訓練、checkpoint 恢復，以及固定 validation 序列的自由預測與配對評分，已完成修訂後的工程驗收。正式 A／B 訓練與實際模型品質驗收由 [#31](https://github.com/JayWu07291/DSP_Dreamer/issues/31) 執行；第一階段 B 尚未啟動，現有 tokenizer 重建 gate 仍為 `failed`。工程 fixtures 的預測評分與[結案結果](issue-25-closeout.json)標為 `engineering_only`，不能作為下一階段的合格模型。
 
 ## 模型與時間對齊
 
 正式設定為 width 512、8 blocks、8 heads、8 register tokens，每個 block 做 spatial attention，第 4／8 個 block 再做 causal temporal attention，context 64 steps。影像表示沿用 64×32 tokenizer latents。原生 640×360 RGB 不縮放，任務條件及具特權狀態不送入 dynamics。
 
-每個二元控制用獨立 off／on embedding，mouse 與 wheel 各有類別 embedding，相加後形成一個 action token；signal level 與 step size 用離散 embedding 組成另一個 token。採用 [ADR-0002](adr/0002-build-mode-control.md) 的 `action_catalog_v4`／21 維，取代 #25 原文的 v2 和早期留言的 v3。載入任何權重前先驗完整 `ACTION_CODEC`，不接受舊寬度、控制順序或量化設定。
+每個二元控制用獨立 off／on embedding，mouse 與 wheel 各有類別 embedding，相加後形成一個 action token；signal level 與 step size 用離散 embedding 組成另一個 token。採用 [ADR-0002](adr/0002-build-mode-control.md) 及修訂後 #25 的 `action_catalog_v4`／21 維，取代早期 v2／v3 敘述。載入任何權重前先驗完整 `ACTION_CODEC`，不接受舊寬度、控制順序或量化設定。
 
 訓練從 `TrainingIndex` 的 train 合法視窗均勻抽樣。T 個 transitions 讀出 T+1 張觀測，latent `z_t` 配上進入該影格的 `a_(t-1)`；第一張的 action 為 no-op，只供歷史，不計 loss。Tokenizer 使用 eval 模式、關閉 masking 與梯度。Dynamics 使用三次 32-step、一次 80-step 更新；microbatch 2、accumulation 8，AdamW 與 LR schedule 沿用 #7。
 
