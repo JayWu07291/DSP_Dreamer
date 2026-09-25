@@ -19,17 +19,18 @@ Shortcut forcing 按 [Dreamer 4 第 3.2 節、式 6–8](https://arxiv.org/abs/2
 以下訓練命令必須等同一 tokenizer checkpoint 的重建 gate 通過才能執行。`100` 只是示例，正式 updates 需依完整 loader、loss、accumulation 的測速及剩餘預算固定。
 
 ```powershell
-.venv/Scripts/python.exe tools/train-dynamics.py train --tokenizer runs/tokenizer-v1/final-100.pt --reconstruction-metrics runs/reconstruction-v1/metrics.json --reconstruction-gate runs/reconstruction-v1/reviewed-gate.json --updates 100 --output runs/dynamics-v1
-.venv/Scripts/python.exe tools/train-dynamics.py train --checkpoint runs/dynamics-v1/step-40.pt --output runs/dynamics-resumed
+.venv/Scripts/python.exe tools/train-dynamics.py benchmark --tokenizer runs/tokenizer-v1/final-100.pt --reconstruction-metrics runs/reconstruction-v1/metrics.json --reconstruction-gate runs/reconstruction-v1/reviewed-gate.json --output runs/B-plan.json
+.venv/Scripts/python.exe tools/train-dynamics.py train --tokenizer runs/tokenizer-v1/final-100.pt --reconstruction-metrics runs/reconstruction-v1/metrics.json --reconstruction-gate runs/reconstruction-v1/reviewed-gate.json --output runs/dynamics-v1
+.venv/Scripts/python.exe tools/train-dynamics.py train --checkpoint runs/dynamics-v1/final-100.pt --output runs/dynamics-resumed
 .venv/Scripts/python.exe tools/train-dynamics.py evaluate --checkpoint runs/dynamics-v1/final-100.pt --output runs/prediction-v1
-.venv/Scripts/python.exe tools/train-dynamics.py score --checkpoint runs/dynamics-v1/final-100.pt --metrics runs/prediction-v1/metrics.json --judgments runs/prediction-v1/judgments.json --output runs/prediction-v1/reviewed-gate.json
+.venv/Scripts/python.exe tools/train-dynamics.py score --checkpoint runs/dynamics-v1/final-100.pt --metrics runs/prediction-v1/prediction/metrics.json --judgments runs/prediction-v1/prediction/judgments.json --output runs/prediction-v1/reviewed-gate.json
 ```
 
 CLI 核對凍結 catalog、protocol、資料覆蓋、完整 checksum 與重建證據。它會重算重建評分，確認 report、人工判讀、checkpoint hash 及凍結身分完全相符，不能只提供一個 `passed` 字串。正式預測評分還須提供原 checkpoint 及 metrics 同目錄的 `recipe.json`，並核對記錄的實作 checksum；修改 `formal` 或重封 smoke metrics 不會使其通過。CUDA 訓練期間須關閉 DSP。
 
 Checkpoint 保存 dynamics、AdamW、配方與排程進度、抽樣紀錄、Python／NumPy／PyTorch／CUDA RNG、資料身分及重建證據。凍結 tokenizer 以絕對路徑和 checksum 引用，恢復時必須保留上游 `.pt` 及旁邊的 `.pt.json`；不重複複製其權重。恢復沿用原配方，不能用 `--updates` 重新安排 LR。
 
-每 30 分鐘保存 checkpoint，並對固定名單前四個序列做離線 validation。完整候選仍需另外跑全部 200 序列。`runs/dynamics-budget.json` 累計第一階段 B 的訓練、資料驗證、儲存、評估及失敗重跑，合計最多 16 小時。中斷未收尾會在下次保守補計 wall time。Windows 檔案鎖會拒絕同時使用預算的另一個程序，程序終止後系統釋放鎖；不可刪除紀錄重置預算。顯存不足的紀錄存在後才允許 `--microbatch 1`，改用 accumulation 16。
+[共用訓練控制器](training.md)負責每 30 分鐘固定小樣本 validation、可恢復 checkpoint、候選完整 gate 及累計 16 小時上限。正式 `train` 前先用相同來源與 gate 參數執行 `benchmark`，輸出一份計畫 JSON。所有階段、評估和失敗重跑都使用 `runs/training-budget.json`；原本的 dynamics 帳本只作不可修改的匯入來源。單獨 `evaluate` 的預測報告位於輸出目錄的 `prediction/`。
 
 ## 預測與判讀
 

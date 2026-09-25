@@ -18,19 +18,20 @@ PMPO 將整個 effective batch × 15 steps 依 advantage 正負分組，正組�
 
 現有模型沒有 imagined terminal／continuation head，因此固定 horizon 內視為持續，末端用 value bootstrap；不把真實後續 task 切換或終止標籤套到生成軌跡。這是目前固定長度工程模型的限制，不能據此判定遊戲完成或失敗。
 
-Policy／value peak LR 分別為 3e-5／1e-4，沿用 AdamW、5% warmup、cosine 至 10%、weight decay 0.01 及 gradient clipping 1.0。先分 microbatch 生成無梯度 rollout，再一次計算小型 heads 的整批 loss，避免各 microbatch 的正負例比例改變 PMPO 權重。最長四小時；deadline 在 rollout 和 optimizer update 前檢查。每 30 分鐘保存 checkpoint 並跑固定前四個 validation 預測序列。跨程序、失敗重跑與評估的統一預算管理仍由 #28 承接。
+Policy／value peak LR 分別為 3e-5／1e-4，沿用 AdamW、5% warmup、cosine 至 10%、weight decay 0.01 及 gradient clipping 1.0。先分 microbatch 生成無梯度 rollout，再一次計算小型 heads 的整批 loss，避免各 microbatch 的正負例比例改變 PMPO 權重。最長四小時；deadline 在 rollout 和 optimizer update 前檢查。每 30 分鐘保存 checkpoint，跑固定前四個 validation 預測序列及前 32 個 policy/reward transitions。跨程序、失敗重跑與評估均使用[共用訓練控制器](training.md)的累計帳本。
 
 ## 正式命令
 
 以下路徑只示範檔案關係；updates 必須由完整 loader／loss 測速決定。第二階段需已有同源、完整且 passed 的 reward／policy／dynamics gate。CLI 不提供跳過 gate 的選項。
 
 ```powershell
-.venv/Scripts/python.exe tools/train-agent.py imagine --stage-two runs/agent-v1/final-100.pt --metrics runs/agent-metrics/metrics.json --agent-gate runs/agent-gate.json --prediction-dir runs/agent-prediction --prediction-gate runs/agent-prediction/reviewed-gate.json --updates 100 --output runs/imagination-v1
-.venv/Scripts/python.exe tools/train-agent.py imagine --checkpoint runs/imagination-v1/step-40.pt --output runs/imagination-resumed
+.venv/Scripts/python.exe tools/train-agent.py benchmark --stage-two runs/agent-v1/final-100.pt --metrics runs/agent-metrics/agent/metrics.json --agent-gate runs/agent-gate.json --prediction-dir runs/agent-metrics/prediction --prediction-gate runs/agent-metrics/prediction/reviewed-gate.json --output runs/third-plan.json
+.venv/Scripts/python.exe tools/train-agent.py imagine --stage-two runs/agent-v1/final-100.pt --metrics runs/agent-metrics/agent/metrics.json --agent-gate runs/agent-gate.json --prediction-dir runs/agent-metrics/prediction --prediction-gate runs/agent-metrics/prediction/reviewed-gate.json --output runs/imagination-v1
+.venv/Scripts/python.exe tools/train-agent.py imagine --checkpoint runs/imagination-v1/final-100.pt --output runs/imagination-resumed
 .venv/Scripts/python.exe tools/train-agent.py evaluate --checkpoint runs/imagination-v1/final-100.pt --output runs/imagination-metrics
-.venv/Scripts/python.exe tools/train-agent.py predict --checkpoint runs/imagination-v1/final-100.pt --output runs/imagination-prediction
-.venv/Scripts/python.exe tools/train-agent.py score-prediction --checkpoint runs/imagination-v1/final-100.pt --metrics runs/imagination-prediction/metrics.json --judgments runs/imagination-prediction/judgments.json --output runs/imagination-prediction/reviewed-gate.json
-.venv/Scripts/python.exe tools/train-agent.py export --checkpoint runs/imagination-v1/final-100.pt --metrics runs/imagination-metrics/metrics.json --prediction-dir runs/imagination-prediction --prediction-gate runs/imagination-prediction/reviewed-gate.json --output runs/imagination-candidate
+.venv/Scripts/python.exe tools/train-agent.py score-prediction --checkpoint runs/imagination-v1/final-100.pt --metrics runs/imagination-metrics/prediction/metrics.json --judgments runs/imagination-metrics/prediction/judgments.json --output runs/imagination-metrics/prediction/reviewed-gate.json
+.venv/Scripts/python.exe tools/train-agent.py score --checkpoint runs/imagination-v1/final-100.pt --metrics runs/imagination-metrics/agent/metrics.json --prediction-dir runs/imagination-metrics/prediction --prediction-gate runs/imagination-metrics/prediction/reviewed-gate.json --output runs/imagination-gate.json
+.venv/Scripts/python.exe tools/train-agent.py export --checkpoint runs/imagination-v1/final-100.pt --metrics runs/imagination-metrics/agent/metrics.json --prediction-dir runs/imagination-metrics/prediction --prediction-gate runs/imagination-metrics/prediction/reviewed-gate.json --output runs/imagination-candidate
 ```
 
 評估與第二階段共用 `evaluate`、`predict`、`score-prediction`、`score`，包含相同 validation 分母、train baseline、人工判讀及門檻。匯出會重新核對三項 gate 與來源第二階段資格，不採信外加的 passed 字串。只有正式 checkpoint 且三項都 passed 才有 `qualified=true`，可交給 development。Pending、failed、證據不足及工程候選可保留診斷，但不取得 development 資格。

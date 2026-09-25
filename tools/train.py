@@ -1,4 +1,4 @@
-"""沿用既有階段名稱，轉交共用訓練控制器。"""
+"""共用訓練、測速與候選 gate 入口。"""
 import os
 from pathlib import Path
 import sys
@@ -12,4 +12,4 @@ for stream in (sys.stdout, sys.stderr):
 from dsp_dreamer.training_cli import main
 
 if __name__ == '__main__':
-    main('A')
+    main()

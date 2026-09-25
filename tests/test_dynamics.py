@@ -310,12 +310,13 @@ def test_concurrent_budget_command_is_rejected(tmp_path):
     import msvcrt
 
     (tmp_path / 'runs').mkdir()
-    script = Path(__file__).resolve().parents[1] / 'tools/train-dynamics.py'
-    with (tmp_path / 'runs/dynamics-budget.lock').open('a+b') as lock:
+    root = Path(__file__).resolve().parents[1]
+    with (tmp_path / 'runs/training-budget.lock').open('a+b') as lock:
         msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-        code = ('import importlib.util, sys; s=importlib.util.spec_from_file_location("cli",sys.argv[1]); '
-                'm=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.run_budgeted(None)')
-        result = subprocess.run([sys.executable, '-c', code, str(script)], cwd=tmp_path,
+        code = ('import sys; sys.path.insert(0, sys.argv[1]); '
+                'from dsp_dreamer.training_control import TrainingBudget; '
+                'TrainingBudget("runs/training-budget.json").__enter__()')
+        result = subprocess.run([sys.executable, '-c', code, str(root)], cwd=tmp_path,
                                 capture_output=True, text=True, encoding='utf-8')
-    assert result.returncode != 0 and '另一個 dynamics 程序' in result.stderr
-    assert not (tmp_path / 'runs/dynamics-budget.json').exists()
+    assert result.returncode != 0 and 'PermissionError' in result.stderr
+    assert not (tmp_path / 'runs/training-budget.json').exists()

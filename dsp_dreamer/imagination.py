@@ -197,6 +197,7 @@ class ImaginationTrainer:
         self.pools = {length: sequence_pools(index, length)['uniform'] for length in {config.short_length, config.long_length}}
         require(all(self.pools.values()), 'Train 缺少合法 context')
         self.step, self.elapsed_seconds = 0, 0.
+        self.control: dict | None = None
         self.history = []
         self.frozen = self.frozen_hashes()
 
@@ -297,7 +298,7 @@ class ImaginationTrainer:
             prior=self.prior.state_dict(), value=self.value.state_dict(), frozen=self.frozen,
             model=self.model.dynamics.state_dict(), agent={k: v for k, v in self.model.state_dict().items() if not k.startswith('dynamics.')},
             optimizer=self.optimizer.state_dict(), training_config=asdict(self.config), provenance=self.provenance,
-            step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history,
+            step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
             python_rng=random.getstate(), numpy_rng=(state[0], state[1].tolist(), *state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
             device_type=self.device.type)
@@ -315,6 +316,7 @@ class ImaginationTrainer:
         trainer.value.load_state_dict(value['value'])
         trainer.optimizer.load_state_dict(value['optimizer'])
         trainer.step, trainer.elapsed_seconds, trainer.history = value['step'], value['elapsed_seconds'], value['history']
+        trainer.control = value.get('control')
         random.setstate(value['python_rng'])
         state = value['numpy_rng']
         np.random.set_state((state[0], np.array(state[1], dtype=np.uint32), *state[2:]))

@@ -1,0 +1,8 @@
+{
+  "schema": "dsp-training-history/1",
+  "說明": "#25 的兩次既有合成 GPU smoke 合計 120.031 秒，計入前置 2 小時。A 的既有用量另從 tokenizer-budget.json 或 issue-24-results.json 匯入，不重複計費。",
+  "attempts": [
+    {"command": "engineering-smoke", "microbatch": 2, "seconds": 62.187, "status": "completed", "evidence": "runs/issue-25/gpu-smoke/report.json"},
+    {"command": "engineering-smoke", "microbatch": 2, "seconds": 57.844, "status": "completed", "evidence": "docs/issue-25-results.json"}
+  ]
+}

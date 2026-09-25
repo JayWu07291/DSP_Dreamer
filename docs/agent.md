@@ -18,19 +18,19 @@ Reward 使用 255 個對稱 symexp support，從 `symexp(-20)` 到 `symexp(20)`�
 
 正式配方保持三次 32-step、一次 80-step，microbatch 2、accumulation 8，或已核准的 1/16。Dynamics LR 為 1e-5，新增參數為 1e-4；AdamW、5% warmup、cosine 衰減及 norm clipping 沿用 #7。Tokenizer 一律 eval 且無梯度。
 
-Checkpoint 保存完整世界模型及 agent 權重、optimizer、配方、進度、Python/NumPy/PyTorch/CUDA RNG、來源 checkpoint 路徑/checksum、凍結資料與 gate 證據。恢復不能改 updates 或資料身分。每 30 分鐘存檔並使用 #25 的固定前四個 validation 預測序列檢查；候選仍須另跑完整 gate。每個 checkpoint 的累計執行上限為六小時。跨程序、失敗重跑、評估與全階段 32 小時的統一預算管理由 #28 承接；此入口不宣稱已完成該項驗收。
+Checkpoint 保存完整世界模型及 agent 權重、optimizer、配方、進度、Python/NumPy/PyTorch/CUDA RNG、來源 checkpoint 路徑/checksum、凍結資料與 gate 證據。恢復不能改 updates 或資料身分。[共用訓練控制器](training.md)負責每 30 分鐘固定小樣本 validation、可恢復存檔與階段候選完整 gate。第二階段六小時及總計 32 小時都以獨立帳本累計，包含初始化、評估、儲存與失敗重跑。
 
 ## 正式入口
 
-以下命令只有在 #31 的同源重建與預測證據完整通過後才能執行。`100` 僅示例，正式 updates 必須由完整 loader/loss 測速決定。第一階段的 `reviewed-gate.json` 必須包含完整人工判讀。
+以下命令只有在 #31 的同源重建與預測證據完整通過後才能執行。檔名 `100` 僅示例。先以相同來源與 gate 參數執行 `benchmark`，正式 updates 由完整 loader/loss 測速決定。第一階段的 `reviewed-gate.json` 必須包含完整人工判讀。
 
 ```powershell
-.venv/Scripts/python.exe tools/train-agent.py train --stage-one runs/dynamics-v1/final-100.pt --prediction-dir runs/prediction-v1 --prediction-gate runs/prediction-v1/reviewed-gate.json --updates 100 --output runs/agent-v1
-.venv/Scripts/python.exe tools/train-agent.py train --checkpoint runs/agent-v1/step-40.pt --output runs/agent-resumed
+.venv/Scripts/python.exe tools/train-agent.py benchmark --stage-one runs/dynamics-v1/final-100.pt --prediction-dir runs/prediction-v1/prediction --prediction-gate runs/prediction-v1/reviewed-gate.json --output runs/second-plan.json
+.venv/Scripts/python.exe tools/train-agent.py train --stage-one runs/dynamics-v1/final-100.pt --prediction-dir runs/prediction-v1/prediction --prediction-gate runs/prediction-v1/reviewed-gate.json --output runs/agent-v1
+.venv/Scripts/python.exe tools/train-agent.py train --checkpoint runs/agent-v1/final-100.pt --output runs/agent-resumed
 .venv/Scripts/python.exe tools/train-agent.py evaluate --checkpoint runs/agent-v1/final-100.pt --output runs/agent-metrics
-.venv/Scripts/python.exe tools/train-agent.py predict --checkpoint runs/agent-v1/final-100.pt --output runs/agent-prediction
-.venv/Scripts/python.exe tools/train-agent.py score-prediction --checkpoint runs/agent-v1/final-100.pt --metrics runs/agent-prediction/metrics.json --judgments runs/agent-prediction/judgments.json --output runs/agent-prediction/reviewed-gate.json
-.venv/Scripts/python.exe tools/train-agent.py score --checkpoint runs/agent-v1/final-100.pt --metrics runs/agent-metrics/metrics.json --prediction-dir runs/agent-prediction --prediction-gate runs/agent-prediction/reviewed-gate.json --output runs/agent-gate.json
+.venv/Scripts/python.exe tools/train-agent.py score-prediction --checkpoint runs/agent-v1/final-100.pt --metrics runs/agent-metrics/prediction/metrics.json --judgments runs/agent-metrics/prediction/judgments.json --output runs/agent-metrics/prediction/reviewed-gate.json
+.venv/Scripts/python.exe tools/train-agent.py score --checkpoint runs/agent-v1/final-100.pt --metrics runs/agent-metrics/agent/metrics.json --prediction-dir runs/agent-metrics/prediction --prediction-gate runs/agent-metrics/prediction/reviewed-gate.json --output runs/agent-gate.json
 ```
 
 入口重新計算上游 gate，核對 checkpoint、recipe、凍結資料及實作 checksum。來源必須為第一階段且已有更新，工程 checkpoint、模擬 passed、缺證據及不同來源均不能授權正式微調。工程測試直接使用 Python API；CLI 不提供跳過 gate 的旗標。保留被引用的 `.pt` 與 `.pt.json`，來源修改後恢復會拒絕。
@@ -45,6 +45,6 @@ Policy 的 binary 機率 ≥0.5；mouse/wheel argmax 同分取最小類別。有
 
 另列逐任務 policy 指標、joint action NLL、no-op 比例及原始禁止組合率。零目標機率的 NLL 在 JSON 記為字串 `infinity`，另列筆數，不暗中 clamp；該情況不能通過。每個評估 transition 保存來源 artifact、模型索引、原始 transition indices、預測與監督值，可重算指標。
 
-`evaluate` 先輸出 reward/policy 報告，dynamics 保持 pending。`predict` 直接讀同一第二階段 checkpoint 的 dynamics，沿用 #25 的 200 序列、1/5/15 步、配對 baseline 與人工判讀。`score` 重算三項 gate 並核對同一 checkpoint；只有正式產物且三項都 passed 才會令 `qualified=true`。工程資料即使數值達標，仍為 `engineering_only`。
+`evaluate` 同時排程完整 dynamics 與 reward/policy 評估，分別寫入 `prediction/` 與 `agent/`，根目錄的合併 gate 在人工判讀完成前維持未合格。`predict` 直接讀同一第二階段 checkpoint 的 dynamics，沿用 #25 的 200 序列、1/5/15 步、配對 baseline 與人工判讀。`score` 重算三項 gate 並核對同一 checkpoint；只有正式產物且三項都 passed 才會令 `qualified=true`。工程資料即使數值達標，仍為 `engineering_only`。
 
 驗證命令與各項證據見 [Issue #26 工程驗證](issue-26-validation.md)。

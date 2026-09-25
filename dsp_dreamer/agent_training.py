@@ -139,6 +139,7 @@ class AgentTrainer:
         self.pools = {length: sequence_pools(index, length) for length in {config.short_length, config.long_length}}
         require(all(p for pools in self.pools.values() for p in pools.values()), 'Train 缺少 uniform/relevant 合法 sequence')
         self.step, self.elapsed_seconds = 0, 0.
+        self.control: dict | None = None
         self.history = []
 
     def samples(self, step):
@@ -226,7 +227,7 @@ class AgentTrainer:
             formal=self.formal, status='pending' if self.formal else 'engineering_only',
             reconstruction=self.reconstruction, prediction=self.prediction, stage_one_source=self.stage_one_source,
             provenance=self.provenance, index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
-            step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history,
+            step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
             python_rng=random.getstate(), numpy_rng=(state[0], state[1].tolist(), *state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
             device_type=self.device.type)
@@ -244,6 +245,7 @@ class AgentTrainer:
         trainer.model.load_state_dict({**{f'dynamics.{k}': v for k, v in value['model'].items()}, **value['agent']})
         trainer.optimizer.load_state_dict(value['optimizer'])
         trainer.step, trainer.elapsed_seconds, trainer.history = value['step'], value['elapsed_seconds'], value['history']
+        trainer.control = value.get('control')
         random.setstate(value['python_rng'])
         state = value['numpy_rng']
         np.random.set_state((state[0], np.array(state[1], dtype=np.uint32), *state[2:]))

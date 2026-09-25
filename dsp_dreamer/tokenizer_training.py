@@ -96,6 +96,7 @@ class TokenizerTrainer:
         self.optimizer = torch.optim.AdamW([dict(params=decay, weight_decay=.01),
             dict(params=no_decay, weight_decay=0.)], lr=config.learning_rate, betas=(.9, .999), eps=1e-8)
         self.step, self.elapsed_seconds = 0, 0.
+        self.control: dict | None = None
         self.provenance = provenance or {}
         self.history = []
         self.pools = {length: [(s['artifact_id'], start) for s in index.report['sources']
@@ -166,7 +167,7 @@ class TokenizerTrainer:
             index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
             provenance=self.provenance, metric=self.loss.identity,
             model=self.model.state_dict(), optimizer=self.optimizer.state_dict(), step=self.step,
-            elapsed_seconds=self.elapsed_seconds, history=self.history,
+            elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
             python_rng=random.getstate(), numpy_rng=(numpy_state[0], numpy_state[1].tolist(), *numpy_state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
             device_type=self.device.type)
@@ -194,6 +195,7 @@ class TokenizerTrainer:
         trainer.optimizer.load_state_dict(value['optimizer'])
         trainer.step, trainer.elapsed_seconds = value['step'], value['elapsed_seconds']
         trainer.history = value['history']
+        trainer.control = value.get('control')
         random.setstate(value['python_rng'])
         state = value['numpy_rng']
         np.random.set_state((state[0], np.array(state[1], dtype=np.uint32), *state[2:]))

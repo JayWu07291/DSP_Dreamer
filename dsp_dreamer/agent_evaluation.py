@@ -194,8 +194,9 @@ def evaluation_rows(index):
     return result
 
 
-def score_agent(index, predictions, *, baseline=None):
-    expected = evaluation_rows(index)
+def score_agent(index, predictions, *, baseline=None, limit=None):
+    require(limit is None or type(limit) is int and limit > 0, '無效 validation 數量')
+    expected = evaluation_rows(index)[:limit]
     require([(r['artifact_id'], r['model_index']) for r in predictions] ==
             [(r['artifact_id'], r['model_index']) for r in expected], '評估必須完整、依序且不可重複 transition')
     actual_baseline = train_baseline(index)
@@ -209,7 +210,7 @@ def score_agent(index, predictions, *, baseline=None):
 
 
 @torch.no_grad()
-def evaluate_agent(checkpoint_path, index, inputs, output, *, device='cuda', deadline=None):
+def evaluate_agent(checkpoint_path, index, inputs, output, *, device='cuda', deadline=None, limit=None):
     value = read_agent_checkpoint(checkpoint_path)
     verify_seal(inputs)
     require(value['index_id'] == index.report['artifact_id'] == inputs['index_id']
@@ -225,13 +226,15 @@ def evaluate_agent(checkpoint_path, index, inputs, output, *, device='cuda', dea
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     recipe = seal(dict(schema='dsp-agent-evaluation-recipe/1', checkpoint_sha256=file_info(checkpoint_path)['sha256'],
+        limit=limit,
         formal=value['formal'], status='pending' if value['formal'] else 'engineering_only',
         index_id=value['index_id'], agent_config=value['agent_config'],
         history_steps=64, signal=.1, generation_seed=2601, precision='bf16' if torch.device(device).type == 'cuda' else 'float32',
         **value['provenance']))
     atomic_save(output / 'recipe.json', recipe)
     predictions = []
-    for row in evaluation_rows(index):
+    require(limit is None or type(limit) is int and limit > 0, '無效 validation 數量')
+    for row in evaluation_rows(index)[:limit]:
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError('已達預算，policy/reward 評估未完成')
         view = index.views[row['artifact_id']]
@@ -256,12 +259,18 @@ def evaluate_agent(checkpoint_path, index, inputs, output, *, device='cuda', dea
                          for k, v in logits.items() if k != 'reward'}
         predictions.append(dict(artifact_id=row['artifact_id'], model_index=end,
                                 score=reward_expectation(logits['reward']).item(), probabilities=probabilities))
-    result = score_agent(index, predictions, baseline=inputs.get('baseline'))
+    result = score_agent(index, predictions, baseline=inputs.get('baseline'), limit=limit)
     report = seal(dict(schema='dsp-agent-metrics/1', recipe_id=recipe['artifact_id'],
         checkpoint_sha256=recipe['checkpoint_sha256'], formal=value['formal'], index_id=value['index_id'],
         status='pending' if value['formal'] else 'engineering_only',
         **value['provenance'], **result))
     atomic_save(output / 'metrics.json', report)
+    if limit is not None:
+        gate = seal(dict(schema='dsp-agent-validation/1', status=report['status'], qualified=False,
+                         checkpoint_sha256=recipe['checkpoint_sha256'], limit=limit,
+                         report_id=report['artifact_id'], reward=result['reward'], policy=result['policy']))
+        atomic_save(output / 'gate.json', gate)
+        return gate
     # A policy/reward report cannot certify the candidate without its own dynamics gate.
     gate = combine_gates(report, index, inputs, checkpoint_path=checkpoint_path, recipe=recipe)
     atomic_save(output / 'gate.json', gate)
@@ -269,6 +278,7 @@ def evaluate_agent(checkpoint_path, index, inputs, output, *, device='cuda', dea
 
 
 def combine_gates(metrics, index, inputs, *, checkpoint_path, recipe, prediction=None):
+    require(recipe.get('limit') is None, '小樣本 validation 不可作為完整 gate')
     value = read_agent_checkpoint(checkpoint_path)
     if value['schema'] == 'dsp-imagination-checkpoint/1' and value['formal']:
         from .imagination import require_stage_two

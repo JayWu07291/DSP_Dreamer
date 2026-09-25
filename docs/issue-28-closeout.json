@@ -1,0 +1,182 @@
+{
+  "acceptance_criteria_passed": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "artifact_id": "534effde9ca4e9dfb8303e48c767ed87f47e6a0f443ee485f4cf20bc2aab171b",
+  "date": "2026-09-25",
+  "engineering_checks_status": "passed",
+  "formal_training_started": false,
+  "implementation": {
+    "dsp_dreamer\\agent_evaluation.py": {
+      "bytes": 19093,
+      "sha256": "b646bf8bedb0838d1c06d182d393dc86b8333f54da88c30e24a131060f3cf5df"
+    },
+    "dsp_dreamer\\agent_training.py": {
+      "bytes": 15733,
+      "sha256": "304829c5673cfb254d0047947195be8062dd70af30e6bc43dd543bddcd60050e"
+    },
+    "dsp_dreamer\\dynamics_training.py": {
+      "bytes": 13968,
+      "sha256": "c94000c4867c8c13b37da7a4154f9863bcc1a5e2cb0887afeaca11a0c6661410"
+    },
+    "dsp_dreamer\\imagination.py": {
+      "bytes": 21969,
+      "sha256": "e3e5bdc5fc378c6b68985a98840828378002e8105bea3f9c6dd0098755147e4a"
+    },
+    "dsp_dreamer\\tokenizer_training.py": {
+      "bytes": 11462,
+      "sha256": "a3822a63453715f9de9e0b3043403866081148015fa00f4dede32e9a92eed08d"
+    },
+    "dsp_dreamer\\training_cli.py": {
+      "bytes": 15324,
+      "sha256": "feceb494482aa1c7b5b32e43318144a52121855deeb6c75f28a412c6807d8934"
+    },
+    "dsp_dreamer\\training_control.py": {
+      "bytes": 19410,
+      "sha256": "e256b73af306e2663217c7a3a841b72b917a2193bae50372557b44aa893e695f"
+    },
+    "tests\\test_dynamics.py": {
+      "bytes": 20109,
+      "sha256": "1ae1a257c917625d83b742aa325cfbb5103c5b82ce5c0e5c495c592d25229d79"
+    },
+    "tests\\test_training_control.py": {
+      "bytes": 17723,
+      "sha256": "0ec96ac2d0a5883c55f375d928bdde9d2592988110ec7f564c92d425418dcdbd"
+    },
+    "tools\\train-agent.py": {
+      "bytes": 460,
+      "sha256": "3d823fffa03027bb631e46d3707027355acc98e9082dec74b04397985e1ec92c"
+    },
+    "tools\\train-dynamics.py": {
+      "bytes": 456,
+      "sha256": "56dbc60925ebdbea24b77e00436183ca213f516e9c0b1c68b8d75c30eb8e01e9"
+    },
+    "tools\\train-tokenizer.py": {
+      "bytes": 456,
+      "sha256": "b1f37baeb4655cf536a115cd55485e834d3a771282ce10582eb52fd2ded5e274"
+    },
+    "tools\\train.py": {
+      "bytes": 441,
+      "sha256": "053e8aa3225d87d59799c5a69678de5a7de9cf5e2a80102ca669d0c54ef98ecd"
+    }
+  },
+  "imported_history": {
+    "A_seconds": 2305.2320443573,
+    "audit": "runs\\issue-28\\history-audit.json",
+    "audit_file": {
+      "bytes": 2995,
+      "sha256": "475bf501aa4eae507537297803ceec12facf5f709da88fefe96feb6d62c2074c"
+    },
+    "preflight_seconds": 120.031
+  },
+  "issue": "https://github.com/JayWu07291/DSP_Dreamer/issues/28",
+  "limitations": "CPU 合成錄製經正式 compiler、loader、loss 與四階段 checkpoint；時鐘控制只供排程驗證。未執行正式 GPU throughput、訓練、品質 gate 或 development。",
+  "mypy": {
+    "files": 34,
+    "status": "passed"
+  },
+  "new_gpu_training_seconds": 0,
+  "reviews": {
+    "base": "7b5b75af322dc6a7dea627d61f626e27669f1600",
+    "spec": 0,
+    "standards": 0
+  },
+  "schema": "dsp-training-control-engineering-closeout/1",
+  "stages": {
+    "A": {
+      "charged_updates": 2,
+      "checkpoint": "E:\\GitHub\\DSP_Dreamer\\runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\A\\final-2.pt",
+      "checkpoint_file": {
+        "bytes": 2253693,
+        "sha256": "62969168503e2d1c225310abc35c4c9ff63a1d8abd85650ef2c4a4774878d167"
+      },
+      "gate_status": "insufficient_evidence",
+      "planned_updates": 2,
+      "qualified": false,
+      "quality_status": "engineering_only",
+      "report": "runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\A\\run.json",
+      "report_file": {
+        "bytes": 13449,
+        "sha256": "ae4dbf05c4a507b5a52651119519e5a54b3b3fecda27f8d33b5633ae027e5560"
+      },
+      "report_id": "9e8cf5acbe31896dc7c2ecb7bd63a1929958cfb864acab9cb56dfc2683b1366a",
+      "updates": 2
+    },
+    "B": {
+      "charged_updates": 2,
+      "checkpoint": "E:\\GitHub\\DSP_Dreamer\\runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\B\\final-2.pt",
+      "checkpoint_file": {
+        "bytes": 1859789,
+        "sha256": "dd316d9ae96d69cba765b0f93932db6b8950aa045013b89cc4204193c9524f70"
+      },
+      "gate_status": "engineering_only",
+      "planned_updates": 2,
+      "qualified": false,
+      "quality_status": "engineering_only",
+      "report": "runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\B\\run.json",
+      "report_file": {
+        "bytes": 65824,
+        "sha256": "7ae2081dca44ce2fdb1878a5954849ca44d31a26fa31a19cfbb64b5f14864003"
+      },
+      "report_id": "6a32d607b0a9f238c47fd136d27dca3869be3182bca74c66fcb9f0fe200725c5",
+      "updates": 2
+    },
+    "second": {
+      "charged_updates": 2,
+      "checkpoint": "E:\\GitHub\\DSP_Dreamer\\runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\second\\final-2.pt",
+      "checkpoint_file": {
+        "bytes": 3452301,
+        "sha256": "1122e505dbf2d1537f630c56177ce5293996d5cb17d72850c24cf44e43555743"
+      },
+      "gate_status": "engineering_only",
+      "planned_updates": 2,
+      "qualified": false,
+      "quality_status": "engineering_only",
+      "report": "runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\second\\run.json",
+      "report_file": {
+        "bytes": 114563,
+        "sha256": "8f44fde0dca0ff7e539db80e3a41f8b863962c177b4642b1b83573f63e4f9571"
+      },
+      "report_id": "25e45206a245bb421f305387ca6685878184961aa930558f83330beefb230bd1",
+      "updates": 2
+    },
+    "third": {
+      "charged_updates": 2,
+      "checkpoint": "E:\\GitHub\\DSP_Dreamer\\runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\third\\final-2.pt",
+      "checkpoint_file": {
+        "bytes": 1925121,
+        "sha256": "d29a9f8009f45615d8dfd9f22a8d9f16c33e7046786077ca0b411c5f17f54592"
+      },
+      "gate_status": "engineering_only",
+      "planned_updates": 2,
+      "qualified": false,
+      "quality_status": "engineering_only",
+      "report": "runs\\issue-28\\full-suite\\test_controlled_pipeline_uses_0\\third\\run.json",
+      "report_file": {
+        "bytes": 154721,
+        "sha256": "9114acfd8e3df54d4f2d49c0815c6f45055c29589e7ce3f26140e8e342d25dc3"
+      },
+      "report_id": "133c8210340ffa758c55a6003fe96ed0627f429336748ff3c5420f06a7fbcbf7",
+      "updates": 2
+    }
+  },
+  "status": "engineering_only",
+  "tests": {
+    "command": ".venv/Scripts/python.exe -X utf8 -m pytest -q --basetemp runs/issue-28/full-suite --junitxml runs/issue-28/full-suite.xml",
+    "errors": 0,
+    "failures": 0,
+    "report": "runs\\issue-28\\full-suite.xml",
+    "report_file": {
+      "bytes": 22899,
+      "sha256": "6dde0e522d1629224f92963d2621ee1acf939c1c53821df44dc86b31db1edb8e"
+    },
+    "seconds": 447.185,
+    "skipped": 0,
+    "tests": 179
+  }
+}

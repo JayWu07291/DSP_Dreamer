@@ -12,6 +12,8 @@ Issue #26 的[任務條件微調、恢復與 policy/reward 評估工具](docs/ag
 
 Issue #27 的[固定任務想像訓練與候選匯出](docs/imagination.md)延續第二階段 checkpoint，只更新 policy／value，並沿用相同離線 gate。合成資料的[工程驗證](docs/issue-27-validation.md)不授予正式候選資格；正式第三階段與品質仍由 #33 驗收。
 
+Issue #28 的[統一訓練控制](docs/training.md)提供跨階段預算、完整 loader/loss 測速、30 分鐘存檔與驗證、恢復及 gate 停止。工程測試不授權 #31–#33 的正式訓練。
+
 ## 專案結構
 
 | 路徑 | 用途 |

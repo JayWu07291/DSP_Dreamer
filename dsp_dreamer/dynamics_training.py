@@ -123,6 +123,7 @@ class DynamicsTrainer:
         self.optimizer = torch.optim.AdamW([dict(params=decay, weight_decay=.01),
             dict(params=no_decay, weight_decay=0.)], lr=config.learning_rate, betas=(.9, .999), eps=1e-8)
         self.step, self.elapsed_seconds = 0, 0.
+        self.control: dict | None = None
         self.history = []
         self.pools = {length: [(s['artifact_id'], start) for s in index.report['sources']
             if s['split'] == 'train' for start in index.views[s['artifact_id']].sequence_starts(length)]
@@ -197,7 +198,7 @@ class DynamicsTrainer:
             tokenizer_source=self.tokenizer_source, metric=self.metric_identity,
             formal=self.formal, reconstruction=self.reconstruction, provenance=self.provenance,
             index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
-            step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history,
+            step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
             python_rng=random.getstate(), numpy_rng=(state[0], state[1].tolist(), *state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
             device_type=self.device.type)
@@ -227,6 +228,7 @@ class DynamicsTrainer:
         trainer.model.load_state_dict(value['model'])
         trainer.optimizer.load_state_dict(value['optimizer'])
         trainer.step, trainer.elapsed_seconds, trainer.history = value['step'], value['elapsed_seconds'], value['history']
+        trainer.control = value.get('control')
         random.setstate(value['python_rng'])
         state = value['numpy_rng']
         np.random.set_state((state[0], np.array(state[1], dtype=np.uint32), *state[2:]))
