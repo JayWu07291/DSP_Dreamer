@@ -283,11 +283,14 @@ def combine_gates(metrics, index, inputs, *, checkpoint_path, recipe, prediction
     require(all(metrics[k] == v for k, v in rescored.items()), '第二階段評分內容不符')
     dynamics = dict(status='pending', threshold_status='pending')
     if prediction is not None:
+        require(prediction['metrics']['formal'] == prediction['recipe']['formal'] == value['formal'],
+                'Dynamics gate 工程／正式標記不符')
         require(prediction['metrics']['checkpoint_sha256'] == metrics['checkpoint_sha256'], 'Dynamics gate 不是此第二階段 checkpoint')
         dynamics = score_prediction(prediction['metrics'], inputs, prediction['gate']['judgments'],
                                     checkpoint_path=checkpoint_path, recipe=prediction['recipe'])
         require(dynamics == prediction['gate'], 'Dynamics gate 內容不符')
-    status = gate_status([metrics['reward']['status'], metrics['policy']['status'], dynamics['threshold_status']])
+    status = gate_status([metrics['reward']['status'], metrics['policy']['status'],
+                          dynamics['status'] if value['formal'] else dynamics['threshold_status']])
     return seal(dict(schema='dsp-agent-gate/1', status=status if value['formal'] else 'engineering_only',
         threshold_status=status, checkpoint_sha256=metrics['checkpoint_sha256'], report_id=metrics['artifact_id'],
         reward=metrics['reward'], policy=metrics['policy'], dynamics=dynamics,

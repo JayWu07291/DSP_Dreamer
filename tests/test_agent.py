@@ -237,7 +237,7 @@ def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path):
     from dsp_dreamer.agent_evaluation import evaluation_rows, score_agent, train_baseline, combine_gates
     from dsp_dreamer.dynamics_evaluation import evaluate_prediction
     from dsp_dreamer.evaluation_protocol import seal
-    from dsp_dreamer.contract import load, file_info
+    from dsp_dreamer.contract import load, file_info, atomic_save
 
     with Recording.synthetic(tmp_path / 'source', FFMPEG) as recording:
         recording.metadata.update(progress_version=1, progress_tech_ids=[1001, 1002, 1003, 1004, 1005])
@@ -303,6 +303,86 @@ def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path):
     gate = combine_gates(metrics, index, inputs, checkpoint_path=path, recipe=recipe, prediction=proof)
     assert set(('reward', 'policy', 'dynamics')) <= gate.keys() and not gate['qualified']
     assert gate['dynamics'] == dynamics_gate
+    atomic_save(tmp_path / 'combined-metrics.json', metrics)
+    atomic_save(tmp_path / 'combined-gate.json', gate)
+    mismatched = copy.deepcopy(proof)
+    mismatched['recipe'] = seal({**{k: v for k, v in proof['recipe'].items() if k != 'artifact_id'}, 'formal': True})
+    with pytest.raises(InvalidRecording, match='工程／正式'):
+        combine_gates(metrics, index, inputs, checkpoint_path=path, recipe=recipe, prediction=mismatched)
     proof['metrics'] = dict(proof['metrics'], checkpoint_sha256='different')
     with pytest.raises(InvalidRecording, match='不是此第二階段'):
         combine_gates(metrics, index, inputs, checkpoint_path=path, recipe=recipe, prediction=proof)
+
+
+def test_stage_one_gate_checks_reconstruction_prediction_and_identity(tmp_path):
+    from dataclasses import asdict
+    from dsp_dreamer.agent_training import require_stage_one
+    from dsp_dreamer.contract import atomic_save, file_info
+    from dsp_dreamer.evaluation_protocol import seal, ITEM_TYPES, CATEGORIES
+    from dsp_dreamer.tokenizer_evaluation import score_reconstruction
+    from dsp_dreamer.dynamics_evaluation import score_prediction
+
+    # Metadata-only rejection fixtures: no model weights and no executable tokenizer.
+    token = tmp_path / 'not-a-tokenizer.txt'
+    token.write_text('engineering_only')
+    selected = [dict(artifact_id='fixture', observation_index=i, task_id=i % 17) for i in range(200)]
+    samples = [dict(artifact_id='fixture', start=i, category=CATEGORIES[i//50], task_id=i % 17,
+        action_difference=dict(noop=True, shuffled=True, copy_last=True), key_states=[dict(type='cursor', expected='fixture')])
+        for i in range(200)]
+    inputs = seal(dict(index_id='fixture-index', reconstruction=dict(selected=selected), prediction=dict(selected=samples)))
+    annotations = seal(dict(items=[dict(sample_id=str(i), artifact_id='fixture', observation_index=i, type=kind, eligible=True)
+        for i, kind in enumerate(ITEM_TYPES)], ui_regions=[dict(ui_type=k) for k in ('technology', 'backpack', 'crafting', 'building', 'lab')]))
+    provenance = dict(protocol_id='fixture-protocol', data_freeze_id='fixture-freeze', annotations_id=annotations['artifact_id'],
+                      evaluation_inputs_id=inputs['artifact_id'], implementation={str(token): file_info(token)})
+    metrics = seal(dict(**provenance, checkpoint_sha256=file_info(token)['sha256'],
+                        frames=[dict(sample=s, mse=.2, lpips=.3, ui_mse=.1, ui_pixels=10) for s in selected]))
+    judgments = dict(report_id=metrics['artifact_id'], annotations_id=annotations['artifact_id'],
+        checkpoint_sha256=metrics['checkpoint_sha256'], items=[dict(sample_id=str(i), correct=True, reviewer='測試', evidence='fixture')
+        for i in range(4)])
+    reconstruction = dict(metrics=metrics, inputs=inputs, annotations=annotations,
+                          gate=score_reconstruction(metrics, inputs, annotations, judgments))
+    payload = dict(schema='dsp-dynamics-checkpoint/1', formal=True, step=1, action_codec=ACTION_CODEC,
+        sources=[dict(source_kind='live')], provenance=provenance, index_id=inputs['index_id'],
+        tokenizer_source=dict(path=str(token), checkpoint=file_info(token)), reconstruction=reconstruction,
+        metric='fixture', model_config=asdict(DynamicsConfig(width=32, heads=4)), model={})
+
+    def checkpoint(name, value):
+        path = tmp_path / f'{name}.pt'
+        torch.save(value, path)
+        atomic_save(str(path) + '.json', dict(checkpoint=file_info(path)))
+        return path
+
+    path = checkpoint('metadata-only', payload)
+    with pytest.raises(InvalidRecording, match='第一階段凍結來源不同'):
+        require_stage_one(path, None, {**provenance, 'data_freeze_id': 'other'})
+    with pytest.raises(InvalidRecording, match='完整重建 gate'):
+        require_stage_one(checkpoint('missing-reconstruction', {**payload, 'reconstruction': None}), None, provenance)
+    with pytest.raises(InvalidRecording, match='第一階段預測 gate 證據'):
+        require_stage_one(path, None, provenance)
+    for correct in (False, None):
+        reviewed = copy.deepcopy(judgments)
+        reviewed['items'][0]['correct'] = correct
+        proof = {**reconstruction, 'gate': score_reconstruction(metrics, inputs, annotations, reviewed)}
+        with pytest.raises(InvalidRecording, match='重建 gate 未通過'):
+            require_stage_one(checkpoint(f'reconstruction-{correct}', {**payload, 'reconstruction': proof}), None, provenance)
+    altered = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'checkpoint_sha256': 'other'})
+    reviewed = {**judgments, 'report_id': altered['artifact_id'], 'checkpoint_sha256': 'other'}
+    proof = {**reconstruction, 'metrics': altered, 'gate': score_reconstruction(altered, inputs, annotations, reviewed)}
+    with pytest.raises(InvalidRecording, match='不屬於此 tokenizer'):
+        require_stage_one(checkpoint('other-tokenizer', {**payload, 'reconstruction': proof}), None, provenance)
+    predicted = seal(dict(**provenance, checkpoint_sha256=file_info(path)['sha256'], formal=False, samples=[dict(sample=s,
+        conditions={c: {str(step): dict(mse=.1, lpips=.2, region_lpips=.8 if c == 'correct' else 1.) for step in (1, 5, 15)}
+                    for c in ('correct', 'noop', 'shuffled', 'copy_last')}) for s in samples]))
+    reviews = dict(report_id=predicted['artifact_id'], checkpoint_sha256=predicted['checkpoint_sha256'],
+        evaluation_inputs_id=inputs['artifact_id'], items=[dict(sample_id=f'P{i+1:03d}-K001', correct=True,
+        reviewer='測試', evidence='fixture') for i in range(200)])
+    proof = dict(metrics=predicted, inputs=inputs, recipe={}, gate=score_prediction(predicted, inputs, reviews))
+    assert proof['gate']['threshold_status'] == 'passed' and proof['gate']['status'] == 'engineering_only'
+    with pytest.raises(InvalidRecording, match='第一階段預測 gate 未通過'):
+        require_stage_one(path, proof, provenance)
+    recipe = seal(dict(formal=True, checkpoint_sha256='other', metric='fixture', model_config=payload['model_config'], **provenance))
+    proof['recipe'] = recipe
+    proof['metrics'] = seal({**{k: v for k, v in predicted.items() if k != 'artifact_id'},
+                             'formal': True, 'checkpoint_sha256': 'other', 'recipe_id': recipe['artifact_id']})
+    with pytest.raises(InvalidRecording, match='正式評分 checkpoint 或 recipe 不符'):
+        require_stage_one(path, proof, provenance)

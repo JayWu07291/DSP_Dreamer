@@ -12,7 +12,7 @@
 | Reward 指標與缺證據 | `test_reward_and_policy_metrics_use_exact_paired_denominators` 核對 TP=4、FP=1、FN=1、TN=4，P/R=.8、AP=.74；另驗證 failed、缺正例與未定義 precision |
 | Policy baseline、門檻與缺樣本 | Digit1 納入 F1；macro-F1=.60、非零 accuracy=.50、眾數差距恰為 10 百分點；缺 baseline、空子集、零機率 NLL 均不能通過 |
 | 完整資料與三項 gate | `test_continuous_validation_relevant_union_and_stage_two_dynamics` 的 17 個重疊 relevant 視窗合為 80 個 transitions；故障 validation 不補 reward 分母；同一 agent checkpoint 可執行 #25 預測評估並併入完整報告 |
-| 恢復及正式入口隔離 | 恢復後下一次 loss、樣本與全部模型權重逐值一致；工程 checkpoint、模擬 passed、不同來源、缺列或重複列被拒；合併 gate 不會讓工程產物 qualified |
+| 恢復及正式入口隔離 | 恢復後下一次 loss、樣本與全部模型權重逐值一致；`test_stage_one_gate_checks_reconstruction_prediction_and_identity` 逐一核對缺重建、缺預測、重建 failed/pending、錯 tokenizer、錯凍結來源及錯預測 checkpoint 的拒絕；合併 gate 拒絕工程／正式標記不一致 |
 
 ## 執行方式
 
@@ -23,9 +23,9 @@
 .venv/Scripts/python.exe tools/train-agent.py --help
 ```
 
-模型整合測試使用 CPU、float32、width 32、4 heads，其餘 8 blocks、8 registers、64×32 latents 與 17 任務保持不變。原生 RGB 仍為 640×360。四項新增測試涵蓋模型、訓練恢復、評分邊界與完整串接。這些證據驗證工程行為，沒有量測正式 width 512 的第二階段 GPU throughput 或收斂。
+模型整合測試使用 CPU、float32、width 32、4 heads，其餘 8 blocks、8 registers、64×32 latents 與 17 任務保持不變。原生 RGB 仍為 640×360。五項測試涵蓋模型、訓練恢復、評分邊界、完整串接及上游 gate 拒絕。上游拒絕案例使用沒有模型權重、無法執行 tokenizer 的中繼資料 fixture，只供走到各失敗分支。這些證據驗證工程行為，沒有量測正式 width 512 的第二階段 GPU throughput 或收斂。
 
-四項新增測試通過；完整回歸為 **171 passed**，耗時 317.25 秒，沒有失敗或跳過。`mypy` 檢查 28 個檔案通過。CLI help 與 `git diff --check` 也通過。測試中的 numcodecs／torchvision 警告來自既有依賴的棄用提示。
+五項 agent 測試通過，耗時 38.00 秒；完整回歸為 **172 passed**，耗時 309.30 秒，沒有失敗或跳過。`mypy` 檢查 28 個檔案通過。CLI help 與 `git diff --check` 也通過。完整回歸有 10 則既有 torchvision 棄用警告，啟動時另有 numcodecs 棄用提示。
 
 ## Standards
 
@@ -33,8 +33,17 @@
 
 ## Spec
 
-獨立審查未發現可確認的 #26 規格偏差。核對 checkpoint 與 gate 來源、codec、MTP、抽樣、reward 分母、policy 配對 baseline 及同一 checkpoint 的三項 gate。Policy 的逐任務數字是報告，不額外增加每個 task 都必須有非零 mouse/wheel 的門檻。
+結案複查發現合併 gate 未核對 dynamics 證據的工程／正式標記，可能把工程報告的數值達標當成正式品質通過。已先以真實 loader 整合測試重現，再要求 metrics、recipe 與候選的標記一致，正式合併改用 dynamics 的實際 `status`。另補上游 gate 各拒絕分支的測試，避免所有案例都只撞到工程 checkpoint 的第一道檢查。
 
-審查結果：Standards 一項判斷性重複規則已修正，零項待處理；Spec 零項待處理。基準為實作前的 `fa3e8d3`。
+最終獨立審查核對 checkpoint 與 gate 來源、codec、MTP、抽樣、reward 分母、policy 配對 baseline 及同一 checkpoint 的三項 gate，沒有剩餘的工程驗收問題。Policy 的逐任務數字是報告，不額外增加每個 task 都必須有非零 mouse/wheel 的門檻。Standards 與 Spec 均零項待處理；基準為實作前的 `fa3e8d3`。
+
+## 結案證據
+
+可機讀摘要及 checksum 見 [issue-26-closeout.json](issue-26-closeout.json)。原始合成錄製、checkpoint、完整評分報告和測試 XML 保留在本機 `runs/issue-26/`，不納入 Git：
+
+- `closeout-tests-20260925/test_stage_one_loader_finetuni0/`：實際模型推論六個 reward transitions；reward/policy 為證據不足，dynamics 為 pending。
+- `closeout-tests-20260925/test_continuous_validation_rel0/`：八十個 transitions 的受控 policy/reward 機率評分，搭配同一 checkpoint 的實際 dynamics 預測；reward 為證據不足、policy 為 failed、dynamics 為 engineering_only。
+
+兩組完整 gate 均為 `engineering_only`、`qualified=false`。另以 CLI 實際嘗試恢復工程 checkpoint，確認建立輸出目錄前即拒絕。正式凍結檔與來源 hash 已重新核對，預測序列仍為四類各 50 段。
 
 正式 reward/policy/dynamics 品質均未執行，狀態為未驗證；現有第一階段尚未取得 #31 的合格 checkpoint。此交付不啟動 #32／#33，也不揭露 offline-test 模型結果。跨階段統一預算與停止規則的工程驗收仍屬 #28。
