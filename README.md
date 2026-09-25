@@ -6,6 +6,8 @@
 
 Issue #24 的 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/tokenizer.md)已完成五項工程驗收。64／96-token 各四次對照更新及 200 圖評估已完成；人工判讀兩組各 0／15 正確、無缺判，重建品質 gate 均為 failed。四次更新不能支持收斂或容量優劣結論，後續 dynamics 仍須等待重建 gate 通過。正式 v1 維持 64 latent tokens，詳見 [驗證紀錄](docs/issue-24-validation.md)。
 
+Issue #25 的 [dynamics 訓練、恢復與配對預測評估工具](docs/dynamics.md)已加入。工程測試使用合成 fixtures；正式第一階段 B 仍由重建 gate 阻擋，尚無正式預測品質結果。
+
 ## 專案結構
 
 | 路徑 | 用途 |
