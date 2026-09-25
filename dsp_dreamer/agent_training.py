@@ -15,6 +15,7 @@ from .contract import atomic_save, file_info, require
 from .dynamics import Dynamics, DynamicsConfig, shortcut_loss
 from .dynamics_training import (DynamicsTrainingConfig, load_tokenizer, read_dynamics_checkpoint,
                                 require_reconstruction, verify_implementation)
+from .optimization import LossRMS
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,7 @@ class AgentTrainer:
             require_stage_one(stage_one_path, prediction, self.provenance)
             verify_implementation(self.provenance)
             config.validate_formal()
-            require(value['model_config'] == asdict(DynamicsConfig()) and index.report['coverage_gate_passed']
+            require(index.report['coverage_gate_passed']
                     and torch.device(device).type == 'cuda', '正式架構、資料覆蓋或 CUDA 不符')
         else:
             require(not value['formal'] and all(s['source_kind'] == 'synthetic' for s in index.report['sources']),
@@ -135,6 +136,7 @@ class AgentTrainer:
         world = Dynamics(DynamicsConfig(**value['model_config'])).to(self.device)
         world.load_state_dict(value['model'])
         self.model = Agent(world).to(self.device)
+        self.loss_rms = LossRMS(3, config.loss_rms_decay, config.loss_rms_epsilon).to(self.device)
         groups = []
         for is_world in (True, False):
             for decay in (True, False):
@@ -171,6 +173,8 @@ class AgentTrainer:
             group['lr'] = group['peak_lr'] * factor
         length, samples = self.samples(self.step)
         totals = dict(dynamics=0., policy=0., reward=0.)
+        squares = np.zeros(3)
+        scales = self.loss_rms.scales()
         counts = [0] * 9
         # A microbatch never crosses the uniform/relevant boundary.
         half = len(samples) // 2
@@ -194,10 +198,13 @@ class AgentTrainer:
                 with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.device.type == 'cuda'):
                     with torch.no_grad():
                         clean = self.tokenizer.encode(rgb).float()
+                    del rgb
                     if uniform:
                         _, flow, bootstrap = shortcut_loss(self.model.dynamics, clean, past)
-                        total = cfg.dynamics_weight * (cfg.flow_weight * flow + cfg.bootstrap_weight * bootstrap)
-                        totals['dynamics'] += total.detach().item() * weight
+                        raw = cfg.flow_weight * flow + cfg.bootstrap_weight * bootstrap
+                        total = cfg.dynamics_weight * raw / scales[0]
+                        totals['dynamics'] += raw.detach().item() * weight
+                        squares[0] += raw.detach().item() ** 2 * weight
                     else:
                         tasks = torch.from_numpy(np.stack([b['inputs']['task_condition'] for b in batches])).to(self.device)
                         rewards = torch.from_numpy(np.stack([b['targets']['reward'] for b in batches])).to(self.device)
@@ -206,9 +213,10 @@ class AgentTrainer:
                         tau = levels[..., None, None]
                         outputs = self.model(tau * clean + (1 - tau) * torch.randn_like(clean), past, tasks, levels)
                         losses = mtp_loss(outputs, actual, rewards, tasks, valid, valid)
-                        total = cfg.policy_weight * losses['policy'] + cfg.reward_weight * losses['reward']
-                        for key in ('policy', 'reward'):
-                            totals[key] += getattr(cfg, key + '_weight') * losses[key].detach().item() * weight
+                        total = cfg.policy_weight * losses['policy'] / scales[1] + cfg.reward_weight * losses['reward'] / scales[2]
+                        for index, key in enumerate(('policy', 'reward'), 1):
+                            totals[key] += losses[key].detach().item() * weight
+                            squares[index] += losses[key].detach().item() ** 2 * weight
                         counts = [a + b for a, b in zip(counts, losses['counts'])]
                 require(torch.isfinite(total).item(), '非有限 loss，停止訓練')
                 (total * weight).backward()
@@ -216,9 +224,13 @@ class AgentTrainer:
         if time.monotonic() >= deadline:
             raise TimeoutError('已達預算，未完成的 accumulation 不更新權重')
         self.optimizer.step()
+        self.loss_rms.update(squares)
         self.step += 1
         self.elapsed_seconds += time.monotonic() - started
-        result = dict(step=self.step, length=length, samples=samples, loss=sum(totals.values()), **totals,
+        normalized = {key: value / scales[i].item() for i, (key, value) in enumerate(totals.items())}
+        result = dict(step=self.step, length=length, samples=samples,
+                      loss=sum(getattr(cfg, key + '_weight') * value for key, value in normalized.items()), **totals,
+                      normalized_losses=normalized, loss_rms=dict(zip(totals, scales.tolist())),
                       mtp_counts=counts, grad_norm=norm.item(), learning_rates=[g['lr'] for g in self.optimizer.param_groups])
         self.history.append(result)
         return result
@@ -229,7 +241,8 @@ class AgentTrainer:
         payload = dict(schema='dsp-agent-checkpoint/1', action_codec=ACTION_CODEC, agent_config=AGENT_CONFIG,
             model_config=asdict(self.model.dynamics.config), training_config=asdict(self.config),
             model=self.model.dynamics.state_dict(), agent={k: v for k, v in self.model.state_dict().items() if not k.startswith('dynamics.')},
-            optimizer=self.optimizer.state_dict(), tokenizer_source=self.tokenizer_source, metric=self.metric_identity,
+            optimizer=self.optimizer.state_dict(), loss_rms=self.loss_rms.state_dict(),
+            tokenizer_source=self.tokenizer_source, metric=self.metric_identity,
             formal=self.formal, status='pending' if self.formal else 'engineering_only',
             reconstruction=self.reconstruction, prediction=self.prediction, stage_one_source=self.stage_one_source,
             provenance=self.provenance, index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
@@ -250,6 +263,7 @@ class AgentTrainer:
                       device=device, formal=value['formal'], prediction=value['prediction'], provenance=value['provenance'])
         trainer.model.load_state_dict({**{f'dynamics.{k}': v for k, v in value['model'].items()}, **value['agent']})
         trainer.optimizer.load_state_dict(value['optimizer'])
+        trainer.loss_rms.load_state_dict(value['loss_rms'])
         trainer.step, trainer.elapsed_seconds, trainer.history = value['step'], value['elapsed_seconds'], value['history']
         trainer.control = value.get('control')
         random.setstate(value['python_rng'])

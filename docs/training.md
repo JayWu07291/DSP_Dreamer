@@ -1,6 +1,6 @@
 # 統一訓練控制
 
-`tools/train.py` 管理 A、B、second、third 四個訓練子階段。舊的 `train-tokenizer.py`、`train-dynamics.py`、`train-agent.py` 轉交相同入口。訓練器、loss、模型架構及 gate 評分器沿用 #24–#27，學習參數集中在根目錄 [training_config.py](../training_config.py)。
+`tools/train.py` 管理 A、B、second、third 四個訓練子階段。舊的 `train-tokenizer.py`、`train-dynamics.py`、`train-agent.py` 轉交相同入口。學習參數集中在根目錄 [training_config.py](../training_config.py)，資料與 gate 評分器沿用 #24–#27。2026-09-26 依使用者要求把模型改為縮小版 Dreamer 4 時空 Transformer，架構版本為 `dsp-block-causal/2`。
 
 本文件描述工程入口，不授權正式 GPU 工作。正式測速、訓練與品質證據由 #31–#33 執行。
 
@@ -34,12 +34,54 @@
 | `STAGES['B']` | seed、LR、秒數／更新上限、flow／bootstrap 權重 |
 | `STAGES['second']` | world 與 agent LR、dynamics／policy／reward 權重及 B 的 loss 參數 |
 | `STAGES['third']` | policy／value LR、horizon、gamma、lambda、PMPO alpha、KL／value 權重 |
-| `RUNTIME` | 資料核對模式、前置時數、驗證間隔、測速換算比例、CPU threads |
-| `TOKENIZER`／`DYNAMICS` | 顯示目前固定 v1 架構；正式入口會拒絕不相容修改，A 必須維持 64 tokens |
+| `RUNTIME` | 資料核對模式、前置時數、驗證間隔、測速換算比例、CPU threads、CUDA allocator 顯存上限比例 |
+| `LOSS_RMS` | A、B、second 的 running RMS 衰減率與 epsilon |
+| `TOKENIZER`／`DYNAMICS` | 寬度、heads、encoder／decoder 深度、時間層間隔、context、GQA、attention soft cap、分段計算與 activation checkpointing；輸出表徵仍為 64×32 |
 
 共同字典的參數可在各 `STAGES` 中覆寫。有效 batch 維持 16，2／8 是預設，1／16 限 OOM 後使用。正式秒數可縮減，不能超過下方階段上限。`updates=None` 依測速換算；整數只能進一步降低更新上限。資料表示、動作 codec、shortcut 算法步長、reward bins、固定評估名單及 gate 門檻仍屬模型／評估契約，不是本次調參開關。`show-config` 的 third 會列出父訓練配置的 flow/world/reward 等欄位，這些不作用於想像訓練；可調的第三階段參數以上表與 `STAGES['third']` 為準。
 
-本次 A 預設只把 `mask_max_probability` 從 0.9 改為 0，先嘗試完整畫面重建。LR 仍為 1e-4、MSE／LPIPS 權重仍為 1／0.2、預算仍為 4 小時。這是一個待驗證實驗，沒有證據證明它已解決雜訊重建。新模型的 tokenizer 架構未改。執行中修改設定檔不影響已載入的配方；恢復時若學習參數、模型或驗證排程不同，入口拒絕混用。
+執行中修改設定檔不影響已載入的配方；恢復時若學習參數、模型或驗證排程不同，入口拒絕混用。新架構與舊的單層 cross-attention tokenizer 權重不相容，須執行 `A run --restart`，舊檔案保留作為歷史證據。
+
+### 縮小版論文結構與起始配方
+
+論文依據與舊實作差異見 [Dreamer 4 原文核對](research/dreamer4-paper-primary-notes.md)。本版 tokenizer 的 encoder、decoder 都有空間 self-attention 與因果時間 attention，每四層為三個空間層加一個時間層。encoder 的影像 patches 只能看 patches，latent 可看兩者；decoder 的 latent 只能看 latent，patch readout 可看兩者。共用 blocks 採 RMSNorm、RoPE、SwiGLU、QKNorm 與 logit soft capping，dynamics 另外使用 GQA。agent tokens 插入相同 blocks，世界 tokens 不能注意 agent tokens。
+
+| 設定 | A tokenizer | B dynamics |
+| --- | --- | --- |
+| 寬度、heads | 640、10 | 1280、20 query heads／4 KV heads |
+| 深度 | encoder 12、decoder 12 | 16 層 |
+| 參數量 | 121,341,264 | 275,689,120；second 加上 agent heads 共 286,882,480 |
+| 每層時間 context | 32 幀 | 64 幀 |
+| 短／長片段 | 16／48 幀，三短一長 | 32／80 transitions，需 33／81 幀，三短一長 |
+| 有效 batch | microbatch 2 × accumulation 8 | microbatch 2 × accumulation 8 |
+| 起始 LR | 1e-4 | 1e-4 |
+| 遮罩 | 每張圖抽 `p ~ U(0, 0.9)` | 凍結 tokenizer，encode 時不遮罩 |
+| 目標 | 正規化 MSE + 0.2 × 正規化 LPIPS | 正規化 flow + 正規化 bootstrap |
+
+兩者預設 AdamW betas `(0.9, 0.99)`、weight decay `0.01`、gradient clip `1`，先用總更新數的 5% warmup，再 cosine 衰減至 peak LR 的 10%。second 的 world LR 為 `1e-5`、agent LR 為 `1e-4`；third 的 policy LR 為 `3e-5`、value LR 為 `1e-4`。A 時數仍為 4 小時，測速決定實際更新數，沒有為本次改模型扣掉正式訓練步數。
+
+running RMS 以微批次平均 loss 的平方建立 EMA，decay `0.99`、epsilon `1e-8`，每次完整 optimizer update 後才提交統計並做偏差修正；第一步用單位尺度。中斷的 accumulation 不改變 normalizer。checkpoint 保存統計，續跑必須恢復；log 同時保存原始 loss、使用的 RMS 尺度與正規化 loss。A 另外記錄 latent 在 token 間的標準差與 `abs(z)>0.99` 的比例。正式評估仍使用未正規化的原始 MSE／LPIPS，不改 gate 門檻。third 保留以 nats 表示的 PMPO／KL，繼承的 RMS 欄位不作用於想像訓練。
+
+以上 LR、EMA、寬度、層數與序列長度是本專案的起始選擇，論文沒有公開完整配方。縮小模型保留原生 640×360、patch 20、64×32 bottleneck；RoPE 分別沿 raster token 順序與時間軸計算。仍使用現有 `.25/.5` shortcut 訓練子集、歷史 signal `0.1` 與循環短長採樣，尚未加入完整 step-size 抽樣或最後 long-only 微調。這些差異不宣稱與論文等效，歷史 signal 的原文歧義見研究筆記。
+
+GPU 工程檢查可執行以下命令，使用合成 RGB／latent、完整反向傳播，預留兩份 FP32 AdamW moments，但不呼叫 optimizer step，不讀資料集、不動訓練帳本：
+
+```powershell
+.venv/Scripts/python.exe tools/check-model-memory.py --cycles 2 --output runs/model-memory-check.json
+.venv/Scripts/python.exe tools/check-model-memory.py --stage second --cycles 2 --output runs/agent-memory-check.json
+```
+
+RTX 5070 12GB 的工程檢查採 microbatch 2、BF16 與 activation checkpointing。A 的空間 attention 每次處理 8 個 frame，dynamics 為 16；這是獨立項目的計算分段，不會截斷 attention 序列。以下均包含 AdamW moments 的預留空間：
+
+| 檢查 | allocated peak | reserved peak | 單次前向＋反向時間 |
+| --- | ---: | ---: | ---: |
+| A，連續兩輪三短一長中的 48 幀 | 6.89 GiB | 8.86 GiB（9.52 GB） | 6.77–6.88 秒 |
+| B，連續兩次 81 幀，含凍結 tokenizer | 7.61 GiB | 8.50 GiB | 4.94–5.74 秒 |
+| second，連續兩次 81 幀，含 uniform dynamics 與 relevant policy/reward | 7.78 GiB | 8.48 GiB（9.10 GB） | 6.70–7.77 秒 |
+
+`cuda_memory_fraction=0.75` 將本機 PyTorch allocator 限於約 8.96 GiB（9.62 GB），另外留給 Windows、CUDA context 與其他程式。allocated 是張量占用，reserved 還包含 allocator 快取；兩者都不是整張 GPU 的總占用。實測中 A 分段 16 曾保留 11.87 GiB 並降至每次約 52 秒，改成 8 後解除顯存壓力；390M dynamics 雖可單獨通過 B，加入 second heads 與梯度後超出上限，因此預設使用 276M。
+
+紀錄保存在本機 `runs/issue-31/vram-tuning/selected-A.json`、`selected-B.json`、`selected-second.json`，附完整配置。這些合成檢查沒有 optimizer 更新、資料載入或完整梯度累積，不能當成正式吞吐或品質證據。真實測速與完整訓練留給使用者執行，重建品質仍須看新的固定圖評估；模型較大不保證在固定四小時內品質較好。
 
 ### 資料核對與 log
 
@@ -83,7 +125,7 @@
 
 首次執行匯入既有 `runs/tokenizer-budget.json`，若本機沒有該檔則使用 `docs/issue-24-results.json` 保存的同份紀錄，合計 2305.2320443573 秒仍歸 A。另匯入可用的 `runs/dynamics-budget.json`。#25 兩次 GPU smoke 合計 120.031 秒歸 preflight，來源見 `training-history.json`。這些用量不因工程／正式分工修訂而消失。已匯入的來源若改變，入口拒絕執行，必須先核對歷史紀錄。
 
-`benchmark` 穿過完整 loss、累積與 optimizer，CUDA 同步後計時。預設四次更新為 32、32、32、80 steps；修改 sequence 設定時，測速跑 `lcm(4, long_every)` 次以涵蓋完整週期。正式模式要求真實資料、固定架構、BF16 及上游合格 gate。Synthetic 與 CPU 測速只存在隔離測試帳本，不可成為正式計畫。
+`benchmark` 穿過完整 loss、累積與 optimizer，CUDA 同步後計時。A 預設四次更新為 16、16、16、48 幀，B／second 為 32、32、32、80 transitions；修改 sequence 設定時，測速跑 `lcm(4, long_every)` 次以涵蓋完整週期。正式模式要求真實資料、相容架構、BF16 及上游合格 gate。Synthetic 與 CPU 測速只存在隔離測試帳本，不可成為正式計畫。
 
 更新上限為 `floor(剩餘階段秒數 × update_fraction ÷ 平均更新秒數)`，預設比例 0.9，其餘約 10% 留給驗證與儲存。`benchmark --updates N` 只能再縮減上限。測速權重不接入正式訓練，正式訓練從同一來源與 seed 初始化，使用換算後的 warmup／cosine 排程。
 

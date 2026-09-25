@@ -19,7 +19,7 @@ def actions(steps):
 def test_agent_causality_masks_twohot_and_legal_actions():
     torch.set_num_threads(2)
     torch.manual_seed(26)
-    world = Dynamics(DynamicsConfig(width=32, heads=4)).eval()
+    world = Dynamics(DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2)).eval()
     agent = Agent(world).eval()
     clean = torch.rand(1, 5, 64, 32)
     actual = actions(5)
@@ -32,6 +32,11 @@ def test_agent_causality_masks_twohot_and_legal_actions():
         changed_tasks = tasks.roll(1, -1)
         changed = agent(clean, past, changed_tasks, levels)
         assert not torch.equal(expected['binary'], changed['binary'])
+        original_tokens = agent.query + agent.task(tasks)[:, :, None]
+        changed_tokens = agent.query + agent.task(changed_tasks)[:, :, None]
+        original_hidden = world.hidden(clean, past, levels, .25, agent_tokens=original_tokens)
+        changed_hidden = world.hidden(clean, past, levels, .25, agent_tokens=changed_tokens)
+        torch.testing.assert_close(original_hidden[:, :, :-1], changed_hidden[:, :, :-1], rtol=0, atol=0)
         torch.testing.assert_close(world(clean, past, levels, .25), expected_world, rtol=0, atol=0)
         actual['binary'][:, 3, 1] = 1
         changed = agent(clean, incoming_actions(actual), tasks, levels)
@@ -83,12 +88,12 @@ def test_stage_one_loader_finetuning_resume_and_gate_rejection(tmp_path):
                           registry(('train', 'demonstration'), ('9', 'demonstration')), length=2)
     inputs = seal(dict(index_id=index.report['artifact_id'], prediction=dict(selected=[])))
     provenance = dict(evaluation_inputs_id=inputs['artifact_id'])
-    token = TokenizerTrainer(index, ReconstructionLoss('data/torch-cache'), TokenizerConfig(width=32, heads=4),
+    token = TokenizerTrainer(index, ReconstructionLoss('data/torch-cache'), TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
         TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2), device='cpu')
     token.update()
     token.save(tmp_path / 'token.pt')
     stage_one = DynamicsTrainer(tmp_path / 'token.pt', index, DynamicsTrainingConfig(updates=1, microbatch=1,
-        accumulation=1, short_length=2, long_length=2), model_config=DynamicsConfig(width=32, heads=4), device='cpu')
+        accumulation=1, short_length=2, long_length=2), model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu')
     stage_one.update()
     source = tmp_path / 'world.pt'
     stage_one.save(source)
@@ -282,11 +287,11 @@ def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path, s
     inputs = seal(dict(index_id=index.report['artifact_id'], prediction=dict(selected=[sample])))
     provenance = dict(evaluation_inputs_id=inputs['artifact_id'])
     metric = ReconstructionLoss('data/torch-cache')
-    tokenizer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4),
+    tokenizer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
         TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2), device='cpu')
     tokenizer.save(tmp_path / 'token.pt')
     world = DynamicsTrainer(tmp_path / 'token.pt', index, DynamicsTrainingConfig(updates=1, microbatch=1,
-        accumulation=1, short_length=2, long_length=2), model_config=DynamicsConfig(width=32, heads=4), device='cpu', provenance=provenance)
+        accumulation=1, short_length=2, long_length=2), model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu', provenance=provenance)
     world.update()
     world.save(tmp_path / 'world.pt')
     trainer = AgentTrainer(tmp_path / 'world.pt', index, AgentTrainingConfig(updates=1, microbatch=1,
@@ -362,7 +367,7 @@ def test_stage_one_gate_checks_reconstruction_prediction_and_identity(tmp_path):
     payload = dict(schema='dsp-dynamics-checkpoint/1', formal=True, step=1, action_codec=ACTION_CODEC,
         sources=[dict(source_kind='live')], provenance=provenance, index_id=inputs['index_id'],
         tokenizer_source=dict(path=str(token), checkpoint=file_info(token)), reconstruction=reconstruction,
-        metric='fixture', model_config=asdict(DynamicsConfig(width=32, heads=4)), model={})
+        metric='fixture', model_config=asdict(DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2)), model={})
 
     def checkpoint(name, value):
         path = tmp_path / f'{name}.pt'

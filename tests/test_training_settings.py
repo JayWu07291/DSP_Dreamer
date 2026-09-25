@@ -25,7 +25,7 @@ def test_editable_recipe_reaches_optimizer_and_checkpoint(tmp_path):
     path = fixture(tmp_path / 'source', group='train')
     index = TrainingIndex([path], registry(('train', 'demonstration')), length=2)
     metric = ReconstructionLoss('data/torch-cache')
-    trainer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4), TrainingConfig(**values), device='cpu')
+    trainer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4), TrainingConfig(**values), device='cpu')
     result = trainer.update()
     assert result['learning_rate'] == .00015
     assert result['loss'] == pytest.approx(.5 * result['mse'] + .1 * result['lpips'])
@@ -36,6 +36,15 @@ def test_editable_recipe_reaches_optimizer_and_checkpoint(tmp_path):
     restored = TokenizerTrainer.restore(checkpoint, index, metric, device='cpu')
     assert restored.config == trainer.config
     assert restored.update() == expected
+    # Architecture knobs are accepted for a NEW run, with the 64x32 interface intact.
+    with custom.open('a', encoding='utf-8') as stream:
+        stream.write("\nTOKENIZER.update(width=128, heads=4, encoder_blocks=4, decoder_blocks=4)\n")
+    adjusted = read_settings(custom)
+    assert adjusted['tokenizer']['width'] == 128 and adjusted['tokenizer']['encoder_blocks'] == 4
+    with custom.open('a', encoding='utf-8') as stream:
+        stream.write(f"\nTOKENIZER.update(context={settings['stages']['A']['long_length']})\n")
+    with pytest.raises(InvalidRecording, match='長片段'):
+        read_settings(custom)
 
 
 def test_immutable_loader_skips_rgb_but_rejects_metadata_changes(tmp_path):

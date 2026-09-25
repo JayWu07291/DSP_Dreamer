@@ -10,7 +10,7 @@ from dsp_dreamer.tokenizer import CausalTokenizer, TokenizerConfig
 def test_native_reconstruction_is_causal_and_differentiable():
     torch.set_num_threads(2)
     torch.manual_seed(24)
-    model = CausalTokenizer(TokenizerConfig(width=32, heads=4)).eval()
+    model = CausalTokenizer(TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4)).eval()
     frames = torch.rand(1, 3, 3, 360, 640)
     with torch.no_grad():
         latents, reconstruction = model(frames)
@@ -20,12 +20,21 @@ def test_native_reconstruction_is_causal_and_differentiable():
         changed = frames.clone()
         changed[:, 0] = 0
         _, changed_history = model(changed)
+        # Decoder must use past latents itself, including when called without encode.
+        changed_latents = latents.clone()
+        changed_latents[:, 0] = 0
+        decoded_history = model.decode(changed_latents)
+        changed_latents = latents.clone()
+        changed_latents[:, 2] = 0
+        decoded_future = model.decode(changed_latents)
     assert latents.shape == (1, 3, 64, 32)
     assert reconstruction.shape == frames.shape
     torch.testing.assert_close(latents[:, :2], other_latents[:, :2], rtol=0, atol=0)
     torch.testing.assert_close(reconstruction[:, :2], other[:, :2], rtol=0, atol=0)
     assert not torch.equal(reconstruction[:, 2], other[:, 2])
     assert not torch.equal(reconstruction[:, 2], changed_history[:, 2])
+    assert not torch.equal(reconstruction[:, 2], decoded_history[:, 2])
+    torch.testing.assert_close(reconstruction[:, :2], decoded_future[:, :2], rtol=0, atol=0)
     model.train()
     _, masked = model(frames, generator=torch.Generator().manual_seed(2202))
     masked.square().mean().backward()
@@ -42,7 +51,7 @@ def test_loader_update_resume_repeats_next_update(tmp_path):
     path = fixture(tmp_path / "source", group="train")
     index = TrainingIndex([path], registry(("train", "demonstration")), length=2)
     metric = ReconstructionLoss("data/torch-cache")
-    trainer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4),
+    trainer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
         TrainingConfig(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=2), device="cpu")
     first = trainer.update()
     assert first['mse'] > 0 and first['lpips'] > 0 and first['samples']
@@ -53,12 +62,27 @@ def test_loader_update_resume_repeats_next_update(tmp_path):
     trainer.save(checkpoint)
     expected_rng = (random.random(), np.random.random(), torch.rand(3).tolist())
     expected = trainer.update()
+    assert expected['mse_rms'] == pytest.approx(first['mse'])
+    assert expected['lpips_rms'] == pytest.approx(first['lpips'])
     restored = TokenizerTrainer.restore(checkpoint, index, metric, device="cpu")
     assert (random.random(), np.random.random(), torch.rand(3).tolist()) == expected_rng
     actual = restored.update()
     assert actual == expected
+    assert actual['mse_rms'] != 1 and actual['lpips_rms'] != 1
+    assert actual['loss'] == pytest.approx(actual['normalized_mse'] + .2 * actual['normalized_lpips'])
+    for key, tensor in trainer.loss_rms.state_dict().items():
+        torch.testing.assert_close(tensor, restored.loss_rms.state_dict()[key], rtol=0, atol=0)
     for key, tensor in trainer.model.state_dict().items():
         torch.testing.assert_close(tensor, restored.model.state_dict()[key], rtol=0, atol=0)
+    from dsp_dreamer.contract import atomic_save, file_info
+    from dsp_dreamer.tokenizer_training import read_checkpoint
+    legacy = torch.load(checkpoint, weights_only=True)
+    legacy['model_config'].pop('architecture')
+    legacy_path = tmp_path / 'legacy.pt'
+    torch.save(legacy, legacy_path)
+    atomic_save(str(legacy_path) + '.json', dict(checkpoint=file_info(legacy_path)))
+    with pytest.raises(InvalidRecording, match='舊 tokenizer'):
+        read_checkpoint(legacy_path)
     with checkpoint.open('ab') as stream:
         stream.write(b'changed')
     with pytest.raises(InvalidRecording, match='checksum'):

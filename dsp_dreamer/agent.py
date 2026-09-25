@@ -1,4 +1,4 @@
-"""Task-conditioned agent queries over the task-blind dynamics transformer."""
+"""Interleaved task tokens with one-way attention in the dynamics transformer."""
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -8,7 +8,7 @@ from .contract import require
 
 
 AGENT_CONFIG = dict(tasks=17, distances=9, reward_bins=255, reward_support='symexp(-20:20)',
-                    query_tokens=1, attention='one-way cross-attention over final world tokens')
+                    query_tokens=1, attention='interleaved block-causal tokens; world cannot attend to agent')
 
 
 def incoming_actions(actions):
@@ -24,8 +24,6 @@ class Agent(nn.Module):
         d = dynamics.config.width
         self.task = nn.Linear(17, d, bias=False)
         self.query = nn.Parameter(torch.randn(1, 1, d) * .02)
-        self.cross = nn.MultiheadAttention(d, dynamics.config.heads, batch_first=True)
-        self.norm = nn.LayerNorm(d)
         self.heads = nn.ModuleDict({k: nn.Sequential(nn.Linear(d, d), nn.GELU(), nn.Linear(d, 9 * n))
                                    for k, n in dict(binary=21, mouse=121, wheel=3, reward=255).items()})
 
@@ -37,12 +35,9 @@ class Agent(nn.Module):
         require(tuple(task_condition.shape) == (*noisy.shape[:2], 17)
                 and ((task_condition == 0) | (task_condition == 1)).all().item()
                 and (task_condition.sum(-1) == 1).all().item(), '需要 17 維 one-hot 任務條件')
-        # No task or agent representation is ever passed to the world transformer.
-        hidden = self.dynamics.hidden(noisy, past_actions, levels, .25)
-        query = self.query + self.task(task_condition).flatten(0, 1)[:, None]
-        memory = hidden.flatten(0, 1)
-        attended, _ = self.cross(query, memory, memory, need_weights=False)
-        return self.norm(query + attended).reshape(*noisy.shape[:2], -1)
+        query = self.query + self.task(task_condition)[:, :, None]
+        hidden = self.dynamics.hidden(noisy, past_actions, levels, .25, agent_tokens=query)
+        return hidden[:, :, -1]
 
 
 def reward_support(device):

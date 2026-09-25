@@ -15,7 +15,8 @@ from .dynamics import Dynamics, DynamicsConfig, shortcut_loss
 from .tokenizer import CausalTokenizer, TokenizerConfig
 from .tokenizer_training import read_checkpoint
 from .tokenizer_evaluation import score_reconstruction
-from .optimization import OptimizerConfig
+from .optimization import LossRMS, OptimizerConfig
+from .transformer import ARCHITECTURE
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,8 @@ class DynamicsTrainingConfig(OptimizerConfig):
     max_seconds: float = 57600
     flow_weight: float = 1.
     bootstrap_weight: float = 1.
+    loss_rms_decay: float = .99
+    loss_rms_epsilon: float = 1e-8
 
     def __post_init__(self):
         super().__post_init__()
@@ -39,6 +42,8 @@ class DynamicsTrainingConfig(OptimizerConfig):
                 and math.isfinite(self.max_seconds) and self.max_seconds > 0, '無效訓練預算或配方')
         require(all(math.isfinite(v) and v >= 0 for v in (self.flow_weight, self.bootstrap_weight))
                 and self.flow_weight + self.bootstrap_weight > 0, 'Invalid dynamics loss weights')
+        require(math.isfinite(self.loss_rms_decay) and 0 <= self.loss_rms_decay < 1
+                and math.isfinite(self.loss_rms_epsilon) and self.loss_rms_epsilon > 0, '無效 loss RMS 設定')
 
     def validate_formal(self):
         require((self.microbatch, self.accumulation) in ((2, 8), (1, 16)), '正式配方需 batch 16')
@@ -61,6 +66,7 @@ def read_dynamics_checkpoint(path):
     value = torch.load(path, map_location='cpu', weights_only=True)
     require(value.get('schema') in ('dsp-dynamics-checkpoint/1', 'dsp-agent-checkpoint/1',
                                    'dsp-imagination-checkpoint/1'), '不支援的 dynamics checkpoint')
+    require(value['model_config'].get('architecture') == ARCHITECTURE, '舊 dynamics 架構不能續訓，請重新訓練')
     # Validate the entire codec before constructing or loading any model weights.
     validate_action_contract(value['action_codec'])
     if value['schema'] in ('dsp-agent-checkpoint/1', 'dsp-imagination-checkpoint/1'):
@@ -99,7 +105,7 @@ class DynamicsTrainer:
             require_reconstruction(reconstruction, self.tokenizer_source['checkpoint']['sha256'], self.provenance)
             verify_implementation(self.provenance)
             config.validate_formal()
-            require(model_config == DynamicsConfig() and index.report['coverage_gate_passed'], '正式架構或資料覆蓋不符')
+            require(model_config.latent_tokens == 64 and index.report['coverage_gate_passed'], '正式表徵或資料覆蓋不符')
             require(torch.device(device).type == 'cuda', '正式訓練需要 CUDA')
         else:
             require(all(s['source_kind'] == 'synthetic' for s in index.report['sources']),
@@ -116,11 +122,12 @@ class DynamicsTrainer:
                 'Tokenizer 資料身分不同')
         require(self.tokenizer.config.latent_tokens == 64, '正式 v1 dynamics 固定 64 tokens')
         if formal:
-            require(self.tokenizer.config == TokenizerConfig() and payload['step'] > 0, '正式 tokenizer 架構或進度不符')
+            require(self.tokenizer.config.latent_tokens == 64 and payload['step'] > 0, '正式 tokenizer 表徵或進度不符')
             require(all(payload['provenance'].get(k) == self.provenance.get(k) for k in
                     ('protocol_id', 'data_freeze_id', 'evaluation_inputs_id', 'annotations_id')), 'Tokenizer 凍結資料不符')
         self.metric_identity = payload['metric']
         self.model = Dynamics(model_config).to(self.device)
+        self.loss_rms = LossRMS(2, config.loss_rms_decay, config.loss_rms_epsilon).to(self.device)
         decay: list[torch.nn.Parameter] = []
         no_decay: list[torch.nn.Parameter] = []
         for name, parameter in self.model.named_parameters():
@@ -153,6 +160,8 @@ class DynamicsTrainer:
             group['lr'] = cfg.learning_rate * factor
         length, samples = self.samples(self.step)
         totals = np.zeros(3)
+        squares = np.zeros(2)
+        scales = self.loss_rms.scales()
         for offset in range(0, len(samples), cfg.microbatch):
             if time.monotonic() >= deadline:
                 raise TimeoutError('已達預算，未完成的 accumulation 不更新權重')
@@ -175,19 +184,24 @@ class DynamicsTrainer:
                     clean = self.tokenizer.encode(rgb).float()
                 del rgb
                 total, flow, bootstrap = shortcut_loss(self.model, clean, actions)
-                total = cfg.flow_weight * flow + cfg.bootstrap_weight * bootstrap
+                total = cfg.flow_weight * flow / scales[0] + cfg.bootstrap_weight * bootstrap / scales[1]
             require(torch.isfinite(total).item(), '非有限 loss，停止訓練')
             (total / cfg.accumulation).backward()
             totals += [v.detach().item() / cfg.accumulation for v in (total, flow, bootstrap)]
+            squares += np.array([flow.detach().item(), bootstrap.detach().item()]) ** 2 / cfg.accumulation
         norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
         if time.monotonic() >= deadline:
             raise TimeoutError('已達預算，未完成的 accumulation 不更新權重')
         self.optimizer.step()
+        self.loss_rms.update(squares)
         self.step += 1
         self.elapsed_seconds += time.monotonic() - started
         result = dict(step=self.step, length=length, samples=samples, loss=float(totals[0]),
                       flow=float(totals[1]), bootstrap=float(totals[2]), grad_norm=norm.item(),
-                      learning_rate=self.optimizer.param_groups[0]['lr'])
+                      learning_rate=self.optimizer.param_groups[0]['lr'],
+                      flow_rms=scales[0].item(), bootstrap_rms=scales[1].item(),
+                      normalized_flow=float(totals[1]) / scales[0].item(),
+                      normalized_bootstrap=float(totals[2]) / scales[1].item())
         self.history.append(result)
         return result
 
@@ -199,7 +213,7 @@ class DynamicsTrainer:
         assert isinstance(state, tuple)
         payload = dict(schema='dsp-dynamics-checkpoint/1', action_codec=ACTION_CODEC,
             model_config=asdict(self.model.config), training_config=asdict(self.config),
-            model=self.model.state_dict(), optimizer=self.optimizer.state_dict(),
+            model=self.model.state_dict(), optimizer=self.optimizer.state_dict(), loss_rms=self.loss_rms.state_dict(),
             tokenizer_source=self.tokenizer_source, metric=self.metric_identity,
             formal=self.formal, reconstruction=self.reconstruction, provenance=self.provenance,
             index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
@@ -232,6 +246,7 @@ class DynamicsTrainer:
         require(trainer.metric_identity == value['metric'], 'Tokenizer metric 不同')
         trainer.model.load_state_dict(value['model'])
         trainer.optimizer.load_state_dict(value['optimizer'])
+        trainer.loss_rms.load_state_dict(value['loss_rms'])
         trainer.step, trainer.elapsed_seconds, trainer.history = value['step'], value['elapsed_seconds'], value['history']
         trainer.control = value.get('control')
         random.setstate(value['python_rng'])

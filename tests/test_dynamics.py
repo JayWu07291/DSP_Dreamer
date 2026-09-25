@@ -14,7 +14,7 @@ from dsp_dreamer.dynamics import Dynamics, DynamicsConfig, shortcut_loss
 def test_causal_action_conditioning_and_free_prediction():
     torch.set_num_threads(2)
     torch.manual_seed(25)
-    model = Dynamics(DynamicsConfig(width=32, heads=4)).eval()
+    model = Dynamics(DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2)).eval()
     latents = torch.rand(1, 3, 64, 32)
     actions = dict(binary=torch.zeros(1, 3, 21, dtype=torch.long),
                    mouse=torch.full((1, 3), 60), wheel=torch.ones(1, 3, dtype=torch.long))
@@ -62,14 +62,14 @@ def test_loader_training_resume_and_checkpoint_contract(tmp_path):
     index = TrainingIndex([fixture(tmp_path / 'source', group='train')],
                           registry(('train', 'demonstration')), length=2)
     tokenizer = TokenizerTrainer(index, ReconstructionLoss('data/torch-cache'),
-        TokenizerConfig(width=32, heads=4), TrainingConfig(updates=1, microbatch=1,
+        TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4), TrainingConfig(updates=1, microbatch=1,
         accumulation=1, short_length=2, long_length=2), device='cpu')
     tokenizer.update()
     initial = tmp_path / 'tokenizer.pt'
     tokenizer.save(initial)
     frozen = copy.deepcopy(tokenizer.model.state_dict())
     config = DynamicsTrainingConfig(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=3)
-    trainer = DynamicsTrainer(initial, index, config, model_config=DynamicsConfig(width=32, heads=4), device='cpu')
+    trainer = DynamicsTrainer(initial, index, config, model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu')
     first = trainer.update()
     assert first['loss'] > 0 and first['flow'] > 0 and first['bootstrap'] > 0 and first['samples']
     checkpoint = tmp_path / 'step1.pt'
@@ -269,7 +269,7 @@ def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
         key_states=[dict(type='cursor', expected='fixture')], action_difference=dict(noop=True, shuffled=False, copy_last=True))
     inputs = seal(dict(index_id=index.report['artifact_id'], prediction=dict(selected=[sample])))
     metric = ReconstructionLoss('data/torch-cache')
-    tokenizer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4),
+    tokenizer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
         TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2), device='cpu')
     initial = tmp_path / 'tokenizer.pt'
     tokenizer.save(initial)
@@ -277,7 +277,7 @@ def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
     implementation.write_text('original')
     trainer = DynamicsTrainer(initial, index,
         DynamicsTrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2),
-        model_config=DynamicsConfig(width=32, heads=4), device='cpu', provenance=dict(evaluation_inputs_id=inputs['artifact_id'],
+        model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu', provenance=dict(evaluation_inputs_id=inputs['artifact_id'],
             implementation={str(implementation): file_info(implementation)}))
     trainer.update()
     checkpoint = tmp_path / 'dynamics.pt'

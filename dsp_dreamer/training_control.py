@@ -347,6 +347,11 @@ def run_training(trainer, budget, stage, output, evaluate, *, validation_seconds
         if event:
             event('validation_started', stage=stage, step=trainer.step, full=full)
         path = save_checkpoint('candidate' if full else f'validation-{progress["updates"]}')
+        # Validation reloads the published checkpoint. Completed gradients and unused
+        # short/long-batch cache are not needed while the evaluator is resident.
+        trainer.optimizer.zero_grad(set_to_none=True)
+        if trainer.device.type == 'cuda':
+            torch.cuda.empty_cache()
         with preserve_rng(trainer):
             gate = evaluate(path, output / ('gate' if full else f'validation-{progress["updates"]}'), full, budget.deadline)
         budget.tick()

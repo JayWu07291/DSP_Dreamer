@@ -14,7 +14,8 @@ from torch.utils.checkpoint import checkpoint
 from .actions import ACTION_CODEC, validate_action_contract
 from .contract import atomic_save, file_info, load, require
 from .tokenizer import CausalTokenizer, TokenizerConfig
-from .optimization import OptimizerConfig
+from .optimization import LossRMS, OptimizerConfig
+from .transformer import ARCHITECTURE
 
 
 class ReconstructionLoss:
@@ -57,13 +58,15 @@ class TrainingConfig(OptimizerConfig):
     seed: int = 2202
     microbatch: int = 2
     accumulation: int = 8
-    short_length: int = 32
-    long_length: int = 80
+    short_length: int = 16
+    long_length: int = 48
     learning_rate: float = 1e-4
     max_seconds: float = 14400
     mask_max_probability: float = .9
     mse_weight: float = 1.
     lpips_weight: float = .2
+    loss_rms_decay: float = .99
+    loss_rms_epsilon: float = 1e-8
 
     def __post_init__(self):
         super().__post_init__()
@@ -75,6 +78,8 @@ class TrainingConfig(OptimizerConfig):
         require(math.isfinite(self.mask_max_probability) and 0 <= self.mask_max_probability <= 1
                 and all(math.isfinite(v) and v >= 0 for v in (self.mse_weight, self.lpips_weight))
                 and self.mse_weight + self.lpips_weight > 0, 'Invalid tokenizer loss/masking setting')
+        require(math.isfinite(self.loss_rms_decay) and 0 <= self.loss_rms_decay < 1
+                and math.isfinite(self.loss_rms_epsilon) and self.loss_rms_epsilon > 0, '無效 loss RMS 設定')
 
     def validate_formal(self):
         require((self.microbatch, self.accumulation) in ((2, 8), (1, 16)), "正式配方需 batch 16")
@@ -84,6 +89,8 @@ def read_checkpoint(path):
     require(file_info(path) == load(str(path) + ".json")["checkpoint"], "Checkpoint checksum mismatch")
     payload = torch.load(path, map_location="cpu", weights_only=True)
     require(payload.get("schema") == "dsp-tokenizer-checkpoint/1", "不支援的 checkpoint schema")
+    require(payload['model_config'].get('architecture') == ARCHITECTURE,
+            '舊 tokenizer 架構不能續訓，請以 A run --restart 重新訓練')
     validate_action_contract(payload["action_codec"])
     return payload
 
@@ -99,6 +106,7 @@ class TokenizerTrainer:
         np.random.seed(config.seed)
         torch.manual_seed(config.seed)
         self.model = CausalTokenizer(model_config).to(self.device)
+        self.loss_rms = LossRMS(2, config.loss_rms_decay, config.loss_rms_epsilon).to(self.device)
         decay: list[torch.nn.Parameter] = []
         no_decay: list[torch.nn.Parameter] = []
         for name, parameter in self.model.named_parameters():
@@ -133,6 +141,8 @@ class TokenizerTrainer:
             group['lr'] = cfg.learning_rate * factor
         length, samples = self.samples(self.step)
         totals = np.zeros(3)
+        squares, diagnostics = np.zeros(2), np.zeros(2)
+        scales = self.loss_rms.scales()
         for offset in range(0, len(samples), cfg.microbatch):
             if time.monotonic() >= deadline:
                 raise TimeoutError('已達訓練時數，未完成的 accumulation 不更新權重')
@@ -146,22 +156,31 @@ class TokenizerTrainer:
             # Mask RNG is independent of parameter count: the 64/96 runs see identical masks.
             generator = torch.Generator(device=self.device).manual_seed(cfg.seed + self.step * 16 + offset)
             with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.device.type == 'cuda'):
-                _, prediction = self.model(inputs, generator=generator, mask_max_probability=cfg.mask_max_probability)
-                total, mse, perceptual = self.loss(prediction, inputs, mse_weight=cfg.mse_weight,
-                                                  lpips_weight=cfg.lpips_weight)
+                latents, prediction = self.model(inputs, generator=generator, mask_max_probability=cfg.mask_max_probability)
+                _, mse, perceptual = self.loss(prediction, inputs)
+                total = cfg.mse_weight * mse / scales[0] + cfg.lpips_weight * perceptual / scales[1]
             require(torch.isfinite(total).item(), "非有限 loss，停止訓練")
             (total / cfg.accumulation).backward()
             totals += [value.detach().item() / cfg.accumulation for value in (total, mse, perceptual)]
-            del inputs, prediction, total, mse, perceptual
+            squares += np.array([mse.detach().item(), perceptual.detach().item()]) ** 2 / cfg.accumulation
+            with torch.no_grad():
+                diagnostics += np.array([latents.float().std(dim=2).mean().item(),
+                    (latents.abs() > .99).float().mean().item()]) / cfg.accumulation
+            del inputs, prediction, latents, total, mse, perceptual
         norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
         if time.monotonic() >= deadline:
             raise TimeoutError('已達訓練時數，未完成的 accumulation 不更新權重')
         self.optimizer.step()
+        self.loss_rms.update(squares)
         self.step += 1
         self.elapsed_seconds += time.monotonic() - started
         result = dict(step=self.step, length=length, samples=samples, loss=float(totals[0]),
                       mse=float(totals[1]), lpips=float(totals[2]), grad_norm=norm.item(),
-                      learning_rate=self.optimizer.param_groups[0]['lr'])
+                      learning_rate=self.optimizer.param_groups[0]['lr'],
+                      mse_rms=scales[0].item(), lpips_rms=scales[1].item(),
+                      normalized_mse=float(totals[1]) / scales[0].item(),
+                      normalized_lpips=float(totals[2]) / scales[1].item(),
+                      latent_std=float(diagnostics[0]), latent_saturation=float(diagnostics[1]))
         self.history.append(result)
         return result
 
@@ -175,7 +194,7 @@ class TokenizerTrainer:
             model_config=asdict(self.model.config), training_config=asdict(self.config),
             index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
             provenance=self.provenance, metric=self.loss.identity,
-            model=self.model.state_dict(), optimizer=self.optimizer.state_dict(), step=self.step,
+            model=self.model.state_dict(), optimizer=self.optimizer.state_dict(), loss_rms=self.loss_rms.state_dict(), step=self.step,
             elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
             python_rng=random.getstate(), numpy_rng=(numpy_state[0], numpy_state[1].tolist(), *numpy_state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
@@ -202,6 +221,7 @@ class TokenizerTrainer:
                       TrainingConfig(**value['training_config']), device=device, provenance=value['provenance'])
         trainer.model.load_state_dict(value['model'])
         trainer.optimizer.load_state_dict(value['optimizer'])
+        trainer.loss_rms.load_state_dict(value['loss_rms'])
         trainer.step, trainer.elapsed_seconds = value['step'], value['elapsed_seconds']
         trainer.history = value['history']
         trainer.control = value.get('control')

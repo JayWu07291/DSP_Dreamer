@@ -172,7 +172,7 @@ class ImaginationTrainer:
             require_stage_two(stage_two_path, index, inputs, proof, self.provenance)
             verify_implementation(self.provenance)
             config.validate_formal()
-            require(value['model_config'] == asdict(DynamicsConfig()) and index.report['coverage_gate_passed']
+            require(index.report['coverage_gate_passed']
                     and torch.device(device).type == 'cuda', '正式架構、資料覆蓋或 CUDA 不符')
         else:
             require(not value['formal'] and all(s['source_kind'] == 'synthetic' for s in index.report['sources']),

@@ -190,6 +190,7 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
             tasks = subprocess.check_output(['tasklist', '/FI', 'IMAGENAME eq DSPGAME.exe', '/FO', 'CSV'], text=True)
             require('DSPGAME.exe' not in tasks, 'GPU 訓練／評估前請關閉 DSP')
             torch.set_num_threads(settings['runtime']['num_threads'])
+            torch.cuda.set_per_process_memory_fraction(settings['runtime']['cuda_memory_fraction'])
             torch.use_deterministic_algorithms(True)
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.deterministic = True
@@ -269,9 +270,6 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
                     unchanged = set(asdict(config)) - {'updates', 'microbatch', 'accumulation'}
                     require(all(getattr(config, k) == getattr(trainer.config, k) for k in unchanged),
                             '恢復時設定已改變；新配方需 run --restart')
-                    expected_model = settings['tokenizer'] if stage == 'A' else settings['dynamics']
-                    actual_model = trainer.model.dynamics.config if hasattr(trainer.model, 'dynamics') else trainer.model.config
-                    require(asdict(actual_model) == expected_model, '恢復時模型設定已改變')
                     if args.microbatch != trainer.config.microbatch:
                         require(args.microbatch == 1 and plan['identity']['training']['microbatch'] == 1,
                                 '只允許 OOM 後已重新測速的 1/16 配方')
@@ -290,6 +288,9 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
                         prediction=prediction_proof(args.prediction_dir, args.prediction_gate, inputs), gate=load(args.agent_gate))
                     trainer = ImaginationTrainer(args.stage_two, index, config, formal=True,
                         inputs=inputs, proof=proof, provenance=provenance)
+                expected_model = settings['tokenizer'] if stage == 'A' else settings['dynamics']
+                actual_model = trainer.model.dynamics.config if hasattr(trainer.model, 'dynamics') else trainer.model.config
+                require(asdict(actual_model) == expected_model, '模型設定與 checkpoint 不符；新架構需從 A 重新訓練')
                 result = (benchmark(trainer, budget, stage, args.output, update_limit=args.updates or recipe['updates'],
                                     fraction=settings['runtime']['update_fraction'], event=log.emit)
                           if args.command == 'benchmark' else run_training(trainer, budget, stage, args.output, evaluate,

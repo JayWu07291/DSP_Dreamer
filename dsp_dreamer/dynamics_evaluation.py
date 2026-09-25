@@ -121,7 +121,10 @@ def evaluate_prediction(checkpoint_path, index, loss, inputs, output, *, device=
                 with torch.autocast(torch.device(device).type, dtype=torch.bfloat16, enabled=torch.device(device).type == 'cuda'):
                     predicted_latents = model.rollout(latents, past_actions,
                         {'correct': actual, 'noop': noop, 'shuffled': shuffled}[name], seed=sample['generation_seed'])
-                    prediction = tokenizer.decode(predicted_latents[:, [s-1 for s in STEPS]])[0].float()
+                    # The decoder is now temporal: preserve every intervening generated
+                    # frame and its observed prefix before selecting evaluation horizons.
+                    decoded = tokenizer.decode(torch.cat((latents, predicted_latents), 1))
+                    prediction = decoded[:, latents.shape[1]:][0, [s-1 for s in STEPS]].float()
             metrics = {}
             for step, p, target in zip(STEPS, prediction, targets):
                 mse, perceptual = loss.per_frame(p[None], target[None])[0].tolist()

@@ -61,12 +61,12 @@ def test_stage_two_imagination_resume_export_and_rejections(tmp_path):
                           registry(('train', 'demonstration'), ('9', 'demonstration')), length=2)
     inputs = seal(dict(index_id=index.report['artifact_id'], prediction=dict(selected=[])))
     provenance = dict(evaluation_inputs_id=inputs['artifact_id'])
-    token = TokenizerTrainer(index, ReconstructionLoss('data/torch-cache'), TokenizerConfig(width=32, heads=4),
+    token = TokenizerTrainer(index, ReconstructionLoss('data/torch-cache'), TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
         TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2), device='cpu')
     token.update()
     token.save(tmp_path / 'token.pt')
     world = DynamicsTrainer(tmp_path / 'token.pt', index, DynamicsTrainingConfig(updates=1, microbatch=1,
-        accumulation=1, short_length=2, long_length=2), model_config=DynamicsConfig(width=32, heads=4), device='cpu')
+        accumulation=1, short_length=2, long_length=2), model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu')
     world.update()
     world.save(tmp_path / 'world.pt')
     agent = AgentTrainer(tmp_path / 'world.pt', index, AgentTrainingConfig(updates=1, microbatch=1,

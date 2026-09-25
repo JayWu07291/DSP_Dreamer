@@ -196,11 +196,11 @@ def test_controlled_pipeline_uses_real_trainers_and_recovers(tmp_path):
 
     def create(stage):
         if stage == 'A':
-            return TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4), TrainingConfig(**cfg),
+            return TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4), TrainingConfig(**cfg),
                                     device='cpu', provenance=provenance)
         if stage == 'B':
             return DynamicsTrainer(paths['A'], index, DynamicsTrainingConfig(**cfg),
-                model_config=DynamicsConfig(width=32, heads=4), device='cpu', provenance=provenance)
+                model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu', provenance=provenance)
         if stage == 'second':
             return AgentTrainer(paths['B'], index, AgentTrainingConfig(**cfg), device='cpu', provenance=provenance)
         return ImaginationTrainer(paths['second'], index, ImaginationConfig(**cfg), device='cpu', provenance=provenance)
@@ -256,7 +256,7 @@ def test_controlled_pipeline_uses_real_trainers_and_recovers(tmp_path):
                     combine_gates({}, index, inputs, checkpoint_path=report['checkpoint'], recipe=partial_recipe)
             assert trainer.optimizer.defaults['betas'] == (.9, .999) and trainer.optimizer.defaults['eps'] == 1e-8
             for group in trainer.optimizer.param_groups:
-                assert group['lr'] == pytest.approx(group.get('peak_lr', 1e-4) * .1)
+                assert group['lr'] == pytest.approx(group.get('peak_lr', trainer.config.learning_rate) * .1)
             paths[stage] = report['checkpoint']
             restore = type(trainer).restore
             extra = dict(loss=metric) if stage == 'A' else {}
@@ -293,7 +293,7 @@ def test_real_update_failures_keep_last_complete_checkpoint_and_time_cap(tmp_pat
     config = TrainingConfig(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=3)
 
     def create():
-        return TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4), config, device='cpu')
+        return TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4), config, device='cpu')
 
     offset = [0.]
     clock = lambda: time.monotonic() + offset[0]

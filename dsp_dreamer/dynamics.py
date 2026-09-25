@@ -4,30 +4,38 @@ import math
 
 import torch
 from torch import nn
-from torch.utils.checkpoint import checkpoint
 
 from .actions import ACTION_CODEC, forbidden_buttons
 from .contract import require
+from .transformer import ARCHITECTURE, BlockCausalTransformer
 
 
 @dataclass(frozen=True)
 class DynamicsConfig:
-    width: int = 512
-    heads: int = 8
-    blocks: int = 8
+    architecture: str = ARCHITECTURE
+    width: int = 1280
+    heads: int = 20
+    kv_heads: int = 4
+    blocks: int = 16
     registers: int = 8
     temporal_every: int = 4
     context: int = 64
     latent_tokens: int = 64
     bottleneck: int = 32
+    attention_softcap: float = 30.
+    attention_chunk_size: int = 16
     activation_checkpointing: bool = True
 
     def __post_init__(self):
-        require(self.blocks == 8 and self.registers == 8 and self.temporal_every == 4
-                and self.context == 64 and self.latent_tokens == 64 and self.bottleneck == 32,
-                '不相容的 dynamics 架構')
-        require(self.width > 0 and self.width % 2 == 0 and self.heads > 0
-                and self.width % self.heads == 0, '無效 attention 寬度')
+        require(self.architecture == ARCHITECTURE, '舊 dynamics 架構不能續訓，請重新訓練')
+        require(self.latent_tokens == 64 and self.bottleneck == 32, '不相容的 dynamics 表徵')
+        require(all(type(v) is int and v > 0 for v in (self.width, self.heads, self.kv_heads,
+            self.blocks, self.registers, self.temporal_every, self.context, self.attention_chunk_size))
+            and self.width % self.heads == 0 and (self.width // self.heads) % 2 == 0
+            and self.heads % self.kv_heads == 0 and self.temporal_every >= 2
+            and self.blocks % self.temporal_every == 0, '無效 dynamics Transformer 配置')
+        require(math.isfinite(self.attention_softcap) and self.attention_softcap > 0
+                and type(self.activation_checkpointing) is bool, '無效 attention 設定')
 
 
 def validate_actions(actions, shape):
@@ -55,24 +63,15 @@ class Dynamics(nn.Module):
         self.action_token = nn.Parameter(torch.randn(d) * .02)
         self.signal = nn.Embedding(5, d // 2)  # 0, .1, .25, .5, .75
         self.step_size = nn.Embedding(2, d // 2)  # .25, .5
-        self.spatial = nn.ModuleList([self._layer() for _ in range(config.blocks)])
-        self.temporal = nn.ModuleList([self._layer() for _ in range(config.blocks // config.temporal_every)])
-        self.norm = nn.LayerNorm(d)
+        self.transformer = BlockCausalTransformer(d, config.heads, config.blocks, config.context,
+            kv_heads=config.kv_heads, temporal_every=config.temporal_every, softcap=config.attention_softcap,
+            chunk_size=config.attention_chunk_size, activation_checkpointing=config.activation_checkpointing)
         self.latent_out = nn.Linear(d, 32)
-
-    def _layer(self):
-        return nn.TransformerEncoderLayer(self.config.width, self.config.heads, self.config.width * 4,
-            dropout=0., activation='gelu', batch_first=True, norm_first=True)
-
-    def _checkpoint(self, function, value):
-        if self.training and self.config.activation_checkpointing and torch.is_grad_enabled():
-            return checkpoint(function, value, use_reentrant=False)
-        return function(value)
 
     def forward(self, noisy, actions, levels, step_size):
         return self.latent_out(self.hidden(noisy, actions, levels, step_size)[:, :, :64])
 
-    def hidden(self, noisy, actions, levels, step_size):
+    def hidden(self, noisy, actions, levels, step_size, *, agent_tokens=None):
         require(noisy.ndim == 4 and tuple(noisy.shape[2:]) == (64, 32)
                 and noisy.shape[0] > 0 and noisy.shape[1] > 0 and torch.isfinite(noisy).all().item(),
                 '不相容的 dynamics latent')
@@ -89,22 +88,14 @@ class Dynamics(nn.Module):
                   + self.wheel(actions['wheel']) + self.action_token)
         tokens = torch.cat((self.latent_in(noisy) + self.position, action[:, :, None], signal[:, :, None],
                            self.registers.expand(batch, steps, -1, -1)), dim=2)
-        # Sinusoidal time positions distinguish histories with the same set of frames.
-        positions = torch.arange(steps, device=noisy.device)
-        angles = positions[:, None] * torch.exp(torch.arange(0, self.config.width, 2, device=noisy.device)
-                                               * (-math.log(10000.) / self.config.width))
-        tokens = tokens + torch.stack((angles.sin(), angles.cos()), -1).flatten(-2)[None, :, None]
-        distance = positions[:, None] - positions[None, :]
-        mask = (distance < 0) | (distance >= self.config.context)
-        count = tokens.shape[2]
-        for i, spatial in enumerate(self.spatial):
-            tokens = self._checkpoint(spatial, tokens.flatten(0, 1)).reshape(batch, steps, count, -1)
-            if (i + 1) % self.config.temporal_every == 0:
-                temporal = self.temporal[i // self.config.temporal_every]
-                value = tokens.permute(0, 2, 1, 3).flatten(0, 1)
-                value = self._checkpoint(lambda x, layer=temporal: layer(x, src_mask=mask), value)
-                tokens = value.reshape(batch, count, steps, -1).permute(0, 2, 1, 3)
-        return self.norm(tokens)
+        mask = None
+        if agent_tokens is not None:
+            require(tuple(agent_tokens.shape) == (batch, steps, 1, self.config.width), '不相容的 agent tokens')
+            world_count = tokens.shape[2]
+            tokens = torch.cat((tokens, agent_tokens), 2)
+            mask = torch.zeros(tokens.shape[2], tokens.shape[2], device=tokens.device, dtype=torch.bool)
+            mask[:world_count, world_count:] = True
+        return self.transformer(tokens, mask)
 
     @torch.no_grad()
     def rollout(self, history, history_actions, future_actions, *, seed):
