@@ -11,3 +11,6 @@ Use the default canonical triage labels: `needs-triage`, `needs-info`, `ready-fo
 ### Domain docs
 
 This is a single-context repo using root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+### Git
+When creating commits, follow the Conventional Commits specification (`<type>[optional scope]: <description>`).
