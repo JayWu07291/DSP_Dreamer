@@ -4,6 +4,8 @@
 
 目前已完成錄製器、轉移資料集、10 Hz 模型視圖、固定 split 與評估協定。Issue #22 的資料及人工標註已凍結，2026-09-25 逐條複核後結案。模型訓練與品質評估尚未執行。詳見 [Issue #22 完成核對](docs/issue-22-completion.md)。
 
+Issue #24 新增 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/tokenizer.md)。工程驗證與模型品質 gate 分別記錄，正式 v1 維持 64 latent tokens。
+
 ## 專案結構
 
 | 路徑 | 用途 |
