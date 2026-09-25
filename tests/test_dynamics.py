@@ -44,6 +44,10 @@ def test_causal_action_conditioning_and_free_prediction():
     assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in model.parameters())
     with pytest.raises(InvalidRecording, match='動作'):
         model(latents, {**actions, 'binary': actions['binary'][..., :20]}, levels, .25)
+    illegal = {k: v.clone() for k, v in actions.items()}
+    illegal['binary'][..., [4, 9]] = 1
+    with pytest.raises(InvalidRecording, match='禁止'):
+        model(latents, illegal, levels, .25)
 
 
 def test_loader_training_resume_and_checkpoint_contract(tmp_path):
@@ -113,17 +117,23 @@ def test_prediction_gate_uses_paired_denominators_and_requires_reviews():
 
     def report(samples):
         return seal(dict(evaluation_inputs_id=inputs['artifact_id'], checkpoint_sha256='abc',
-            formal=True, samples=[dict(sample=s, conditions={c: {str(step): dict(mse=.1, lpips=.2,
+            formal=False, samples=[dict(sample=s, conditions={c: {str(step): dict(mse=.1, lpips=.2,
                 region_lpips=.8 if c == 'correct' else 1.) for step in (1, 5, 15)}
                 for c in ('correct', 'noop', 'shuffled', 'copy_last')}) for s in samples]))
 
     metrics = report(selected)
     result = score_prediction(metrics, inputs)
-    assert result['status'] == 'pending' and result['recognition']['total'] == 200
+    assert result['threshold_status'] == 'pending' and result['recognition']['total'] == 200
     judgments = dict(report_id=metrics['artifact_id'], checkpoint_sha256='abc',
         evaluation_inputs_id=inputs['artifact_id'], items=[dict(sample_id=f'P{i+1:03d}-K001',
             correct=True, reviewer='測試', evidence='fixture') for i in range(200)])
-    assert score_prediction(metrics, inputs, judgments)['status'] == 'passed'
+    assert score_prediction(metrics, inputs, judgments)['threshold_status'] == 'passed'
+    assert score_prediction(metrics, inputs, judgments)['status'] == 'engineering_only'
+    boundary_rows = copy.deepcopy(metrics['samples'])
+    for row in boundary_rows:
+        row['conditions']['correct']['5']['region_lpips'] = .9
+    boundary = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'samples': boundary_rows})
+    assert score_prediction(boundary, inputs)['comparisons']['movement']['noop']['passed']
     # One excluded pair must exclude BOTH errors from that baseline's means.
     rows = copy.deepcopy(metrics['samples'])
     rows[0]['conditions']['noop']['5']['region_lpips'] = 0.
@@ -135,31 +145,34 @@ def test_prediction_gate_uses_paired_denominators_and_requires_reviews():
     for row in rows[:50]:
         row['conditions']['noop']['5']['region_lpips'] = 0.
     zero = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'samples': rows})
-    assert score_prediction(zero, inputs)['status'] == 'insufficient_evidence'
+    assert score_prediction(zero, inputs)['threshold_status'] == 'insufficient_evidence'
     judgments['items'][0]['correct'] = None
-    assert score_prediction(metrics, inputs, judgments)['status'] == 'pending'
+    assert score_prediction(metrics, inputs, judgments)['threshold_status'] == 'pending'
     judgments['items'] = judgments['items'][:130]
     assert score_prediction(metrics, inputs, judgments)['recognition']['pending'] == 71
     for item in judgments['items'][:20]:
         item['correct'] = False
     judgments['items'] += [dict(sample_id=f'P{i+1:03d}-K001', correct=True, reviewer='測試', evidence='fixture')
                            for i in range(130, 200)]
-    assert score_prediction(metrics, inputs, judgments)['status'] == 'failed'
+    assert score_prediction(metrics, inputs, judgments)['threshold_status'] == 'failed'
     smoke = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'formal': False})
     assert score_prediction(smoke, inputs)['status'] == 'engineering_only'
-    assert score_prediction(report(selected[:4]), inputs)['status'] == 'pending'
+    assert score_prediction(report(selected[:4]), inputs)['threshold_status'] == 'pending'
+    forged = seal({**{k: v for k, v in metrics.items() if k != 'artifact_id'}, 'formal': True})
+    with pytest.raises(InvalidRecording, match='checkpoint'):
+        score_prediction(forged, inputs)
 
 
 def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
     from test_training_index import fixture, registry, FFMPEG
     from dsp_dreamer import Recording, compile_recording
-    from dsp_dreamer.contract import load
+    from dsp_dreamer.contract import load, file_info
     from dsp_dreamer.training_index import TrainingIndex
     from dsp_dreamer.evaluation_protocol import seal
     from dsp_dreamer.tokenizer import TokenizerConfig
     from dsp_dreamer.tokenizer_training import ReconstructionLoss, TokenizerTrainer, TrainingConfig
     from dsp_dreamer.dynamics_training import DynamicsTrainer, DynamicsTrainingConfig
-    from dsp_dreamer.dynamics_evaluation import evaluate_prediction
+    from dsp_dreamer.dynamics_evaluation import evaluate_prediction, score_prediction
 
     torch.set_num_threads(2)
     with Recording.synthetic(tmp_path / 'validation-source', FFMPEG) as recording:
@@ -187,9 +200,12 @@ def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
         TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2), device='cpu')
     initial = tmp_path / 'tokenizer.pt'
     tokenizer.save(initial)
+    implementation = tmp_path / 'implementation.txt'
+    implementation.write_text('original')
     trainer = DynamicsTrainer(initial, index,
         DynamicsTrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2),
-        model_config=DynamicsConfig(width=32, heads=4), device='cpu', provenance=dict(evaluation_inputs_id=inputs['artifact_id']))
+        model_config=DynamicsConfig(width=32, heads=4), device='cpu', provenance=dict(evaluation_inputs_id=inputs['artifact_id'],
+            implementation={str(implementation): file_info(implementation)}))
     trainer.update()
     checkpoint = tmp_path / 'dynamics.pt'
     trainer.save(checkpoint)
@@ -204,3 +220,29 @@ def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
     assert row['conditions']['copy_last']['1']['mse'] == pytest.approx((2 / 255)**2 / 3)
     assert len(list(output.glob('*.png'))) == 15
     assert load(output / 'judgments-template.json')['items'][0]['correct'] is None
+    forged = seal({**{k: v for k, v in report.items() if k != 'artifact_id'}, 'formal': True})
+    with pytest.raises(InvalidRecording, match='checkpoint 或 recipe'):
+        score_prediction(forged, inputs, checkpoint_path=checkpoint, recipe=load(output / 'recipe.json'))
+    implementation.write_text('changed')
+    with pytest.raises(InvalidRecording, match='實作 checksum'):
+        evaluate_prediction(checkpoint, index, metric, inputs, tmp_path / 'changed', device='cpu')
+
+
+def test_concurrent_budget_command_is_rejected(tmp_path):
+    import subprocess
+    import sys
+    from pathlib import Path
+    if sys.platform != 'win32':
+        pytest.skip('Windows 訓練入口')
+    import msvcrt
+
+    (tmp_path / 'runs').mkdir()
+    script = Path(__file__).resolve().parents[1] / 'tools/train-dynamics.py'
+    with (tmp_path / 'runs/dynamics-budget.lock').open('a+b') as lock:
+        msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        code = ('import importlib.util, sys; s=importlib.util.spec_from_file_location("cli",sys.argv[1]); '
+                'm=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.run_budgeted(None)')
+        result = subprocess.run([sys.executable, '-c', code, str(script)], cwd=tmp_path,
+                                capture_output=True, text=True, encoding='utf-8')
+    assert result.returncode != 0 and '另一個 dynamics 程序' in result.stderr
+    assert not (tmp_path / 'runs/dynamics-budget.json').exists()

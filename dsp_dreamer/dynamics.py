@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
-from .actions import ACTION_CODEC
+from .actions import ACTION_CODEC, forbidden_buttons
 from .contract import require
 
 
@@ -37,9 +37,7 @@ def validate_actions(actions, shape):
         expected = (*shape, ACTION_CODEC['binary_width']) if name == 'binary' else tuple(shape)
         require(tuple(value.shape) == expected and value.dtype == torch.int64
                 and ((value >= 0) & (value < classes)).all().item(), '不相容的動作 shape、dtype 或類別')
-    binary = actions['binary']
-    for left, right in [(4, 9), (8, 10), (7, 12), (15, 16), (15, 17), (16, 17)]:
-        require(not (binary[..., left].bool() & binary[..., right].bool()).any().item(), '禁止的動作組合')
+    require(not any(forbidden_buttons(row) for row in actions['binary'].flatten(0, 1).tolist()), '禁止的動作組合')
 
 
 class Dynamics(nn.Module):

@@ -22,14 +22,14 @@ Shortcut forcing 按 [Dreamer 4 第 3.2 節、式 6–8](https://arxiv.org/abs/2
 .venv/Scripts/python.exe tools/train-dynamics.py train --tokenizer runs/tokenizer-v1/final-100.pt --reconstruction-metrics runs/reconstruction-v1/metrics.json --reconstruction-gate runs/reconstruction-v1/reviewed-gate.json --updates 100 --output runs/dynamics-v1
 .venv/Scripts/python.exe tools/train-dynamics.py train --checkpoint runs/dynamics-v1/step-40.pt --output runs/dynamics-resumed
 .venv/Scripts/python.exe tools/train-dynamics.py evaluate --checkpoint runs/dynamics-v1/final-100.pt --output runs/prediction-v1
-.venv/Scripts/python.exe tools/train-dynamics.py score --metrics runs/prediction-v1/metrics.json --judgments runs/prediction-v1/judgments.json --output runs/prediction-v1/reviewed-gate.json
+.venv/Scripts/python.exe tools/train-dynamics.py score --checkpoint runs/dynamics-v1/final-100.pt --metrics runs/prediction-v1/metrics.json --judgments runs/prediction-v1/judgments.json --output runs/prediction-v1/reviewed-gate.json
 ```
 
-CLI 核對凍結 catalog、protocol、資料覆蓋、完整 checksum 與重建證據。它會重算重建評分，確認 report、人工判讀、checkpoint hash 及凍結身分完全相符，不能只提供一個 `passed` 字串。CUDA 訓練期間須關閉 DSP。
+CLI 核對凍結 catalog、protocol、資料覆蓋、完整 checksum 與重建證據。它會重算重建評分，確認 report、人工判讀、checkpoint hash 及凍結身分完全相符，不能只提供一個 `passed` 字串。正式預測評分還須提供原 checkpoint 及 metrics 同目錄的 `recipe.json`，並核對記錄的實作 checksum；修改 `formal` 或重封 smoke metrics 不會使其通過。CUDA 訓練期間須關閉 DSP。
 
 Checkpoint 保存 dynamics、AdamW、配方與排程進度、抽樣紀錄、Python／NumPy／PyTorch／CUDA RNG、資料身分及重建證據。凍結 tokenizer 以絕對路徑和 checksum 引用，恢復時必須保留上游 `.pt` 及旁邊的 `.pt.json`；不重複複製其權重。恢復沿用原配方，不能用 `--updates` 重新安排 LR。
 
-每 30 分鐘保存 checkpoint，並對固定名單前四個序列做離線 validation。完整候選仍需另外跑全部 200 序列。`runs/dynamics-budget.json` 累計第一階段 B 的訓練、資料驗證、儲存、評估及失敗重跑，合計最多 16 小時。中斷未收尾會在下次保守補計 wall time。單一訓練程序使用此紀錄，不可同時啟動多個命令或刪除紀錄重置預算。顯存不足的紀錄存在後才允許 `--microbatch 1`，改用 accumulation 16。
+每 30 分鐘保存 checkpoint，並對固定名單前四個序列做離線 validation。完整候選仍需另外跑全部 200 序列。`runs/dynamics-budget.json` 累計第一階段 B 的訓練、資料驗證、儲存、評估及失敗重跑，合計最多 16 小時。中斷未收尾會在下次保守補計 wall time。Windows 檔案鎖會拒絕同時使用預算的另一個程序，程序終止後系統釋放鎖；不可刪除紀錄重置預算。顯存不足的紀錄存在後才允許 `--microbatch 1`，改用 accumulation 16。
 
 ## 預測與判讀
 
@@ -48,6 +48,6 @@ Checkpoint 保存 dynamics、AdamW、配方與排程進度、抽樣紀錄、Pyth
 .venv/Scripts/python.exe -m mypy dsp_dreamer tools/train-dynamics.py
 ```
 
-測試穿過合成錄製、正式 compiler、模型視圖、tokenizer checkpoint、shortcut loss、恢復與預測 PNG／指標匯出，並檢查 action 因果性、恢復後下一次更新一致、tokenizer 權重不變，以及 gate 的配對分母與缺判處理。CPU 回歸使用 width 32／4 heads，其餘結構不變；這不證明正式寬度的顯存、真實資料 throughput 或品質門檻。
+測試穿過合成錄製、正式 compiler、模型視圖、tokenizer checkpoint、shortcut loss、恢復與預測 PNG／指標匯出，並檢查 action 因果性、恢復後下一次更新一致、tokenizer 權重不變，以及 gate 的配對分母與缺判處理。CPU 回歸使用 width 32／4 heads，其餘結構不變。另有 RTX 5070 正式寬度的合成 smoke，驗證 BF16、2/8 accumulation、32／80-step 更新、恢復與自由預測；見 [驗證紀錄](issue-25-validation.md)。合成資料測速不代表真實資料 throughput 或品質門檻。
 
 目前重建 gate 未通過，正式 200 序列品質、真實資料 dynamics 訓練及第 15 步人工判讀均未執行。沒有產生合格第一階段 B checkpoint，也沒有揭露 offline-test 模型結果。

@@ -60,8 +60,17 @@ def read_dynamics_checkpoint(path):
     return value
 
 
+def verify_implementation(provenance):
+    files = provenance.get('implementation')
+    require(isinstance(files, dict) and bool(files)
+            and all(Path(p).is_file() and file_info(p) == expected for p, expected in files.items()),
+            'Checkpoint 實作 checksum 不符')
+
+
 def load_tokenizer(path, *, device='cpu'):
     payload = read_checkpoint(path)
+    if payload['provenance'].get('implementation'):
+        verify_implementation(payload['provenance'])
     model = CausalTokenizer(TokenizerConfig(**payload['model_config'])).to(device).eval()
     model.load_state_dict(payload['model'])
     model.requires_grad_(False)
@@ -76,6 +85,7 @@ class DynamicsTrainer:
         self.reconstruction, self.provenance = reconstruction, provenance or {}
         if formal:
             require_reconstruction(reconstruction, self.tokenizer_source['checkpoint']['sha256'], self.provenance)
+            verify_implementation(self.provenance)
             config.validate_formal()
             require(model_config == DynamicsConfig() and index.report['coverage_gate_passed'], '正式架構或資料覆蓋不符')
             require(torch.device(device).type == 'cuda', '正式訓練需要 CUDA')

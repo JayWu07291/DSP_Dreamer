@@ -102,7 +102,20 @@ def run_gpu(args, deadline):
 
 
 def run_budgeted(args):
-    # ponytail: single-process ledger; use a file lock before allowing concurrent runs.
+    import msvcrt
+    path = Path('runs/dynamics-budget.lock')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Windows releases the byte lock even if the process is terminated.
+    with path.open('a+b') as lock:
+        lock.seek(0)
+        try:
+            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError as error:
+            raise RuntimeError('另一個 dynamics 程序正在使用訓練預算') from error
+        _run_budgeted(args)
+
+
+def _run_budgeted(args):
     path = Path('runs/dynamics-budget.json')
     path.parent.mkdir(parents=True, exist_ok=True)
     state = load(path) if path.exists() else dict(schema='dsp-dynamics-budget/1', attempts=[])
@@ -163,7 +176,8 @@ def main():
     _, inputs, annotations, freeze = read_frozen_evaluation(args.catalog, args.protocol)
     if args.command == 'score':
         require(args.metrics is not None, '需要 --metrics')
-        result = score_prediction(load(args.metrics), inputs, load(args.judgments) if args.judgments else None)
+        result = score_prediction(load(args.metrics), inputs, load(args.judgments) if args.judgments else None,
+            checkpoint_path=args.checkpoint, recipe=load(args.metrics.parent / 'recipe.json'))
         atomic_save(args.output, result)
         emit(result)
         return

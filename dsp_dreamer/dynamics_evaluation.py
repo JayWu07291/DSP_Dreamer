@@ -11,7 +11,7 @@ import torch
 from .actions import ACTION_CODEC
 from .contract import atomic_save, file_info, require
 from .dynamics import Dynamics, DynamicsConfig
-from .dynamics_training import read_dynamics_checkpoint, load_tokenizer, require_reconstruction
+from .dynamics_training import read_dynamics_checkpoint, load_tokenizer, require_reconstruction, verify_implementation
 from .evaluation_protocol import CATEGORIES, ITEM_TYPES, seal, verify_seal, _validate_regions
 
 
@@ -61,6 +61,8 @@ def evaluate_prediction(checkpoint_path, index, loss, inputs, output, *, device=
             '評估 checkpoint 資料或 metric 不符')
     source = value['tokenizer_source']
     require(file_info(source['path']) == source['checkpoint'], 'Tokenizer checkpoint 已改變')
+    if value['formal'] or value['provenance'].get('implementation'):
+        verify_implementation(value['provenance'])
     if value['formal']:
         require_reconstruction(value['reconstruction'], source['checkpoint']['sha256'], value['provenance'])
         require(all(s['source_kind'] == 'live' for s in index.report['sources'] if s['split'] == 'validation'),
@@ -139,16 +141,32 @@ def evaluate_prediction(checkpoint_path, index, loss, inputs, output, *, device=
                     expected=state, image=rows[i]['images']['correct']['15'])
                for i, row in enumerate(rows) for j, state in enumerate(row['sample']['key_states'])])
     atomic_save(output / 'judgments-template.json', judgments)
-    result = score_prediction(report, inputs)
+    result = score_prediction(report, inputs, checkpoint_path=checkpoint_path, recipe=recipe)
     atomic_save(output / 'gate.json', result)
     return result
 
 
-def score_prediction(metrics, inputs, judgments=None):
+def score_prediction(metrics, inputs, judgments=None, *, checkpoint_path=None, recipe=None):
     for artifact in (metrics, inputs):
         verify_seal(artifact)
     require(metrics['evaluation_inputs_id'] == inputs['artifact_id'] and type(metrics['formal']) is bool,
             '預測評分 artifact 不符')
+    if metrics['formal']:
+        require(checkpoint_path is not None and recipe is not None, '正式評分需要 checkpoint 與 recipe 證據')
+        value = read_dynamics_checkpoint(checkpoint_path)
+        verify_seal(recipe)
+        require(value['formal'] and metrics['checkpoint_sha256'] == file_info(checkpoint_path)['sha256']
+                == recipe['checkpoint_sha256'] and metrics['recipe_id'] == recipe['artifact_id']
+                and recipe['formal'] is True and value['index_id'] == inputs['index_id']
+                and value['metric'] == recipe['metric'] and value['model_config'] == recipe['model_config'],
+                '正式評分 checkpoint 或 recipe 不符')
+        require(all(metrics.get(k) == recipe.get(k) == value['provenance'].get(k) for k in
+                    ('protocol_id', 'data_freeze_id', 'evaluation_inputs_id', 'annotations_id', 'implementation')),
+                '正式評分凍結身分不同')
+        verify_implementation(value['provenance'])
+        source = value['tokenizer_source']
+        require(file_info(source['path']) == source['checkpoint'], 'Tokenizer checkpoint 已改變')
+        require_reconstruction(value['reconstruction'], source['checkpoint']['sha256'], value['provenance'])
     selected, rows = inputs['prediction']['selected'], metrics['samples']
     require(len(rows) <= len(selected) and [r['sample'] for r in rows] == selected[:len(rows)], '預測評分名單不符')
     for row in rows:
@@ -199,20 +217,22 @@ def score_prediction(metrics, inputs, judgments=None):
                 pairs.append(dict(artifact_id=row['sample']['artifact_id'], start=row['sample']['start'],
                                   correct=correct, baseline=error, exclusion_reasons=reasons))
             comparable = [p for p in pairs if not p['exclusion_reasons']]
-            correct_mean = float(np.mean([p['correct'] for p in comparable])) if comparable else None
-            baseline_mean = float(np.mean([p['baseline'] for p in comparable])) if comparable else None
+            correct_mean = math.fsum(p['correct'] for p in comparable) / len(comparable) if comparable else None
+            baseline_mean = math.fsum(p['baseline'] for p in comparable) / len(comparable) if comparable else None
             improvement = ((baseline_mean - correct_mean) / baseline_mean
                            if baseline_mean and correct_mean is not None else None)
             comparisons[category][baseline] = dict(candidates=len(pairs), denominator=len(comparable),
                 no_action_difference=sum('no_action_difference' in p['exclusion_reasons'] for p in pairs),
                 zero_error=sum('baseline_error_zero' in p['exclusion_reasons'] for p in pairs),
                 correct_mean=correct_mean, baseline_mean=baseline_mean, relative_improvement=improvement,
-                passed=improvement is not None and improvement >= .1, pairs=pairs)
+                # Equivalent 10% inequality avoids cancellation at 1 - .9.
+                passed=correct_mean is not None and baseline_mean is not None and correct_mean <= .9 * baseline_mean,
+                pairs=pairs)
     quotas = Counter(s['category'] for s in selected)
     required = [comparisons[c][b] for c in CATEGORIES[:3] for b in CONDITIONS[1:]]
     insufficient = (quotas != Counter({c: 50 for c in CATEGORIES}) or any(not s['key_states'] for s in selected)
                     or len(rows) == len(selected) and any(v['denominator'] == 0 for v in required))
-    status = ('engineering_only' if not metrics['formal'] else 'insufficient_evidence' if insufficient
+    threshold_status = ('insufficient_evidence' if insufficient
               else 'pending' if len(rows) != 200 or recognition['pending']
               else 'passed' if all(v['passed'] for v in required) and recognition['accuracy'] >= .8
                    and all(categories[c]['accuracy'] >= .7 for c in CATEGORIES[:3]) else 'failed')
@@ -222,7 +242,8 @@ def score_prediction(metrics, inputs, judgments=None):
             float(np.mean([r['conditions'][c][str(s)][k] for r in subset])) if subset else None
             for k in ('mse', 'lpips', 'region_lpips')} for s in STEPS} for c in CONDITIONS})
 
-    return seal(dict(schema='dsp-prediction-gate/1', status=status, report_id=metrics['artifact_id'],
+    return seal(dict(schema='dsp-prediction-gate/1', status=threshold_status if metrics['formal'] else 'engineering_only',
+        threshold_status=threshold_status, report_id=metrics['artifact_id'],
         judgments=seal({k: v for k, v in judgments.items() if k != 'artifact_id'}) if judgments is not None else None,
         sequences=len(rows), quotas=dict(quotas), recognition=recognition, categories=categories,
         comparisons=comparisons, overall=averages(rows),
