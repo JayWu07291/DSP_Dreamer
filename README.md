@@ -16,6 +16,8 @@ Issue #28 的[統一訓練控制](docs/training.md)提供跨階段預算、完�
 
 Issue #29 的[單回合工程 runner](docs/runner.md)接入即時 RGB、checkpoint 推理、10 Hz 控制與每回合時序結果。工程 checkpoint 與錄製不算正式代理成果；實機驗證狀態見 [驗證紀錄](docs/issue-29-validation.md)。
 
+Issue #30 的[批次入口與統計匯出](docs/evaluation-batch.md)以隔離 fixtures 串接 #29，保留無效重試、固定選模及 30 個有效回合計數。正式候選資格與實際試驗仍由 #32–#35 驗收。
+
 ## 專案結構
 
 | 路徑 | 用途 |
