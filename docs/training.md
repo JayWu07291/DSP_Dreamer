@@ -83,6 +83,8 @@ RTX 5070 12GB 的工程檢查採 microbatch 2、BF16 與 activation checkpointin
 
 紀錄保存在本機 `runs/issue-31/vram-tuning/selected-A.json`、`selected-B.json`、`selected-second.json`，附完整配置。這些合成檢查沒有 optimizer 更新、資料載入或完整梯度累積，不能當成正式吞吐或品質證據。真實測速與完整訓練留給使用者執行，重建品質仍須看新的固定圖評估；模型較大不保證在固定四小時內品質較好。
 
+2026-09-26 工程驗證：完整 pytest 為 208 passed（935.67 秒），22 則既有 torchvision 棄用警告；mypy 的 `dsp_dreamer` 與顯存檢查工具共 38 個檔案通過。JUnit 位於本機 `runs/issue-31/vram-tuning/pytest.xml`。相對 `6f12c6b` 的 Standards／Spec 獨立審查均無剩餘問題；上述結果不代表重建或預測品質 gate 通過。
+
 ### 資料核對與 log
 
 `verify_rgb=False` 是訓練入口的新預設，依使用者提供的 `data/datasets` 不會修改這項前提，略過 RGB chunk 全量 hash、逐張解壓核對與全目錄 inventory。仍檢查 COMPLETED、metadata、parquet、Zarr metadata、資料索引／split、來源實作及七份凍結評估檔；實際取樣時才讀 RGB。一般 `open_dataset`／`TrainingIndex.open` 仍預設完整核對。若資料曾修改、搬到不可信儲存或需要完整稽核，使用 `--verify-data`。快速模式無法預先偵測尚未取用的 RGB chunk 損壞，也不宣稱驗證了它們。

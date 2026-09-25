@@ -1,5 +1,7 @@
 # Dreamer 4 論文原文核對：tokenizer 與訓練方法
 
+本筆記保存改版前 commit `6f12c6b` 的研究與診斷。後續已依使用者要求實作縮小版時空 Transformer；目前架構、參數與 12GB 顯存檢查見[訓練說明](../training.md)。下文的舊實作差異保留作為修改依據。
+
 核對日期：2026-09-26。來源是 Hafner、Yan、Lillicrap 的 [*Training Agents Inside of Scalable World Models*，arXiv:2509.24527v1](https://arxiv.org/abs/2509.24527v1)，2025-09-29 提交。以下頁碼指 [32 頁 PDF](https://arxiv.org/pdf/2509.24527v1) 的印刷頁碼。本機副本在 [papers/Training Agents Inside of Scalable World Models.pdf](../../papers/Training%20Agents%20Inside%20of%20Scalable%20World%20Models.pdf)，並已核對架構圖與附錄 A 的頁面影像。作者[專案頁](https://danijar.com/project/dreamer4/)提供影片與論文連結，沒有補足下列未報告的訓練超參數。以下分開記錄論文事實、repo 實作與推論。
 
 ## 先確認的結論
@@ -98,4 +100,4 @@ flowchart LR
 3. **用測量區分根因假說。** 重建檢查應包含固定輸入輸出、輸入敏感度、latent 分散程度與飽和比例；若安排短的過擬合診斷，應列為獨立實驗而非取代使用者指定的完整 A 訓練。不要把關閉 masking 當成已證實修復。
 4. **再產出由使用者執行的完整 A 配方。** 訓練步數、預算、模型修改與資料核對成本分開記錄；依既有不可變資料契約沿用 fast preflight，無需為純模型修改再完整解壓核對 `data/datasets`。完整訓練由使用者執行，之後依 loss、重建圖與 checkpoints 判讀。
 
-以上是研究結論與建議順序，這次沒有實作上述修改，也沒有啟動訓練。
+以上是改版前的研究結論與建議順序；研究當時沒有實作修改或啟動訓練，後續工程結果見前述訓練說明。
