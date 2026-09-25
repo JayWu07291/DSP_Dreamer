@@ -2,6 +2,20 @@
 
 本票交付 tokenizer、真實模型視圖訓練、checkpoint 恢復、64／96-token 對照和重建 gate 評分工具。正式 v1 固定 64 tokens；工程驗證不等於模型品質通過。
 
+## 工程驗收核對
+
+2026-09-25 重新核對 [#24](https://github.com/JayWu07291/DSP_Dreamer/issues/24) 與父規格 #12，五項工程要求均已完成。#24 明訂「此工程 ticket 完成不代表正式模型 gate 通過」；下表完成狀態適用於工具與驗證交付。
+
+| #24 要求 | 已完成證據 |
+| --- | --- |
+| 正式架構、完整 loss 與 patch masking | `tokenizer.py`／`tokenizer_training.py` 及 GPU 配方核對原生 640×360、20×20 patches、64 tokens、32 維 bottleneck、width 512、四層 causal temporal attention、MSE + 0.2 LPIPS 與逐圖 masking。 |
+| 64／96 相同步數短程對照，v1 保持 64 | 封存計畫固定 seed 2202 與各四次更新，兩組逐次資料順序相同，共用 loss、masking 與標註；正式 train 入口拒絕 96 tokens。 |
+| 真實 loader、BF16、checkpointing 更新及恢復 | 兩組均完成 32／32／32／80-step 更新，恢復後 loss 與全部權重一致；checkpoint 含資料、配置、optimizer、RNG 與 checksum。 |
+| 固定 200 圖、逐 task 配額、指標與辨識 gate | 兩組均完成 200 圖且 17 個 task 各至少十圖，輸出 MSE、LPIPS、UI MSE 及完整人工判讀；整體 95%／每類 90% 門檻正確判為 failed。 |
+| 缺判／缺類型狀態及工程、品質界線 | `tests/test_tokenizer.py` 驗證 pending、insufficient_evidence、passed、failed；工程摘要與後續人工判讀分別封存，不以工程完成啟動 dynamics。 |
+
+收尾另核對固定評估輸入、實作檔案 checksum、兩個對照 checkpoint、800 張 PNG 與全部封存連結，重新計算兩組人工 gate，均與保存結果一致。程式碼未改動，沿用下方已通過的完整測試與型別檢查結果。
+
 ## 本機驗證
 
 2026-09-25 正式工程驗證通過。24 份資料集、355,853 張 RGB 經完整檔案及逐幀 checksum 核對，重建出的模型視圖與凍結 TrainingIndex 一致。RTX 5070 使用原生 640×360、width 512、BF16、activation checkpointing、完整 MSE + 0.2 LPIPS、microbatch 2／accumulation 8，沒有改用容量原型或較小資料集。

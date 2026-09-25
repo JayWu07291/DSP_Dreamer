@@ -4,7 +4,7 @@
 
 目前已完成錄製器、轉移資料集、10 Hz 模型視圖、固定 split 與評估協定。Issue #22 的資料及人工標註已凍結，2026-09-25 逐條複核後結案。詳見 [Issue #22 完成核對](docs/issue-22-completion.md)。
 
-Issue #24 的 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/tokenizer.md)已通過真實資料與 GPU 少量更新驗證。64／96-token 各四次對照更新及 200 圖評估已完成，15 個關鍵項目待人工判讀，重建品質 gate 保持 pending。正式 v1 維持 64 latent tokens，詳見 [驗證紀錄](docs/issue-24-validation.md)。
+Issue #24 的 [tokenizer 訓練、checkpoint 恢復與重建評估工具](docs/tokenizer.md)已完成五項工程驗收。64／96-token 各四次對照更新及 200 圖評估已完成；人工判讀兩組各 0／15 正確、無缺判，重建品質 gate 均為 failed。四次更新不能支持收斂或容量優劣結論，後續 dynamics 仍須等待重建 gate 通過。正式 v1 維持 64 latent tokens，詳見 [驗證紀錄](docs/issue-24-validation.md)。
 
 ## 專案結構
 
