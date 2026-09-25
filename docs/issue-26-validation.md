@@ -23,6 +23,18 @@
 .venv/Scripts/python.exe tools/train-agent.py --help
 ```
 
-模型整合測試使用 CPU、float32、width 32、4 heads，其餘 8 blocks、8 registers、64×32 latents 與 17 任務保持不變。原生 RGB 仍為 640×360。四項新增測試涵蓋模型、訓練恢复、評分邊界與完整串接。這些證據驗證工程行為，沒有量測正式 width 512 的第二階段 GPU throughput 或收斂。
+模型整合測試使用 CPU、float32、width 32、4 heads，其餘 8 blocks、8 registers、64×32 latents 與 17 任務保持不變。原生 RGB 仍為 640×360。四項新增測試涵蓋模型、訓練恢復、評分邊界與完整串接。這些證據驗證工程行為，沒有量測正式 width 512 的第二階段 GPU throughput 或收斂。
+
+四項新增測試通過；完整回歸為 **171 passed**，耗時 317.25 秒，沒有失敗或跳過。`mypy` 檢查 28 個檔案通過。CLI help 與 `git diff --check` 也通過。測試中的 numcodecs／torchvision 警告來自既有依賴的棄用提示。
+
+## Standards
+
+獨立審查未發現違反 AGENTS.md、CONTEXT.md 或相關 ADR。初次審查指出 policy 合法化重寫了禁止組合；已改為重用 `forbidden_buttons`，移除固定控制索引，並重跑該模型／動作測試。
+
+## Spec
+
+獨立審查未發現可確認的 #26 規格偏差。核對 checkpoint 與 gate 來源、codec、MTP、抽樣、reward 分母、policy 配對 baseline 及同一 checkpoint 的三項 gate。Policy 的逐任務數字是報告，不額外增加每個 task 都必須有非零 mouse/wheel 的門檻。
+
+審查結果：Standards 一項判斷性重複規則已修正，零項待處理；Spec 零項待處理。基準為實作前的 `fa3e8d3`。
 
 正式 reward/policy/dynamics 品質均未執行，狀態為未驗證；現有第一階段尚未取得 #31 的合格 checkpoint。此交付不啟動 #32／#33，也不揭露 offline-test 模型結果。跨階段統一預算與停止規則的工程驗收仍屬 #28。

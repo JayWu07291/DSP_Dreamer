@@ -105,11 +105,11 @@ def policy_action(logits, *, legal=True):
     require(all(torch.isfinite(logits[k]).all().item() for k in ('binary', 'mouse', 'wheel')), '非有限 policy')
     bits = (logits['binary'] >= 0).long().tolist()
     if legal:
-        # Disjoint exclusion groups: keep the most likely active bit, ties by catalog index.
-        for group in ((4, 9), (8, 10), (7, 12), (15, 16, 17)):
-            active = [i for i in group if bits[i]]
-            if len(active) > 1:
-                winner = max(active, key=lambda i: (float(logits['binary'][i]), -i))
-                for i in active:
-                    bits[i] = int(i == winner)
+        # Reuse the codec's exclusions; prefer larger logits, ties by catalog index.
+        active = sorted((i for i, bit in enumerate(bits) if bit), key=lambda i: (-float(logits['binary'][i]), i))
+        bits = [0] * ACTION_CODEC['binary_width']
+        for i in active:
+            bits[i] = 1
+            if forbidden_buttons(bits):
+                bits[i] = 0
     return dict(binary=bits, mouse=int(logits['mouse'].argmax()), wheel=int(logits['wheel'].argmax()))

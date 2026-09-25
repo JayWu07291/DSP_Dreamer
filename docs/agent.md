@@ -22,7 +22,7 @@ Checkpoint 保存完整世界模型及 agent 權重、optimizer、配方、進�
 
 ## 正式入口
 
-以下命令只有在 #31 的同源重建與預測證據完整通過後才能執行。`100` 僅示例，正式 updates 必須由完整 loader/loss 測速决定。第一階段的 `reviewed-gate.json` 必須包含完整人工判讀。
+以下命令只有在 #31 的同源重建與預測證據完整通過後才能執行。`100` 僅示例，正式 updates 必須由完整 loader/loss 測速決定。第一階段的 `reviewed-gate.json` 必須包含完整人工判讀。
 
 ```powershell
 .venv/Scripts/python.exe tools/train-agent.py train --stage-one runs/dynamics-v1/final-100.pt --prediction-dir runs/prediction-v1 --prediction-gate runs/prediction-v1/reviewed-gate.json --updates 100 --output runs/agent-v1
@@ -33,7 +33,7 @@ Checkpoint 保存完整世界模型及 agent 權重、optimizer、配方、進�
 .venv/Scripts/python.exe tools/train-agent.py score --checkpoint runs/agent-v1/final-100.pt --metrics runs/agent-metrics/metrics.json --prediction-dir runs/agent-prediction --prediction-gate runs/agent-prediction/reviewed-gate.json --output runs/agent-gate.json
 ```
 
-入口重新計算上游 gate，核對 checkpoint、recipe、凍結資料及實作 checksum。來源必须為第一階段且已有更新，工程 checkpoint、模擬 passed、缺證據及不同來源均不能授權正式微調。工程測試直接使用 Python API；CLI 不提供跳過 gate 的旗標。保留被引用的 `.pt` 與 `.pt.json`，來源修改後恢復會拒絕。
+入口重新計算上游 gate，核對 checkpoint、recipe、凍結資料及實作 checksum。來源必須為第一階段且已有更新，工程 checkpoint、模擬 passed、缺證據及不同來源均不能授權正式微調。工程測試直接使用 Python API；CLI 不提供跳過 gate 的旗標。保留被引用的 `.pt` 與 `.pt.json`，來源修改後恢復會拒絕。
 
 ## 評估與分母
 
@@ -41,7 +41,7 @@ Reward 使用 validation 完整有效回合的所有合法 10 Hz transitions，�
 
 Reward 期望 ≥0.5 為正，逐 16 微任務列 N、正例、TP/FP/FN/TN、precision、recall、PR-AUC 與基率。PR-AUC 使用非插值 average precision，同分視為同一 threshold。每任務 precision/recall 均須 ≥80%；無正例或 precision 未定義為 `insufficient_evidence`。等待與 scalar reward=0 的非 active 完成另列 FP。±1 步匹配只作診斷，在相同回合及未切換的 task 區間內依最短距離、最早時間一對一匹配。
 
-Policy 的 binary 機率 ≥0.5；mouse/wheel argmax 同分取最小類別。有正例控制才列入 macro-F1，須 ≥0.60；全部 21 個控制皆列計數，無正例明列缺项。非零 mouse/wheel 子集各須 exact-class accuracy ≥50%，且比 train task-conditioned 眾數高至少 10 百分點。Baseline 從全部合法 train transitions 建立，含 no-op，不讀 validation 或 offline-test。兩邊使用相同非零子集與分母，缺 baseline 不刪掉樣本冒充通過。
+Policy 的 binary 機率 ≥0.5；mouse/wheel argmax 同分取最小類別。有正例控制才列入 macro-F1，須 ≥0.60；全部 21 個控制皆列計數，無正例明列缺項。非零 mouse/wheel 子集各須 exact-class accuracy ≥50%，且比 train task-conditioned 眾數高至少 10 百分點。Baseline 從全部合法 train transitions 建立，含 no-op，不讀 validation 或 offline-test。兩邊使用相同非零子集與分母，缺 baseline 不刪掉樣本冒充通過。
 
 另列逐任務 policy 指標、joint action NLL、no-op 比例及原始禁止組合率。零目標機率的 NLL 在 JSON 記為字串 `infinity`，另列筆數，不暗中 clamp；該情況不能通過。每個評估 transition 保存來源 artifact、模型索引、原始 transition indices、預測與監督值，可重算指標。
 
