@@ -60,8 +60,21 @@ def validate_agent_checkpoint(value):
 
 def read_agent_checkpoint(path):
     value = read_dynamics_checkpoint(path)
-    require(value['schema'] == 'dsp-agent-checkpoint/1', '需要第二階段 checkpoint')
+    require(value['schema'] in ('dsp-agent-checkpoint/1', 'dsp-imagination-checkpoint/1'), '需要 agent checkpoint')
     return value
+
+
+def save_agent_checkpoint(path, payload):
+    path = Path(path)
+    require(not path.exists(), f'Refusing overwrite: {path}')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + '.partial')
+    with partial.open('xb') as stream:
+        torch.save(payload, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    partial.rename(path)
+    atomic_save(str(path) + '.json', dict(checkpoint=file_info(path), status=payload['status'], step=payload['step']))
 
 
 def sequence_pools(index, length, split='train'):
@@ -204,9 +217,6 @@ class AgentTrainer:
         return result
 
     def save(self, path):
-        path = Path(path)
-        require(not path.exists(), f'Refusing overwrite: {path}')
-        path.parent.mkdir(parents=True, exist_ok=True)
         state = np.random.get_state(legacy=True)
         assert isinstance(state, tuple)
         payload = dict(schema='dsp-agent-checkpoint/1', action_codec=ACTION_CODEC, agent_config=AGENT_CONFIG,
@@ -220,17 +230,12 @@ class AgentTrainer:
             python_rng=random.getstate(), numpy_rng=(state[0], state[1].tolist(), *state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
             device_type=self.device.type)
-        partial = path.with_name(path.name + '.partial')
-        with partial.open('xb') as stream:
-            torch.save(payload, stream)
-            stream.flush()
-            os.fsync(stream.fileno())
-        partial.rename(path)
-        atomic_save(str(path) + '.json', dict(checkpoint=file_info(path), status=payload['status'], step=self.step))
+        save_agent_checkpoint(path, payload)
 
     @classmethod
     def restore(cls, path, index, *, device='cuda', provenance=None):
         value = read_agent_checkpoint(path)
+        require(value['schema'] == 'dsp-agent-checkpoint/1', '恢復第二階段需第二階段 checkpoint')
         require(value['index_id'] == index.report['artifact_id'] and value['sources'] == index.report['sources']
                 and value['device_type'] == torch.device(device).type, 'Checkpoint 資料或 device 不同')
         require(provenance is None or provenance == value['provenance'], 'Checkpoint 凍結資料或實作不同')

@@ -7,6 +7,8 @@ from .contract import CATALOG, CONTROLS, require
 
 SCANCODES = [0x01, 0x02, 0x03, 0x0F, 0x11, 0x13, 0x14, 0x1D,
              0x1E, 0x1F, 0x20, 0x21, 0x2A, 0x2D, 0x2E, None, None, None, 0x39, 0x12, 0x30]
+EXCLUSIVE_CONTROLS = [('W', 'S'), ('A', 'D'), ('LeftControl', 'LeftShift'),
+                      ('MouseLeft', 'MouseRight', 'MouseMiddle')]
 ACTION_CODEC: dict[str, Any] = dict(version="dsp-action/1", catalog=CATALOG, controls=CONTROLS,
                     binary_width=len(CONTROLS), scan_codes=SCANCODES,
                     unity_names=["Alpha1" if k == "Digit1" else "Alpha2" if k == "Digit2" else k for k in CONTROLS],
@@ -22,8 +24,7 @@ def validate_action_contract(contract):
 
 def forbidden_buttons(binary):
     active = {key for key, value in zip(CONTROLS, binary) if value}
-    return any(set(pair) <= active for pair in [("W", "S"), ("A", "D"), ("LeftControl", "LeftShift"),
-               ("MouseLeft", "MouseRight"), ("MouseLeft", "MouseMiddle"), ("MouseRight", "MouseMiddle")])
+    return any(len(set(group) & active) > 1 for group in EXCLUSIVE_CONTROLS)
 
 
 def encode_action(action):

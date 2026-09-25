@@ -226,7 +226,8 @@ def test_reward_and_policy_metrics_use_exact_paired_denominators():
     assert policy_metrics(boundary, baseline)['status'] == 'failed'
 
 
-def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path):
+@pytest.mark.parametrize('stage_three', [False, True])
+def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path, stage_three):
     from test_training_index import fixture, registry, FFMPEG
     from dsp_dreamer import Recording, compile_recording
     from dsp_dreamer.training_index import TrainingIndex
@@ -293,6 +294,13 @@ def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path):
     trainer.update()
     path = tmp_path / 'agent.pt'
     trainer.save(path)
+    if stage_three:
+        from dsp_dreamer.imagination import ImaginationTrainer, ImaginationConfig
+        imagined = ImaginationTrainer(path, index, ImaginationConfig(updates=1, microbatch=1,
+            accumulation=2, short_length=2, long_length=2), device='cpu', provenance=provenance)
+        imagined.update()
+        path = tmp_path / 'imagination.pt'
+        imagined.save(path)
     output = tmp_path / 'prediction'
     dynamics_gate = evaluate_prediction(path, index, metric, inputs, output, device='cpu')
     assert dynamics_gate['status'] == 'engineering_only' and dynamics_gate['sequences'] == 1
@@ -303,6 +311,16 @@ def test_continuous_validation_relevant_union_and_stage_two_dynamics(tmp_path):
     gate = combine_gates(metrics, index, inputs, checkpoint_path=path, recipe=recipe, prediction=proof)
     assert set(('reward', 'policy', 'dynamics')) <= gate.keys() and not gate['qualified']
     assert gate['dynamics'] == dynamics_gate
+    if stage_three:
+        from dsp_dreamer.agent_evaluation import evaluate_agent
+        from dsp_dreamer.imagination import export_candidate
+        actual = tmp_path / 'actual-policy-reward'
+        evaluate_agent(path, index, inputs, actual, device='cpu')
+        candidate = export_candidate(path, index, inputs, tmp_path / 'candidate',
+            metrics=load(actual / 'metrics.json'), recipe=load(actual / 'recipe.json'), prediction=proof)
+        assert candidate['gate']['policy']['n'] == candidate['gate']['reward']['n'] == 80
+        assert candidate['gate']['dynamics'] == dynamics_gate
+        assert candidate['status'] == 'engineering_only' and not candidate['qualified']
     atomic_save(tmp_path / 'combined-metrics.json', metrics)
     atomic_save(tmp_path / 'combined-gate.json', gate)
     mismatched = copy.deepcopy(proof)

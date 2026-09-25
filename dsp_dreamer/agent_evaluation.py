@@ -270,6 +270,9 @@ def evaluate_agent(checkpoint_path, index, inputs, output, *, device='cuda', dea
 
 def combine_gates(metrics, index, inputs, *, checkpoint_path, recipe, prediction=None):
     value = read_agent_checkpoint(checkpoint_path)
+    if value['schema'] == 'dsp-imagination-checkpoint/1' and value['formal']:
+        from .imagination import require_stage_two
+        require_stage_two(value['stage_two_source']['path'], index, inputs, value['stage_two_proof'], value['provenance'])
     for artifact in (metrics, inputs, recipe):
         verify_seal(artifact)
     require(metrics['checkpoint_sha256'] == file_info(checkpoint_path)['sha256'] == recipe['checkpoint_sha256']

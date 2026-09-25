@@ -54,12 +54,16 @@ def require_reconstruction(proof, tokenizer_sha256, provenance):
 def read_dynamics_checkpoint(path):
     require(file_info(path) == load(str(path) + '.json')['checkpoint'], 'Checkpoint checksum mismatch')
     value = torch.load(path, map_location='cpu', weights_only=True)
-    require(value.get('schema') in ('dsp-dynamics-checkpoint/1', 'dsp-agent-checkpoint/1'), '不支援的 dynamics checkpoint')
+    require(value.get('schema') in ('dsp-dynamics-checkpoint/1', 'dsp-agent-checkpoint/1',
+                                   'dsp-imagination-checkpoint/1'), '不支援的 dynamics checkpoint')
     # Validate the entire codec before constructing or loading any model weights.
     validate_action_contract(value['action_codec'])
-    if value['schema'] == 'dsp-agent-checkpoint/1':
+    if value['schema'] in ('dsp-agent-checkpoint/1', 'dsp-imagination-checkpoint/1'):
         from .agent_training import validate_agent_checkpoint
         validate_agent_checkpoint(value)
+    if value['schema'] == 'dsp-imagination-checkpoint/1':
+        from .imagination import validate_imagination_checkpoint
+        validate_imagination_checkpoint(value)
     return value
 
 

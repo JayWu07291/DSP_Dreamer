@@ -30,6 +30,10 @@ class Agent(nn.Module):
                                    for k, n in dict(binary=21, mouse=121, wheel=3, reward=255).items()})
 
     def forward(self, noisy, past_actions, task_condition, levels):
+        features = self.features(noisy, past_actions, task_condition, levels)
+        return {k: head(features).reshape(*features.shape[:2], 9, -1) for k, head in self.heads.items()}
+
+    def features(self, noisy, past_actions, task_condition, levels):
         require(tuple(task_condition.shape) == (*noisy.shape[:2], 17)
                 and ((task_condition == 0) | (task_condition == 1)).all().item()
                 and (task_condition.sum(-1) == 1).all().item(), '需要 17 維 one-hot 任務條件')
@@ -38,8 +42,7 @@ class Agent(nn.Module):
         query = self.query + self.task(task_condition).flatten(0, 1)[:, None]
         memory = hidden.flatten(0, 1)
         attended, _ = self.cross(query, memory, memory, need_weights=False)
-        features = self.norm(query + attended).reshape(*noisy.shape[:2], -1)
-        return {k: head(features).reshape(*features.shape[:2], 9, -1) for k, head in self.heads.items()}
+        return self.norm(query + attended).reshape(*noisy.shape[:2], -1)
 
 
 def reward_support(device):

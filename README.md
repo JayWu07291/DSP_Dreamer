@@ -10,6 +10,8 @@ Issue #25 的 [dynamics 訓練、恢復與配對預測評估工具](docs/dynamic
 
 Issue #26 的[任務條件微調、恢復與 policy/reward 評估工具](docs/agent.md)已完成修訂後七項工程驗收，使用同源第一階段 checkpoint，並合併 reward、policy 與同一模型的 dynamics gate。[工程驗證與結案證據](docs/issue-26-validation.md)使用合成 fixtures，產物為 `engineering_only`；正式第二階段訓練及候選資格仍由 #32 驗收。
 
+Issue #27 的[固定任務想像訓練與候選匯出](docs/imagination.md)延續第二階段 checkpoint，只更新 policy／value，並沿用相同離線 gate。合成資料的[工程驗證](docs/issue-27-validation.md)不授予正式候選資格；正式第三階段與品質仍由 #33 驗收。
+
 ## 專案結構
 
 | 路徑 | 用途 |
