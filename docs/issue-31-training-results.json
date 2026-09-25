@@ -1,0 +1,584 @@
+{
+  "B_started": false,
+  "artifact_id": "35a897e37d13ddb018d4fe3a7d2b92632a574b8fc0d2ec3f6347295a29e4af4d",
+  "budget_id": "991a8127-d941-4de9-a8ca-35cbe5f30b04",
+  "charged_updates": 756,
+  "checkpoint_evaluated": "runs\\issue-31\\restarted\\A\\candidate-756.pt",
+  "checkpoint_final": "runs\\issue-31\\restarted\\A\\final-756.pt",
+  "checkpoint_resume_state_verified": true,
+  "code_commit": "3ddd36d",
+  "files": {
+    "runs\\issue-31\\resolved\\comparison-64.json": {
+      "bytes": 6359,
+      "sha256": "bd9ca94fd10976c09656da3aca113012cffd5093073a96666eb14d34da12dc27"
+    },
+    "runs\\issue-31\\resolved\\comparison-96.json": {
+      "bytes": 6357,
+      "sha256": "9b729b5bcb8637bd5fc7f03555b605144b660574e645b6575817784fb2774b60"
+    },
+    "runs\\issue-31\\resolved\\overfit.json": {
+      "bytes": 12875,
+      "sha256": "148b1194e4ed1294afecde8b63d0e1f17226f4b20974bc30471640332035638c"
+    },
+    "runs\\issue-31\\resolved\\repair-checks.json": {
+      "bytes": 1192,
+      "sha256": "c344d7a0bf33a91ab9430138b26fb54c32487b511c75886c1bd9fda6dddc22f9"
+    },
+    "runs\\issue-31\\resolved\\storage-failure.json": {
+      "bytes": 920,
+      "sha256": "4d3d1bbaa7c1217c7933256197d414649062d879766e1219ef885fde3166152a"
+    },
+    "runs\\issue-31\\restarted\\A-plan.json": {
+      "bytes": 1775871,
+      "sha256": "a2f025731662e5fb299258ab6d82f7ea912b5341b230b748ec8f5a0204c45dd1"
+    },
+    "runs\\issue-31\\restarted\\A\\candidate-756.pt": {
+      "bytes": 203063291,
+      "sha256": "c8c0cf72df2ee4d00be95e4acf7ecfa2beae419014e6e346ad4151cd93159c83"
+    },
+    "runs\\issue-31\\restarted\\A\\candidate-756.pt.json": {
+      "bytes": 5082,
+      "sha256": "7e812c21a1db6c03a9ec0ef295becae791195c5b7570c5740e40f8367a8057cb"
+    },
+    "runs\\issue-31\\restarted\\A\\final-756.pt": {
+      "bytes": 203067003,
+      "sha256": "494b2c9430993c35d7d3102119cc834a66b98468b08581eef54687d575f71d3d"
+    },
+    "runs\\issue-31\\restarted\\A\\final-756.pt.json": {
+      "bytes": 5082,
+      "sha256": "4fbc9745319e1d5f25ae783734f859e1b8c30dc5d38687328afb4a05cea27af3"
+    },
+    "runs\\issue-31\\restarted\\A\\gate\\gate.json": {
+      "bytes": 2085,
+      "sha256": "20db9c17ed5a05e0d894c9fe993826dd8d1eb04b4eeff39f7a0f38a83d0c5530"
+    },
+    "runs\\issue-31\\restarted\\A\\gate\\judgments-template.json": {
+      "bytes": 1451,
+      "sha256": "094c4cfd930e7fcb48c99ab3ebdda39dc50f672a337fad4f2b5c20d6d1d0d4fb"
+    },
+    "runs\\issue-31\\restarted\\A\\gate\\metrics.json": {
+      "bytes": 121247,
+      "sha256": "7a629b8a744f6c165a187597434fdb3dde7c44b3482d7ef8f09a6ed383e7efb8"
+    },
+    "runs\\issue-31\\restarted\\A\\gate\\recipe.json": {
+      "bytes": 5885,
+      "sha256": "7875f6c9d319cea9041bb7506143632e98b45e994a49c310c51119a2da6cb88b"
+    },
+    "runs\\issue-31\\restarted\\A\\recipe.json": {
+      "bytes": 1781696,
+      "sha256": "3c9e975c6221b449130e0c6263a0ba84a5faaa714b4216c4f6a74a5c4d0693cc"
+    },
+    "runs\\issue-31\\restarted\\A\\run.json": {
+      "bytes": 1784156,
+      "sha256": "14b1a4098ef587f9cfc87d072b09e2d40c7b584cc3ff5d0e4be90cc7973a0604"
+    },
+    "runs\\issue-31\\restarted\\budget-completed.json": {
+      "bytes": 1781644,
+      "sha256": "b141b4a5144e4e484065a8df780dd0ff8ac2fe93640ab6156534a6a8eff1fd83"
+    },
+    "runs\\issue-31\\restarted\\execute.log": {
+      "bytes": 100528,
+      "sha256": "5cf05a5fd440f6329111986f23733dcf17b2c63b9fc55a5598c2c94b954a4ddc"
+    },
+    "runs\\issue-31\\restarted\\execute.py": {
+      "bytes": 5213,
+      "sha256": "7f14ed010fc585887b050d561990429dd04d6b10e0bf6efdc5e027ca80149e51"
+    },
+    "runs\\issue-31\\restarted\\execution-recipe.json": {
+      "bytes": 3172,
+      "sha256": "aa5046c38cba2edc719c1c776740987cb0ad435a5acbec02ebd535912f21955e"
+    },
+    "runs\\issue-31\\restarted\\human-review.md": {
+      "bytes": 4218,
+      "sha256": "46c0e9b8c8f1bd4ca902b9cddc04afebc906ee4e5563352cb212e35913a44970"
+    },
+    "runs\\issue-31\\restarted\\previous-budget.json": {
+      "bytes": 1781213,
+      "sha256": "ca07d23bb19ced60dade16947ac15224258f602aa1a3dc2d9c7ffb5e8c296a31"
+    },
+    "runs\\issue-31\\restarted\\progress.ndjson": {
+      "bytes": 99626,
+      "sha256": "731dc159085f253a585e7e468fa982ba096d72bdc1d8e9bd7b4d3ed5934d3226"
+    },
+    "runs\\issue-31\\restarted\\reset.json": {
+      "bytes": 1038,
+      "sha256": "8995d39fde19ed5052d7bcb19a1f57c403b3e30254243efac4760923a4970389"
+    }
+  },
+  "final_training_loss": 0.1373810488730669,
+  "frozen_evaluation_files_verified": 7,
+  "hardware": {
+    "cuda": "12.8",
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "torch": "2.9.0+cu128",
+    "vram_mib": 12227
+  },
+  "last_20_mean_training_loss": 0.13968458669260145,
+  "model": {
+    "activation_checkpointing": true,
+    "bottleneck": 32,
+    "context": 64,
+    "heads": 8,
+    "latent_tokens": 64,
+    "patch_size": 20,
+    "temporal_layers": 4,
+    "width": 512
+  },
+  "periodic_validation": [
+    {
+      "frames": 8,
+      "lpips": 0.4990193620324135,
+      "mse": 0.056476549711078405,
+      "step": 111
+    },
+    {
+      "frames": 8,
+      "lpips": 0.4952240101993084,
+      "mse": 0.0571181052364409,
+      "step": 219
+    },
+    {
+      "frames": 8,
+      "lpips": 0.4875863790512085,
+      "mse": 0.05673538986593485,
+      "step": 318
+    },
+    {
+      "frames": 8,
+      "lpips": 0.4862443320453167,
+      "mse": 0.05723727121949196,
+      "step": 424
+    },
+    {
+      "frames": 8,
+      "lpips": 0.48703789338469505,
+      "mse": 0.0583285610191524,
+      "step": 530
+    },
+    {
+      "frames": 8,
+      "lpips": 0.4865885004401207,
+      "mse": 0.05828970670700073,
+      "step": 636
+    },
+    {
+      "frames": 8,
+      "lpips": 0.4864538945257664,
+      "mse": 0.05649989750236273,
+      "step": 740
+    }
+  ],
+  "plan_artifact_id": "adb24b503e343d6a5df98e2e27c3dfdd9edcad3ef946bb00a7a7ed9e8371a85e",
+  "plan_summary": {
+    "budget_id": "991a8127-d941-4de9-a8ca-35cbe5f30b04",
+    "durations": [
+      14.718000000000757,
+      13.01600000000326,
+      12.014999999999418,
+      28.79699999999866
+    ],
+    "formal": true,
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "lengths": [
+      32,
+      32,
+      32,
+      80
+    ],
+    "peak_allocated_gib": 2.4032087326049805,
+    "peak_reserved_gib": 3.859375,
+    "remaining_seconds": 14400,
+    "stage": "A",
+    "status": "measured",
+    "update_fraction": 0.9,
+    "updates": 756
+  },
+  "provenance": {
+    "annotations_id": "446be9ebb1a428662a211369a15369f1a9684d332d025256c9674b5cf112a3ce",
+    "data_freeze_id": "57d8fbadf60c6a00ece0500dc5f3c14abc5e1ac546aed2edc11c88fd6390775f",
+    "evaluation_inputs_id": "f8705e40e8906a15d20075fbfbd9857a74a1d0636ab8c1aadfeaf20ff3a6e358",
+    "implementation": {
+      "dsp_dreamer\\__init__.py": {
+        "bytes": 385,
+        "sha256": "39d5edac9b54a9cda8020ca546a064e114c524bd0558879e91d39a0f11dfb126"
+      },
+      "dsp_dreamer\\__main__.py": {
+        "bytes": 3575,
+        "sha256": "606eff20c5962e01cc494b967750a266f13af45216856cc5f5c31f819920b2f2"
+      },
+      "dsp_dreamer\\actions.py": {
+        "bytes": 2885,
+        "sha256": "bf2807a968ef8d46c7ab5f0eb2f3284317b45b57483213857d1a95502666a67b"
+      },
+      "dsp_dreamer\\agent.py": {
+        "bytes": 6148,
+        "sha256": "aadb8ef2897a7a0fba8f039a7f8e38223130a46d9c1ffefab2b1ef234a5b1f58"
+      },
+      "dsp_dreamer\\agent_evaluation.py": {
+        "bytes": 19093,
+        "sha256": "b646bf8bedb0838d1c06d182d393dc86b8333f54da88c30e24a131060f3cf5df"
+      },
+      "dsp_dreamer\\agent_training.py": {
+        "bytes": 15733,
+        "sha256": "304829c5673cfb254d0047947195be8062dd70af30e6bc43dd543bddcd60050e"
+      },
+      "dsp_dreamer\\archive.py": {
+        "bytes": 17099,
+        "sha256": "4daa9cab54543a412454505a29a7ca51699270b8f18b98dee4285f156831d1c9"
+      },
+      "dsp_dreamer\\contract.py": {
+        "bytes": 2153,
+        "sha256": "24f0765b9a150a7edf88900f2d3cd14fc2a2fe041bda27cf1aa5bdada5045190"
+      },
+      "dsp_dreamer\\control.py": {
+        "bytes": 10928,
+        "sha256": "0cf1feadb64c2c7ba2446afe61727a211977a6b22a4ece326e7c0a6f660bd5aa"
+      },
+      "dsp_dreamer\\dataset.py": {
+        "bytes": 24634,
+        "sha256": "9e114a808a9743da0d5de4cee7b401d9cf2b16bd0c403e629439a8a85ed2c342"
+      },
+      "dsp_dreamer\\diagnostics.py": {
+        "bytes": 5298,
+        "sha256": "baffc9bb9938867dd7a8a287964ac4d2a6ed27fc8fe876786d2121ac0046531f"
+      },
+      "dsp_dreamer\\dynamics.py": {
+        "bytes": 8730,
+        "sha256": "b8217ed582501197eb9eab37173726060327b5b9c6f718f248420b1420af6843"
+      },
+      "dsp_dreamer\\dynamics_evaluation.py": {
+        "bytes": 16933,
+        "sha256": "258ec87259db8518b1590f1fd58b66b7b7e9f08ecf86221aa5ff79d67a899085"
+      },
+      "dsp_dreamer\\dynamics_training.py": {
+        "bytes": 13968,
+        "sha256": "c94000c4867c8c13b37da7a4154f9863bcc1a5e2cb0887afeaca11a0c6661410"
+      },
+      "dsp_dreamer\\evaluation_batch.py": {
+        "bytes": 19584,
+        "sha256": "4f5b5214d300a592efb6da4eddd911ff97c4b0edd0e631a0fca9ad935c719ce1"
+      },
+      "dsp_dreamer\\evaluation_protocol.py": {
+        "bytes": 12882,
+        "sha256": "03d5b83e5e2c1e2ee3122845395b537554485f056f424d5d96cf6d1ddb3def87"
+      },
+      "dsp_dreamer\\frozen_sources.py": {
+        "bytes": 1088,
+        "sha256": "e75114b78bea434bb93044c1486e43a6c864b94f00cf61b86604ea5735ef56e8"
+      },
+      "dsp_dreamer\\imagination.py": {
+        "bytes": 21969,
+        "sha256": "e3e5bdc5fc378c6b68985a98840828378002e8105bea3f9c6dd0098755147e4a"
+      },
+      "dsp_dreamer\\lifecycle.py": {
+        "bytes": 5960,
+        "sha256": "e8cca415187045ed7c06a8c48838119afda2cc0ebaf9adf25a987223a57f1c67"
+      },
+      "dsp_dreamer\\model_view.py": {
+        "bytes": 8651,
+        "sha256": "853b5b81597fc14c0c7b5df9a60b15e3b3fc9096db53e7aa17aea986bc6a4a8b"
+      },
+      "dsp_dreamer\\production.py": {
+        "bytes": 8101,
+        "sha256": "da1cdb21d25c1fb947550d9a48401f768a852008d7e9b03265245c6c8236be6e"
+      },
+      "dsp_dreamer\\progress.py": {
+        "bytes": 16981,
+        "sha256": "d84c580c408435a990e0a64cd1a6da2bec3afc2126f0c4f230a4a7a3eac3de7a"
+      },
+      "dsp_dreamer\\recording.py": {
+        "bytes": 7015,
+        "sha256": "9efaecd2be9e3dff695034e78532a53909e6aa25deae362ffc149a9864b52c71"
+      },
+      "dsp_dreamer\\recovery.py": {
+        "bytes": 6189,
+        "sha256": "4aaa9090bfeae808347b8b54750fa3ebba1641a2b6444094026aa57fb62de65b"
+      },
+      "dsp_dreamer\\reschedule.py": {
+        "bytes": 2629,
+        "sha256": "be059ca5e263649001fb4e1e9b167865432c9f0a7427163694d078c8c08d51e4"
+      },
+      "dsp_dreamer\\runner.py": {
+        "bytes": 11239,
+        "sha256": "a177e6ace4e4db63a6f8f45991f368b8190045546b94ddefacd2478c91890e02"
+      },
+      "dsp_dreamer\\tokenizer.py": {
+        "bytes": 5236,
+        "sha256": "939cedd47b08b32f9299b0ce3dd03c92e2a8f7fd08e89150ca9a155cd6dc7b45"
+      },
+      "dsp_dreamer\\tokenizer_evaluation.py": {
+        "bytes": 13766,
+        "sha256": "f419fd586c3957c1763a83f8f15c2d0312ff5e9205d8a2c7c9bb24a7fdd9e86c"
+      },
+      "dsp_dreamer\\tokenizer_training.py": {
+        "bytes": 11462,
+        "sha256": "a3822a63453715f9de9e0b3043403866081148015fa00f4dede32e9a92eed08d"
+      },
+      "dsp_dreamer\\training_cli.py": {
+        "bytes": 15584,
+        "sha256": "c225979a06881cc2d754daeac42d731db7cd7fa324c82dccaa7f38c65a07b033"
+      },
+      "dsp_dreamer\\training_control.py": {
+        "bytes": 19410,
+        "sha256": "e256b73af306e2663217c7a3a841b72b917a2193bae50372557b44aa893e695f"
+      },
+      "dsp_dreamer\\training_index.py": {
+        "bytes": 11905,
+        "sha256": "5c81e14e382330c0851776bc30530c31e5b4aee05dd6c7809fe9e8b2f4cbaff3"
+      },
+      "dsp_dreamer\\video.py": {
+        "bytes": 3125,
+        "sha256": "5f8961b8d89555d4e53e39681d57e757703768cc7b998143971d94e23b894ca4"
+      },
+      "protocols\\source-compatibility-issue31.json": {
+        "bytes": 1525,
+        "sha256": "ec233787311d796ca231ea26f35d252ce67aae95d0d46826b2315eacaf36a3a4"
+      }
+    },
+    "protocol_id": "40167e30d83bab5b60b19498ac45380899cd942d8f87fc347db37cae893a9e42"
+  },
+  "qualitative_observation": {
+    "observation": "重建呈現近似的雜訊狀紋理，無法辨識原圖的場景與關鍵 UI；不代表品質 gate 通過。",
+    "reviewer": "Codex (not a human gate judgment)",
+    "samples": [
+      "R031",
+      "R111"
+    ]
+  },
+  "reconstruction": {
+    "artifact_id": "535722420562e5b81ce772796d0c6c6b8525e564cba91d5fef90afee235102fe",
+    "categories": {
+      "connection": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 2,
+        "total": 2
+      },
+      "cursor": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 2,
+        "total": 2
+      },
+      "item_number": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 10,
+        "total": 10
+      },
+      "recipe": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 1,
+        "total": 1
+      }
+    },
+    "excluded": 0,
+    "frames": 200,
+    "judgments": null,
+    "lpips": 0.4486738668382168,
+    "mse": 0.052686494495719674,
+    "per_task": {
+      "0": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "1": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "10": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 3,
+        "total": 3
+      },
+      "11": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 2,
+        "total": 2
+      },
+      "12": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 3,
+        "total": 3
+      },
+      "13": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "14": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "15": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "16": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "2": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 1,
+        "total": 1
+      },
+      "3": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 2,
+        "total": 2
+      },
+      "4": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 1,
+        "total": 1
+      },
+      "5": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "6": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "7": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "8": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 0,
+        "total": 0
+      },
+      "9": {
+        "accuracy": null,
+        "correct": 0,
+        "pending": 3,
+        "total": 3
+      }
+    },
+    "recognition": {
+      "accuracy": null,
+      "correct": 0,
+      "pending": 15,
+      "total": 15
+    },
+    "report_id": "4a97f93a8ef0b88ce2a4d3ba8f3be5a90bc6110ac6bb3fcd45c97c6cd466c948",
+    "schema": "dsp-reconstruction-gate/1",
+    "status": "pending",
+    "task_quotas": {
+      "0": 10,
+      "1": 10,
+      "10": 13,
+      "11": 10,
+      "12": 10,
+      "13": 17,
+      "14": 10,
+      "15": 10,
+      "16": 23,
+      "2": 10,
+      "3": 10,
+      "4": 10,
+      "5": 10,
+      "6": 10,
+      "7": 17,
+      "8": 10,
+      "9": 10
+    },
+    "ui_frames": 5,
+    "ui_mse": 0.0821763515472412,
+    "ui_pixels": 568351
+  },
+  "remaining_seconds": {
+    "A": 1245.234000000004,
+    "B": 57600,
+    "preflight": 5358.389999999999,
+    "second": 21600,
+    "third": 14400
+  },
+  "schema": "dsp-issue31-training-result/1",
+  "spent_seconds": {
+    "A": 13154.765999999996,
+    "B": 0,
+    "preflight": 1841.6100000000006,
+    "second": 0,
+    "third": 0
+  },
+  "status": "A_completed_B_pending_human_gate",
+  "tests": {
+    "errors": "0",
+    "failures": "0",
+    "hostname": "Jay-Win11",
+    "name": "pytest",
+    "skipped": "0",
+    "tests": "204",
+    "time": "675.885",
+    "timestamp": "2026-09-25T17:54:26.280846+08:00"
+  },
+  "training": {
+    "accumulation": 8,
+    "learning_rate": 0.0001,
+    "long_length": 80,
+    "max_seconds": 14400,
+    "microbatch": 2,
+    "seed": 2202,
+    "short_length": 32,
+    "updates": 756
+  },
+  "updates": 756,
+  "user_authorized_reset": {
+    "artifact_id": "8246e7389ca0cb8de308c2aafba5e7542e0c8aae983b938e7605a9ca9a101051",
+    "budget_id": "991a8127-d941-4de9-a8ca-35cbe5f30b04",
+    "driver": {
+      "bytes": 2375,
+      "sha256": "78e53b5610065505df15bf10dff1952c409c865241f61375978fbd3b8e8558f2"
+    },
+    "imports_preserved": 3,
+    "previous_A_updates": 87,
+    "previous_attempts": 10,
+    "reset": {
+      "archive": "runs\\issue-31\\restarted\\previous-budget.json",
+      "archive_file": {
+        "bytes": 1781213,
+        "sha256": "ca07d23bb19ced60dade16947ac15224258f602aa1a3dc2d9c7ffb5e8c296a31"
+      },
+      "authorized_at": "2026-09-25T11:17:08.444850+00:00",
+      "previous_budget_id": "6fed8d5f-776e-4b4c-84b6-98bc1a839ad5",
+      "scope": "New 2/4/16/6/4-hour budgets, new plans and update counters; previous imports remain archived and exempt from recharging.",
+      "user_instruction": "請重設預算，我不希望因為這個類別的問題導致模型少訓練次數"
+    },
+    "stage_seconds": {
+      "A": 14400,
+      "B": 57600,
+      "preflight": 7200,
+      "second": 21600,
+      "third": 14400
+    }
+  },
+  "verified_png_files": 400
+}
