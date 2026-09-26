@@ -32,6 +32,20 @@
 
 完成後檢查同一組圖的趨勢與完整 gate。若延長後改善停滯，再檢查 bottleneck、patch readout 或 loss 配比；2000 次不是收斂保證。Agent 不啟動或輪詢正式訓練，使用者完成後提供新輸出目錄。
 
+### 本輪工程驗證
+
+2026-09-26 的完整 pytest 為 211 passed、1 failed，耗時 936.01 秒。唯一失敗是 `test_built_and_deployed_plugins_reject_policy_during_human_recording` 啟動 `ControlGuards.exe` 時收到 Windows `WinError 4551`，應用程式控制原則阻擋檔案。相同測試單獨重跑為 1 passed，耗時 3.05 秒；首輪失敗保留在 `runs/issue-31/update-limited-checks/pytest.xml`，不將整輪記成零失敗。26 則警告來自既有 torchvision 介面棄用。mypy 的 37 個 `dsp_dreamer` 檔案通過。
+
+新增測試涵蓋無時限預算、停機時間分記、接續權重與 RMS、重設 optimizer、恢復後相同下一步、來源變更拒絕，以及 OOM 重測後仍完成原更新目標。第 431 步真實 checkpoint 通過 checksum、模型配置與四個模型運算檔案指紋核對；本輪沒有執行正式訓練，也沒有改動正式帳本或資料集。
+
+#### Standards
+
+相對 `32494a7` 的獨立審查未發現規範違反或需提出的程式異味。提交格式與繁中文件符合專案規範，無時限目標和 OOM 恢復邏輯與說明一致。
+
+#### Spec
+
+初審發現獨立 `benchmark --init-from` 後無法用同一來源執行 `train`，已於 `7108185` 修正並複查。最終剩餘問題為 0；Standards 剩餘問題也為 0。這些工程結果不代表重建品質 gate 通過。
+
 ## 手動重訓 A
 
 使用者確認 #31 的 756 次更新仍產生無法辨識的紋理，選擇直接重跑完整 A，並自行執行、完成後再通知 Agent。這次修改沒有啟動正式訓練，也沒有重設本機既有帳本。
