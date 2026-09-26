@@ -22,6 +22,9 @@ def test_cli_records_frozen_identity_rejection_before_gpu_work(tmp_path):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(repo / name, path)
+    # This regression exercises the historical time-limited workflow.
+    with (tmp_path / 'training_config.py').open('a', encoding='utf-8') as stream:
+        stream.write("\nSTAGES['A'].update(max_seconds=14400, updates=None)\n")
     atomic_save(tmp_path / 'catalog.json', dict(protocol_id='wrong-protocol', evaluation_directory='evaluation'))
     result = subprocess.run([sys.executable, '-X', 'utf8', str(tmp_path / 'tools/train.py'),
         'A', 'benchmark', '--catalog', 'catalog.json', '--protocol', str(repo / 'protocols/evaluation-v2.json'),
@@ -70,6 +73,85 @@ def test_budget_failure_retry_and_throughput_plan(tmp_path):
         with pytest.raises(InvalidRecording, match='預算'):
             with budget.attempt('A', 'train', microbatch=2):
                 pass
+
+
+def test_update_limited_A_does_not_charge_downtime_or_reduce_other_stages(tmp_path):
+    from dsp_dreamer.training_control import TrainingBudget, STAGE_SECONDS
+    now = [100.]
+    clock = lambda: now[0]
+    path = tmp_path / 'budget.json'
+    with TrainingBudget(path, formal=False, clock=clock, wall_clock=clock) as budget:
+        budget.configure_limits(dict(STAGE_SECONDS, A=None))
+        with budget.attempt('A', 'train'):
+            now[0] += 100000
+            budget.tick()
+            assert budget.remaining('A') == float('inf')
+            assert budget.remaining('B') == 57600
+        saved = copy.deepcopy(budget.state)
+    saved['attempts'][-1]['status'] = 'running'
+    path.write_text(__import__('json').dumps(saved), encoding='utf-8')
+    now[0] += 1000000  # Desktop was closed; no further durable GPU progress exists.
+    with TrainingBudget(path, formal=False, clock=clock, wall_clock=clock) as budget:
+        assert budget.state['attempts'][-1]['seconds'] == 100000
+        assert budget.state['attempts'][-1]['status'] == 'interrupted'
+        assert budget.state['attempts'][-1]['unobserved_seconds'] == 1000000
+
+
+def test_update_target_runs_real_trainer_past_time_and_attempt_counts(tmp_path):
+    from test_training_index import fixture, registry
+    from dsp_dreamer.training_index import TrainingIndex
+    from dsp_dreamer.tokenizer import TokenizerConfig
+    from dsp_dreamer.tokenizer_training import TokenizerTrainer, TrainingConfig, ReconstructionLoss
+    from dsp_dreamer.training_control import TrainingBudget, STAGE_SECONDS, benchmark, run_training
+    torch.set_num_threads(2)
+    index = TrainingIndex([fixture(tmp_path / 'source', group='train')], registry(('train', 'demonstration')), length=2)
+    metric = ReconstructionLoss('data/torch-cache')
+    def create():
+        return TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
+            TrainingConfig(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=2, max_seconds=None), device='cpu')
+    source = create()
+    source.update()
+    source.save(tmp_path / 'source.pt')
+    def initialized():
+        trainer = create()
+        trainer.initialize_from(tmp_path / 'source.pt')
+        return trainer
+    now = [0.]
+    clock = lambda: time.monotonic() + now[0]
+    events = []
+    with TrainingBudget(tmp_path / 'budget.json', formal=False, clock=clock) as budget:
+        budget.configure_limits(dict(STAGE_SECONDS, A=None))
+        with budget.attempt('preflight', 'benchmark', target='A'):
+            plan = benchmark(initialized(), budget, 'A', tmp_path / 'plan.json', update_limit=2)
+        assert plan['updates'] == 2 and plan['remaining_seconds'] is None
+        # More attempts than the new target are not successful optimizer updates.
+        budget.progress('A')['updates'] = 10
+        def evaluate(path, output, full, deadline):
+            assert deadline == float('inf')
+            if not full:
+                raise torch.cuda.OutOfMemoryError('Interrupt after one saved update')
+            output.mkdir()
+            for name in ('metrics.json', 'recipe.json'):
+                atomic_save(output / name, {})
+            return dict(status='engineering_only', qualified=False)
+        with pytest.raises(torch.cuda.OutOfMemoryError):
+            with budget.attempt('A', 'train'):
+                run_training(initialized(), budget, 'A', tmp_path / 'interrupted', evaluate,
+                    validation_seconds=1e9, validation_updates=1)
+        saved = budget.progress('A')['latest']['path']
+        assert budget.progress('A')['plan'] is None
+        with budget.attempt('preflight', 'benchmark', target='A'):
+            replanned = benchmark(initialized(), budget, 'A', tmp_path / 'replan.json', update_limit=5)
+        assert replanned['updates'] == 2
+        assert replanned['identity']['source'] == plan['identity']['source']
+        resumed = TokenizerTrainer.restore(saved, index, metric, device='cpu')
+        with budget.attempt('A', 'train'):
+            now[0] += 100000
+            result = run_training(resumed, budget, 'A', tmp_path / 'trained', evaluate,
+                validation_seconds=1e9, event=lambda name, **row: events.append((name, row)))
+        assert result['status'] == 'completed' and result['updates'] == 2 and result['charged_updates'] == 12
+        assert all(row['remaining_seconds'] is None for name, row in events if name == 'update')
+        assert budget.remaining('B') == 57600
 
 
 def test_budget_import_crash_oom_gates_and_fallback(tmp_path):

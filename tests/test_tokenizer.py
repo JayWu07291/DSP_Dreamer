@@ -89,6 +89,46 @@ def test_loader_update_resume_repeats_next_update(tmp_path):
         TokenizerTrainer.restore(checkpoint, index, metric, device="cpu")
 
 
+def test_warm_start_keeps_weights_and_rms_but_starts_a_new_update_schedule(tmp_path):
+    from dsp_dreamer.contract import InvalidRecording
+    from test_training_index import fixture, registry
+    from dsp_dreamer.training_index import TrainingIndex
+    from dsp_dreamer.tokenizer_training import TokenizerTrainer, TrainingConfig, ReconstructionLoss, read_checkpoint
+    torch.set_num_threads(2)
+    index = TrainingIndex([fixture(tmp_path / 'source', group='train')], registry(('train', 'demonstration')), length=2)
+    loss = ReconstructionLoss('data/torch-cache')
+    config = dict(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=2)
+    model = TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4)
+    source = TokenizerTrainer(index, loss, model, TrainingConfig(**config), device='cpu')
+    source.update()
+    source_path = tmp_path / 'source.pt'
+    source.save(source_path)
+    wrong = TokenizerTrainer(index, loss, model, TrainingConfig(**config), device='cpu',
+                             provenance=dict(evaluation_inputs_id='different-evaluation'))
+    with pytest.raises(InvalidRecording, match='凍結身分'):
+        wrong.initialize_from(source_path)
+    trained = TokenizerTrainer(index, loss, model, TrainingConfig(**config, max_seconds=None, learning_rate=3e-5), device='cpu')
+    trained.initialize_from(source_path)
+    assert trained.step == 0 and not trained.optimizer.state and trained.history == []
+    assert trained.initialization['total_updates'] == 1
+    for key, value in source.model.state_dict().items():
+        torch.testing.assert_close(trained.model.state_dict()[key], value, rtol=0, atol=0)
+    torch.testing.assert_close(trained.loss_rms.scales(), source.loss_rms.scales(), rtol=0, atol=0)
+    trained.elapsed_seconds = 100000  # Hours elapsed cannot stop update-limited A.
+    result = trained.update()
+    assert result['step'] == 1 and result['learning_rate'] == 3e-5
+    saved = tmp_path / 'new.pt'
+    trained.save(saved)
+    restored = TokenizerTrainer.restore(saved, index, loss, device='cpu')
+    assert restored.initialization == trained.initialization
+    assert read_checkpoint(saved)['training_config']['max_seconds'] is None
+    assert restored.update() == trained.update()
+    with source_path.open('ab') as stream:
+        stream.write(b'changed')
+    with pytest.raises(InvalidRecording, match='初始化來源已改變'):
+        TokenizerTrainer.restore(saved, index, loss, device='cpu')
+
+
 def test_reconstruction_gate_keeps_missing_reviews_in_denominator():
     from dsp_dreamer.evaluation_protocol import seal, ITEM_TYPES
     from dsp_dreamer.tokenizer_evaluation import score_reconstruction

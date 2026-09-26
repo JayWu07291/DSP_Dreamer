@@ -1,7 +1,8 @@
 """Edit this file before starting a NEW run. tools/train.py A show-config prints resolved values.
 
-Changing a running/resumed run is rejected. Use `A run --restart` for fresh weights/budget.
-All times are seconds. Evaluation sample lists and quality gates remain frozen.
+Changing a running/resumed run is rejected. Use `A run --restart --init-from PATH`
+for a new experiment from learned weights, or omit --init-from for fresh weights.
+Times are seconds; A max_seconds=None uses completed updates only. Gates remain frozen.
 """
 
 RUNTIME = dict(
@@ -29,9 +30,10 @@ DYNAMICS = dict(architecture='dsp-block-causal/2', width=1280, heads=20, kv_head
 LOSS_RMS = dict(loss_rms_decay=.99, loss_rms_epsilon=1e-8)
 
 STAGES = {
-    'A': dict(**OPTIMIZER, **{**SEQUENCES, 'short_length': 16, 'long_length': 48}, **LOSS_RMS,
-              seed=2202, learning_rate=1e-4, max_seconds=14400,
-              mask_max_probability=.9, mse_weight=1., lpips_weight=.2, updates=None),
+    'A': dict(**{**OPTIMIZER, 'warmup_fraction': .01, 'min_lr_fraction': 1/3},
+              **{**SEQUENCES, 'short_length': 16, 'long_length': 48}, **LOSS_RMS,
+              seed=2202, learning_rate=3e-5, max_seconds=None,
+              mask_max_probability=.9, mse_weight=1., lpips_weight=.2, updates=2000),
     'B': dict(**OPTIMIZER, **SEQUENCES, **LOSS_RMS, seed=2203, learning_rate=1e-4, max_seconds=57600,
               flow_weight=1., bootstrap_weight=1., updates=None),
     'second': dict(**OPTIMIZER, **SEQUENCES, **LOSS_RMS, seed=2203, learning_rate=1e-4, world_learning_rate=1e-5,
@@ -41,7 +43,8 @@ STAGES = {
                   max_seconds=14400, horizon=15, gamma=.997, lambda_=.95, alpha=.5,
                   kl_weight=.3, value_weight=1., updates=None),
 }
-# updates=None uses measured throughput and max_seconds; an integer only lowers that limit.
-# A restarts from fresh weights: old shallow-tokenizer checkpoints are incompatible.
+# A: 2000 ADDITIONAL completed updates when initialized from a trained checkpoint.
+# Optional positive max_seconds also stops on time; updates=None needs a time limit.
+# Other stages retain their original time budgets. Old shallow checkpoints are incompatible.
 # Paper masking and loss normalization are enabled. LR, EMA and model sizes are our
 # starting recipe, not unpublished official hyperparameters or a convergence guarantee.

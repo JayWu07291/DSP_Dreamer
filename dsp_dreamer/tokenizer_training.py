@@ -61,7 +61,7 @@ class TrainingConfig(OptimizerConfig):
     short_length: int = 16
     long_length: int = 48
     learning_rate: float = 1e-4
-    max_seconds: float = 14400
+    max_seconds: float | None = 14400
     mask_max_probability: float = .9
     mse_weight: float = 1.
     lpips_weight: float = .2
@@ -72,7 +72,7 @@ class TrainingConfig(OptimizerConfig):
         super().__post_init__()
         require(all(type(v) is int and v > 0 for v in (self.updates, self.microbatch,
             self.accumulation, self.short_length, self.long_length)), "無效訓練步數或 batch")
-        require(math.isfinite(self.max_seconds) and self.max_seconds > 0
+        require((self.max_seconds is None or math.isfinite(self.max_seconds) and self.max_seconds > 0)
                 and math.isfinite(self.learning_rate) and self.learning_rate > 0 and type(self.seed) is int,
                 "無效訓練預算或配方")
         require(math.isfinite(self.mask_max_probability) and 0 <= self.mask_max_probability <= 1
@@ -116,12 +116,34 @@ class TokenizerTrainer:
             betas=(config.beta1, config.beta2), eps=config.epsilon)
         self.step, self.elapsed_seconds = 0, 0.
         self.control: dict | None = None
+        self.initialization: dict | None = None
         self.provenance = provenance or {}
         self.history = []
         self.pools = {length: [(s['artifact_id'], start) for s in index.report['sources']
             if s['split'] == 'train' for start in index.views[s['artifact_id']].sequence_starts(length)]
             for length in {config.short_length, config.long_length}}
         require(all(self.pools.values()), "Train 缺少合法 sequence")
+
+    def initialize_from(self, path):
+        """New experiment: reuse learned weights/RMS, reset optimizer and schedule."""
+        require(self.step == 0 and self.control is None and self.initialization is None, '只能初始化全新訓練')
+        value = read_checkpoint(path)
+        require(value['step'] > 0 and value['model_config'] == asdict(self.model.config), '初始化來源架構或進度不符')
+        require(value['index_id'] == self.index.report['artifact_id'] and value['sources'] == self.index.report['sources']
+                and value['metric'] == self.loss.identity, '初始化來源資料或 metric 不符')
+        require(all(value['provenance'].get(k) == self.provenance.get(k) for k in
+                ('protocol_id', 'data_freeze_id', 'evaluation_inputs_id', 'annotations_id')), '初始化來源凍結身分不同')
+        implementation = value['provenance'].get('implementation', {})
+        # Training control may evolve between experiments; model math must match.
+        for name in ('tokenizer.py', 'transformer.py', 'optimization.py', 'actions.py'):
+            recorded = [v for p, v in implementation.items() if Path(p).name == name]
+            if implementation or any(s['source_kind'] == 'live' for s in self.index.report['sources']):
+                require(recorded == [file_info(Path(__file__).parent / name)], '初始化來源模型實作不同')
+        self.model.load_state_dict(value['model'])
+        self.loss_rms.load_state_dict(value['loss_rms'])
+        self.initialization = dict(path=str(Path(path).resolve()), checkpoint=file_info(path), source_step=value['step'],
+            total_updates=value['step'] + (value.get('initialization') or {}).get('total_updates', 0),
+            retained=['model', 'loss_rms'], reset=['optimizer', 'schedule', 'rng', 'history'])
 
     def samples(self, step):
         length = self.config.long_length if step % self.config.long_every == self.config.long_every - 1 else self.config.short_length
@@ -131,9 +153,10 @@ class TokenizerTrainer:
 
     def update(self, *, deadline=None):
         cfg = self.config
-        require(self.step < cfg.updates and self.elapsed_seconds < cfg.max_seconds, "已達訓練預算")
+        require(self.step < cfg.updates and (cfg.max_seconds is None or self.elapsed_seconds < cfg.max_seconds), "已達訓練預算")
         started = time.monotonic()
-        deadline = min(deadline or float('inf'), started + cfg.max_seconds - self.elapsed_seconds)
+        deadline = min(deadline if deadline is not None else float('inf'),
+                       started + cfg.max_seconds - self.elapsed_seconds if cfg.max_seconds is not None else float('inf'))
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
         factor = cfg.lr_factor(self.step)
@@ -196,6 +219,7 @@ class TokenizerTrainer:
             provenance=self.provenance, metric=self.loss.identity,
             model=self.model.state_dict(), optimizer=self.optimizer.state_dict(), loss_rms=self.loss_rms.state_dict(), step=self.step,
             elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
+            initialization=self.initialization,
             python_rng=random.getstate(), numpy_rng=(numpy_state[0], numpy_state[1].tolist(), *numpy_state[2:]),
             torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all() if self.device.type == 'cuda' else [],
             device_type=self.device.type)
@@ -225,6 +249,9 @@ class TokenizerTrainer:
         trainer.step, trainer.elapsed_seconds = value['step'], value['elapsed_seconds']
         trainer.history = value['history']
         trainer.control = value.get('control')
+        trainer.initialization = value.get('initialization')
+        if trainer.initialization:
+            require(file_info(trainer.initialization['path']) == trainer.initialization['checkpoint'], '初始化來源已改變')
         random.setstate(value['python_rng'])
         state = value['numpy_rng']
         np.random.set_state((state[0], np.array(state[1], dtype=np.uint32), *state[2:]))

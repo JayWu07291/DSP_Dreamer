@@ -55,6 +55,12 @@ class TrainingBudget:
                         for a in self.state['attempts']), '預算帳本含無效時數')
             for attempt in self.state['attempts']:
                 if attempt['status'] == 'running':
+                    if attempt['reserved'] is None:
+                        # In update-limited experiments, retain measured time and expose
+                        # the unknown gap separately; downtime cannot consume updates.
+                        attempt.update(unobserved_seconds=max(0., self.wall_clock() - attempt['started'] - attempt['seconds']),
+                                       status='interrupted')
+                        continue
                     # 無法得知強制終止時點，保守計入到重啟，最多扣完原先保留額度。
                     attempt.update(seconds=max(attempt['seconds'], min(attempt['reserved'],
                         max(0., self.wall_clock() - attempt['started']))), status='interrupted')
@@ -95,13 +101,18 @@ class TrainingBudget:
     def remaining(self, stage):
         require(stage in STAGE_SECONDS, '未知預算階段')
         limits = self.state.get('limits', STAGE_SECONDS)
+        if limits[stage] is None:
+            return float('inf')
+        if any(v is None for v in limits.values()):
+            return max(0., limits[stage] - sum(a['seconds'] for a in self.state['attempts'] if a['stage'] == stage))
         return max(0., min(limits[stage] - sum(a['seconds'] for a in self.state['attempts']
             if a['stage'] == stage), sum(limits.values()) - sum(a['seconds'] for a in self.state['attempts'])))
 
     def configure_limits(self, limits):
-        require(set(limits) == set(STAGE_SECONDS) and all(math.isfinite(v) and v > 0 for v in limits.values()),
+        require(set(limits) == set(STAGE_SECONDS) and all(v is None and k == 'A' or
+                v is not None and math.isfinite(v) and v > 0 for k, v in limits.items()),
                 'Invalid stage budgets')
-        require(not self.formal or all(v <= STAGE_SECONDS[k] for k, v in limits.items()), '超過正式階段預算上限')
+        require(not self.formal or all(k == 'A' or v <= STAGE_SECONDS[k] for k, v in limits.items()), '超過正式階段預算上限')
         old = self.state.get('limits', STAGE_SECONDS)
         require(all(old[k] == v or not any(a['stage'] == k for a in self.state['attempts']) for k, v in limits.items()),
                 '已使用的預算不能直接更改；先明確 --restart 封存該階段')
@@ -173,11 +184,12 @@ class TrainingBudget:
             require(not any(a['microbatch'] == 1 for a in oom), '1/16 仍顯存不足，停止')
             require((microbatch == 2 and not oom) or (microbatch == 1 and bool(oom)),
                     'OOM 後只可改 1/16 並重新測速')
+        remaining = self.remaining(stage)
         attempt = dict(stage=stage, target=target, command=command, microbatch=microbatch,
-            started=self.wall_clock(), seconds=0., reserved=self.remaining(stage), status='running')
+            started=self.wall_clock(), seconds=0., reserved=remaining if math.isfinite(remaining) else None, status='running')
         self.state['attempts'].append(attempt)
         self.active, self.started = attempt, self.clock()
-        self.deadline = self.started + attempt['reserved']
+        self.deadline = self.started + remaining
         if command in ('train', 'benchmark', 'evaluate'):
             self.invalidate(target, 'pending')
         self.save()
@@ -237,7 +249,8 @@ def trainer_identity(trainer):
         index_id=trainer.index.report['artifact_id'], sources=trainer.index.report['sources'],
         provenance=trainer.provenance, device_type=trainer.device.type,
         metric=metric,
-        source=getattr(trainer, 'stage_two_source', getattr(trainer, 'stage_one_source', getattr(trainer, 'tokenizer_source', None))))
+        source=getattr(trainer, 'initialization', None) or
+            getattr(trainer, 'stage_two_source', getattr(trainer, 'stage_one_source', getattr(trainer, 'tokenizer_source', None))))
 
 
 def synchronize(trainer):
@@ -267,20 +280,26 @@ def benchmark(trainer, budget, stage, output, *, update_limit=None, fraction=.9,
         budget.tick()
     progress = budget.progress(stage)
     require(progress['plan'] is None, '已有固定計畫，不可重新測速追加更新數')
-    ceiling = progress['updates'] + plan_updates(budget.remaining(stage), durations, fraction=fraction)
+    update_limited = trainer.config.max_seconds is None
+    if update_limited:
+        require(type(update_limit) is int and update_limit > 0, '取消時間上限時必須指定更新次數')
+        ceiling = update_limit
+    else:
+        ceiling = progress['updates'] + plan_updates(budget.remaining(stage), durations, fraction=fraction)
     if 'update_ceiling' in progress:
         ceiling = min(ceiling, progress['update_ceiling'])
-    if update_limit is not None:
+    if update_limit is not None and not update_limited:
         require(type(update_limit) is int and update_limit > progress['updates'], '更新上限無效')
         ceiling = min(ceiling, update_limit)
-    require(ceiling > progress['updates'], '剩餘預算不足一次更新')
+    require(update_limited or ceiling > progress['updates'], '剩餘預算不足一次更新')
     plan = seal(dict(schema='dsp-training-plan/1', stage=stage, formal=budget.formal,
         status='measured' if budget.formal else 'engineering_only', budget_id=budget.state['id'],
         identity=trainer_identity(trainer), durations=durations, lengths=[r['length'] for r in trainer.history],
         gpu=torch.cuda.get_device_name(trainer.device) if trainer.device.type == 'cuda' else None,
         peak_allocated_gib=torch.cuda.max_memory_allocated(trainer.device) / 2**30 if trainer.device.type == 'cuda' else None,
         peak_reserved_gib=torch.cuda.max_memory_reserved(trainer.device) / 2**30 if trainer.device.type == 'cuda' else None,
-        updates=ceiling, update_fraction=fraction, remaining_seconds=budget.remaining(stage)))
+        updates=ceiling, update_fraction=fraction,
+        remaining_seconds=None if update_limited else budget.remaining(stage)))
     atomic_save(output, plan)
     progress['plan'] = plan
     progress['update_ceiling'] = ceiling
@@ -369,15 +388,16 @@ def run_training(trainer, budget, stage, output, evaluate, *, validation_seconds
 
     try:
         save_checkpoint('start')
-        while progress['updates'] < plan['updates'] and trainer.step < trainer.config.updates:
+        while trainer.step < trainer.config.updates and (trainer.config.max_seconds is None or progress['updates'] < plan['updates']):
             budget.tick()
-            if budget.clock() >= budget.deadline or trainer.elapsed_seconds >= trainer.config.max_seconds:
+            if budget.clock() >= budget.deadline or (trainer.config.max_seconds is not None
+                                                     and trainer.elapsed_seconds >= trainer.config.max_seconds):
                 raise TimeoutError('已達階段時數預算')
             spent = sum(a['seconds'] for a in budget.state['attempts'] if a['stage'] == stage)
             if spent - progress['validation_seconds'] >= validation_seconds or (
                     validation_updates and trainer.step - last_validation_step >= validation_updates):
                 validate(False)
-            # 先記帳。強制終止或失敗的更新也消耗一次上限，不因舊 checkpoint 退回。
+            # Count attempts separately; only time-limited runs cap failed attempts.
             progress['updates'] += 1
             budget.save()
             trainer.elapsed_seconds = sum(a['seconds'] for a in budget.state['attempts'] if a['stage'] == stage)
@@ -385,7 +405,8 @@ def run_training(trainer, budget, stage, output, evaluate, *, validation_seconds
             result = trainer.update(deadline=budget.deadline)
             if event:
                 event('update', stage=stage, seconds=budget.clock() - started, planned_updates=plan['updates'],
-                      remaining_seconds=max(0., budget.deadline - budget.clock()), **result)
+                      remaining_seconds=max(0., budget.deadline - budget.clock()) if math.isfinite(budget.deadline) else None,
+                      **result)
         if budget.clock() >= budget.deadline:
             raise TimeoutError('已達階段時數預算')
         validate(True)

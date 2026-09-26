@@ -4,6 +4,32 @@
 
 本文件描述工程入口，不授權正式 GPU 工作。正式測速、訓練與品質證據由 #31–#33 執行。
 
+## 接續第 431 步延長 A
+
+`runs/A-20260926-090446-148104` 已完成 431 次更新。固定前八張驗證圖的 LPIPS 從第 250 步的 0.4691 降至第 400 步的 0.4056；同期 MSE 從 0.02084 降至 0.01435。重建已能看到地形與視窗的大致位置，但仍有塊狀紋理，建築和文字難以辨認。完整 200 圖的 MSE 為 0.02047、LPIPS 為 0.43242，樣本集合不同，不能直接拿它和前八張的分數判定退步。品質 gate 仍為 pending。
+
+這些結果支持增加更新次數觀察，尚不能證明訓練不足是唯一原因。這輪沿用模型結構、遮罩、loss 權重與 batch，只延長更新並調低 LR。預設配方如下，全部可在 `training_config.py` 修改：
+
+| 參數 | 新一輪 A |
+| --- | --- |
+| `updates` | 2000 次額外完成的 optimizer 更新，接續後累計 2431 次 |
+| `max_seconds` | `None`，取消 A 的固定時間上限 |
+| `learning_rate` | `3e-5` |
+| `warmup_fraction` | `0.01`，預設 20 次更新 |
+| `min_lr_fraction` | `1/3`，cosine 最低 LR 為 `1e-5` |
+
+先關閉 DSP，在 repo 根目錄的外部 PowerShell 執行，以免訓練程序依附 Codex 內嵌終端：
+
+```powershell
+.venv/Scripts/python.exe -X utf8 tools/train.py A run --restart --init-from runs/A-20260926-090446-148104/final-431.pt
+```
+
+`--init-from` 沿用模型權重與 loss RMS 統計，重設 AdamW、LR 排程、RNG 與本輪 history。新 log 的 step 從 0 計到 2000，來源 checkpoint、SHA-256、來源步數與累計來源更新數寫入 `initialized_from` 事件及新 checkpoint。測速與正式訓練各自從相同來源初始化，測速更新不接入正式權重。保留來源 `.pt` 與 `.pt.json`，後續恢復仍會核對來源 hash。
+
+依上一輪約 30 秒／更新估計，2000 次更新約 17 小時，另加載入、驗證與儲存；這是估計，沒有時間截止。預設每 50 次更新保留 checkpoint，完整一輪約需 60 GB。`--restart` 封存舊帳本，實際用量照常記錄。這次 A 取消原 4 小時限制，也不受原單輪 32 小時總上限截斷；其他階段仍使用各自既有額度。
+
+完成後檢查同一組圖的趨勢與完整 gate。若延長後改善停滯，再檢查 bottleneck、patch readout 或 loss 配比；2000 次不是收斂保證。Agent 不啟動或輪詢正式訓練，使用者完成後提供新輸出目錄。
+
 ## 手動重訓 A
 
 使用者確認 #31 的 756 次更新仍產生無法辨識的紋理，選擇直接重跑完整 A，並自行執行、完成後再通知 Agent。這次修改沒有啟動正式訓練，也沒有重設本機既有帳本。
@@ -38,7 +64,7 @@
 | `LOSS_RMS` | A、B、second 的 running RMS 衰減率與 epsilon |
 | `TOKENIZER`／`DYNAMICS` | 寬度、heads、encoder／decoder 深度、時間層間隔、context、GQA、attention soft cap、分段計算與 activation checkpointing；輸出表徵仍為 64×32 |
 
-共同字典的參數可在各 `STAGES` 中覆寫。有效 batch 維持 16，2／8 是預設，1／16 限 OOM 後使用。正式秒數可縮減，不能超過下方階段上限。`updates=None` 依測速換算；整數只能進一步降低更新上限。資料表示、動作 codec、shortcut 算法步長、reward bins、固定評估名單及 gate 門檻仍屬模型／評估契約，不是本次調參開關。`show-config` 的 third 會列出父訓練配置的 flow/world/reward 等欄位，這些不作用於想像訓練；可調的第三階段參數以上表與 `STAGES['third']` 為準。
+共同字典的參數可在各 `STAGES` 中覆寫。有效 batch 維持 16，2／8 是預設，1／16 限 OOM 後使用。A 的 `max_seconds=None` 必須搭配正整數 `updates`，也可填正秒數作為時間上限。其他階段的秒數只能縮減。有時間上限時，`updates=None` 依測速換算，整數再限制換算結果。資料表示、動作 codec、shortcut 算法步長、reward bins、固定評估名單及 gate 門檻仍屬模型／評估契約，不是本次調參開關。`show-config` 的 third 會列出父訓練配置的 flow/world/reward 等欄位，這些不作用於想像訓練；可調的第三階段參數以上表與 `STAGES['third']` 為準。
 
 執行中修改設定檔不影響已載入的配方；恢復時若學習參數、模型或驗證排程不同，入口拒絕混用。新架構與舊的單層 cross-attention tokenizer 權重不相容，須執行 `A run --restart`，舊檔案保留作為歷史證據。
 
@@ -54,11 +80,11 @@
 | 每層時間 context | 32 幀 | 64 幀 |
 | 短／長片段 | 16／48 幀，三短一長 | 32／80 transitions，需 33／81 幀，三短一長 |
 | 有效 batch | microbatch 2 × accumulation 8 | microbatch 2 × accumulation 8 |
-| 起始 LR | 1e-4 | 1e-4 |
+| peak LR | 3e-5 | 1e-4 |
 | 遮罩 | 每張圖抽 `p ~ U(0, 0.9)` | 凍結 tokenizer，encode 時不遮罩 |
 | 目標 | 正規化 MSE + 0.2 × 正規化 LPIPS | 正規化 flow + 正規化 bootstrap |
 
-兩者預設 AdamW betas `(0.9, 0.99)`、weight decay `0.01`、gradient clip `1`，先用總更新數的 5% warmup，再 cosine 衰減至 peak LR 的 10%。second 的 world LR 為 `1e-5`、agent LR 為 `1e-4`；third 的 policy LR 為 `3e-5`、value LR 為 `1e-4`。A 時數仍為 4 小時，測速決定實際更新數，沒有為本次改模型扣掉正式訓練步數。
+兩者預設 AdamW betas `(0.9, 0.99)`、weight decay `0.01`、gradient clip `1`。A 用總更新數的 1% warmup，再 cosine 衰減至 peak LR 的三分之一；其他階段為 5% warmup、最低 10%。second 的 world LR 為 `1e-5`、agent LR 為 `1e-4`；third 的 policy LR 為 `3e-5`、value LR 為 `1e-4`。A 已改用上方的更新次數配方。
 
 running RMS 以微批次平均 loss 的平方建立 EMA，decay `0.99`、epsilon `1e-8`，每次完整 optimizer update 後才提交統計並做偏差修正；第一步用單位尺度。中斷的 accumulation 不改變 normalizer。checkpoint 保存統計，續跑必須恢復；log 同時保存原始 loss、使用的 RMS 尺度與正規化 loss。A 另外記錄 latent 在 token 間的標準差與 `abs(z)>0.99` 的比例。正式評估仍使用未正規化的原始 MSE／LPIPS，不改 gate 門檻。third 保留以 nats 表示的 PMPO／KL，繼承的 RMS 欄位不作用於想像訓練。
 
@@ -81,7 +107,7 @@ RTX 5070 12GB 的工程檢查採 microbatch 2、BF16 與 activation checkpointin
 
 `cuda_memory_fraction=0.75` 將本機 PyTorch allocator 限於約 8.96 GiB（9.62 GB），另外留給 Windows、CUDA context 與其他程式。allocated 是張量占用，reserved 還包含 allocator 快取；兩者都不是整張 GPU 的總占用。實測中 A 分段 16 曾保留 11.87 GiB 並降至每次約 52 秒，改成 8 後解除顯存壓力；390M dynamics 雖可單獨通過 B，加入 second heads 與梯度後超出上限，因此預設使用 276M。
 
-紀錄保存在本機 `runs/issue-31/vram-tuning/selected-A.json`、`selected-B.json`、`selected-second.json`，附完整配置。這些合成檢查沒有 optimizer 更新、資料載入或完整梯度累積，不能當成正式吞吐或品質證據。真實測速與完整訓練留給使用者執行，重建品質仍須看新的固定圖評估；模型較大不保證在固定四小時內品質較好。
+紀錄保存在本機 `runs/issue-31/vram-tuning/selected-A.json`、`selected-B.json`、`selected-second.json`，附完整配置。這些合成檢查沒有 optimizer 更新、資料載入或完整梯度累積，不能當成正式吞吐或品質證據。真實測速與完整訓練留給使用者執行，重建品質仍須看新的固定圖評估。
 
 2026-09-26 工程驗證：完整 pytest 為 208 passed（935.67 秒），22 則既有 torchvision 棄用警告；mypy 的 `dsp_dreamer` 與顯存檢查工具共 38 個檔案通過。JUnit 位於本機 `runs/issue-31/vram-tuning/pytest.xml`。相對 `6f12c6b` 的 Standards／Spec 獨立審查均無剩餘問題；上述結果不代表重建或預測品質 gate 通過。
 
@@ -118,20 +144,20 @@ RTX 5070 12GB 的工程檢查採 microbatch 2、BF16 與 activation checkpointin
 | 帳目 | 上限 | 用途 |
 | --- | ---: | --- |
 | preflight | 2 小時 | 四個子階段的真實 loader、完整 loss、累積與 optimizer 測速 |
-| A | 4 小時 | Tokenizer |
+| A | 預設 2000 次更新，無時間上限 | Tokenizer |
 | B | 16 小時 | Dynamics |
 | second | 6 小時 | 任務條件微調 |
 | third | 4 小時 | 想像訓練 |
 
-單輪上限總計 32 小時，包含初始化、驗證、checkpoint 儲存及失敗重跑。`runs/training-budget.json` 是唯一累計帳本，檔鎖拒絕並行命令。不能刪除帳本、回復舊副本或只換輸出目錄來重置額度；新的重訓實驗必須明確使用上述 `--restart` 並保存完整舊帳本。Checkpoint 內的帳本快照只供追溯，恢復一律採磁碟上最新帳本。
+原時間模式為 A 4 小時、單輪總計 32 小時，包含初始化、驗證、checkpoint 儲存及失敗重跑。A 改用更新次數後，超出的 A 時間不扣其他階段額度。`runs/training-budget.json` 是唯一累計帳本，檔鎖拒絕並行命令。不能刪除帳本、回復舊副本或只換輸出目錄來重置額度；新的重訓實驗必須明確使用上述 `--restart` 並保存完整舊帳本。Checkpoint 內的帳本快照只供追溯，恢復一律採磁碟上最新帳本。
 
 首次執行匯入既有 `runs/tokenizer-budget.json`，若本機沒有該檔則使用 `docs/issue-24-results.json` 保存的同份紀錄，合計 2305.2320443573 秒仍歸 A。另匯入可用的 `runs/dynamics-budget.json`。#25 兩次 GPU smoke 合計 120.031 秒歸 preflight，來源見 `training-history.json`。這些用量不因工程／正式分工修訂而消失。已匯入的來源若改變，入口拒絕執行，必須先核對歷史紀錄。
 
 `benchmark` 穿過完整 loss、累積與 optimizer，CUDA 同步後計時。A 預設四次更新為 16、16、16、48 幀，B／second 為 32、32、32、80 transitions；修改 sequence 設定時，測速跑 `lcm(4, long_every)` 次以涵蓋完整週期。正式模式要求真實資料、相容架構、BF16 及上游合格 gate。Synthetic 與 CPU 測速只存在隔離測試帳本，不可成為正式計畫。
 
-更新上限為 `floor(剩餘階段秒數 × update_fraction ÷ 平均更新秒數)`，預設比例 0.9，其餘約 10% 留給驗證與儲存。`benchmark --updates N` 只能再縮減上限。測速權重不接入正式訓練，正式訓練從同一來源與 seed 初始化，使用換算後的 warmup／cosine 排程。
+有時間上限時，更新上限為 `floor(剩餘階段秒數 × update_fraction ÷ 平均更新秒數)`，預設比例 0.9，其餘約 10% 留給驗證與儲存；`benchmark --updates N` 只能再縮減結果。A 無時間上限時，設定檔或 `--updates N` 直接指定目標，測速不會減少更新數。測速仍受 preflight 額度約束。測速權重不接入正式訓練，正式訓練從同一來源與 seed 初始化，使用固定目標的 warmup／cosine 排程。
 
-預設 microbatch 2、accumulation 8。帳本有此階段的 CUDA OOM 後，只能改用 1／16，重新執行 benchmark，再用相同 `--microbatch 1` 恢復最新 checkpoint。已花時數、已嘗試更新數與原步數上限保留；重測不能增加原步數上限。1／16 仍 OOM 就停止。
+預設 microbatch 2、accumulation 8。帳本有此階段的 CUDA OOM 後，只能改用 1／16，重新執行 benchmark，再用相同 `--microbatch 1` 恢復最新 checkpoint。若 A 使用 `--init-from`，重新 benchmark 也需帶相同初始化來源，之後仍用 `train --checkpoint` 恢復。已花時數、已嘗試更新數與原步數上限保留；重測不能增加原步數上限。1／16 仍 OOM 就停止。
 
 ## 執行與恢復
 
@@ -145,11 +171,11 @@ RTX 5070 12GB 的工程檢查採 microbatch 2、BF16 與 activation checkpointin
 
 恢復時使用 `--checkpoint`，保留所有上游 `.pt` 和旁邊的 `.pt.json`。模型、完整 ACTION_CODEC、資料身分、實作 checksum、optimizer、schedule、RNG、目前步數、累計預算及 validation 進度一併核對。舊 17／18／20 維或控制順序、量化不符的 checkpoint 在載入權重前拒絕。舊版 checkpoint 可以作為原始證據保留，但缺少新控制狀態者不能冒充此帳本的最新恢復點。
 
-每次更新前先記錄已嘗試更新數，因此程序在更新中被強制終止也不退回步數額度。中斷時若來不及存檔，下次從最新完整 checkpoint 恢復；其後遺失的工作仍計費。未收尾 attempt 以開始到下次重啟的 wall time 保守補計，最多扣完當時剩餘額度。這可能包含停機時間，不能把無法證實的用量當成零。
+每次更新前先記錄已嘗試更新數。中斷時若來不及存檔，下次從最新完整 checkpoint 恢復。A 無時間上限時，以 checkpoint 的已完成 step 為目標進度，遺失的更新會重跑直到達標，嘗試次數另記，不會縮減完成目標。未收尾 attempt 保留已落盤的耗時，未觀測到的工作或停機期間另記 `unobserved_seconds`，不影響更新數或其他階段額度。有時間上限的模式則維持原規則：失敗更新消耗步數額度，未收尾 attempt 以到重啟的 wall time 保守補計，最多扣完當時剩餘時間。
 
 預設每 1800 累計秒或距上次驗證 50 次更新，先到者於下一個更新邊界存檔並執行 validation；可由 RUNTIME 修改，`validation_updates=0` 關閉步數條件。A 為名單前八張，其他階段為前四個預測序列；second／third 另評估固定前 32 個 validation transitions 的 policy／reward。Python、NumPy、CPU 與 CUDA RNG 在 validation 前後保存還原，未完成 validation 的排程會於恢復後重試。小樣本報告不能併成完整 gate。
 
-步數或時數先到就停止更新。完整候選 gate 會在更新結束後排程，使用相同剩餘階段預算；時間不足便保持 pending。已開始的原生檔案寫入會完成以保全 checkpoint，其耗時照實計費，不啟動下一次更新。更新失敗不會把部分 AdamW 狀態或已推進的 RNG 升為新恢復點。
+A 無時間上限時，完成指定更新數後執行完整候選 gate；其他配方在步數或時數先到時停止更新。完整 gate 使用相同剩餘階段預算，時間不足便保持 pending。已開始的原生檔案寫入會完成以保全 checkpoint，其耗時照實記錄。更新失敗不會把部分 AdamW 狀態或已推進的 RNG 升為新恢復點。
 
 ## Gate 與退路
 

@@ -47,6 +47,17 @@ def test_editable_recipe_reaches_optimizer_and_checkpoint(tmp_path):
         read_settings(custom)
 
 
+def test_update_limited_A_requires_a_target_and_accepts_no_deadline(tmp_path):
+    custom = tmp_path / 'updates.py'
+    original = DEFAULT_CONFIG.read_text(encoding='utf-8')
+    custom.write_text(original + "\nSTAGES['A'].update(max_seconds=None, updates=2000)\n", encoding='utf-8')
+    values = read_settings(custom)['stages']['A']
+    assert values['updates'] == 2000 and values['max_seconds'] is None
+    custom.write_text(original + "\nSTAGES['A'].update(max_seconds=None, updates=None)\n", encoding='utf-8')
+    with pytest.raises(InvalidRecording, match='更新次數'):
+        read_settings(custom)
+
+
 def test_immutable_loader_skips_rgb_but_rejects_metadata_changes(tmp_path):
     from test_training_index import fixture, registry
     from dsp_dreamer.training_index import TrainingIndex

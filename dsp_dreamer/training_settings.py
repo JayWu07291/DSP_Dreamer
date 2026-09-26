@@ -40,7 +40,9 @@ def read_settings(path=DEFAULT_CONFIG):
         require(limit is None or type(limit) is int and limit > 0, 'Invalid update limit')
         config = config_type(updates=limit or 4, **settings)
         config.validate_formal()
-        require(config.max_seconds <= STAGE_SECONDS[stage], f'{stage} 超過正式階段預算上限')
+        require(stage == 'A' or config.max_seconds is not None and config.max_seconds <= STAGE_SECONDS[stage],
+                f'{stage} 超過正式階段預算上限')
+        require(config.max_seconds is not None or limit is not None, '取消時間上限時必須指定更新次數')
         stages[stage] = dict(asdict(config), updates=limit)
     tokenizer, dynamics = TokenizerConfig(**value['TOKENIZER']), DynamicsConfig(**value['DYNAMICS'])
     require(tokenizer.latent_tokens == dynamics.latent_tokens == 64

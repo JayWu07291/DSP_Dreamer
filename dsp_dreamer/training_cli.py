@@ -76,6 +76,7 @@ def main(stage=None):
     parser.add_argument('--cache', default='data/torch-cache')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--checkpoint', type=Path)
+    parser.add_argument('--init-from', type=Path, help='A run/benchmark: initialize learned weights and loss RMS')
     parser.add_argument('--tokenizer', type=Path)
     parser.add_argument('--stage-one', type=Path)
     parser.add_argument('--stage-two', type=Path)
@@ -86,7 +87,7 @@ def main(stage=None):
     parser.add_argument('--agent-gate', type=Path)
     parser.add_argument('--metrics', type=Path)
     parser.add_argument('--judgments', type=Path)
-    parser.add_argument('--updates', type=int, help='benchmark 的額外更新上限，只可縮減實測換算值')
+    parser.add_argument('--updates', type=int, help='本輪更新目標；有時間上限時只能縮減測速換算值')
     parser.add_argument('--microbatch', type=int, choices=[1, 2])
     args = parser.parse_args()
     settings = read_settings(args.config)
@@ -100,6 +101,9 @@ def main(stage=None):
     args.output = args.output or Path('runs') / (stage + '-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     require(not args.output.exists(), f'Output already exists: {args.output}')
     require(not args.restart or args.command == 'run' and args.checkpoint is None, '--restart needs a fresh run')
+    require(args.init_from is None or stage == 'A' and args.command in ('run', 'benchmark') and args.checkpoint is None,
+            '--init-from 僅供 A run/benchmark，恢復中斷請用 train --checkpoint')
+    require(args.updates is None or args.updates > 0, '更新次數必須大於零')
     if args.verify_data:
         settings['runtime']['verify_rgb'] = True
     with TrainingLog(str(args.output) + '.logs', settings) as log:
@@ -109,6 +113,11 @@ def main(stage=None):
 
 def execute(args, stage, settings, log):
     saved = {}
+    if args.init_from:
+        initial = read_checkpoint(args.init_from)
+        require(initial['step'] > 0 and all(s['source_kind'] == 'live' for s in initial['sources'])
+                and initial['model_config'] == settings['tokenizer'], '初始化需要相同架構的真實資料 checkpoint')
+        del initial
     require(args.command != 'imagine' or stage == 'third', 'imagine 僅供第三階段')
     require(args.command != 'export' or stage == 'third', 'export 僅供第三階段')
     require(stage != 'A' or args.command not in ('predict', 'score-prediction'), 'A 階段沒有 dynamics prediction')
@@ -276,6 +285,9 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
                         trainer.config = replace(trainer.config, microbatch=1, accumulation=16)
                 elif stage == 'A':
                     trainer = TokenizerTrainer(index, metric, TokenizerConfig(**settings['tokenizer']), config, provenance=provenance)
+                    if args.init_from:
+                        trainer.initialize_from(args.init_from)
+                        log.emit('initialized_from', stage=stage, **trainer.initialization)
                 elif stage == 'B':
                     trainer = DynamicsTrainer(args.tokenizer, index, config, model_config=DynamicsConfig(**settings['dynamics']), formal=True,
                                               reconstruction=proof, provenance=provenance)
