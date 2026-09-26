@@ -76,7 +76,7 @@ def main(stage=None):
     parser.add_argument('--cache', default='data/torch-cache')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--checkpoint', type=Path)
-    parser.add_argument('--init-from', type=Path, help='A run/benchmark: initialize learned weights and loss RMS')
+    parser.add_argument('--init-from', type=Path, help='A run/benchmark/train: initialize learned weights and loss RMS')
     parser.add_argument('--tokenizer', type=Path)
     parser.add_argument('--stage-one', type=Path)
     parser.add_argument('--stage-two', type=Path)
@@ -101,8 +101,8 @@ def main(stage=None):
     args.output = args.output or Path('runs') / (stage + '-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     require(not args.output.exists(), f'Output already exists: {args.output}')
     require(not args.restart or args.command == 'run' and args.checkpoint is None, '--restart needs a fresh run')
-    require(args.init_from is None or stage == 'A' and args.command in ('run', 'benchmark') and args.checkpoint is None,
-            '--init-from 僅供 A run/benchmark，恢復中斷請用 train --checkpoint')
+    require(args.init_from is None or stage == 'A' and args.command in ('run', 'benchmark', 'train') and args.checkpoint is None,
+            '--init-from 僅供 A 新實驗或測速，恢復中斷請用 train --checkpoint')
     require(args.updates is None or args.updates > 0, '更新次數必須大於零')
     if args.verify_data:
         settings['runtime']['verify_rgb'] = True

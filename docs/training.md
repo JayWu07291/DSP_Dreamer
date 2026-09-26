@@ -26,6 +26,8 @@
 
 `--init-from` 沿用模型權重與 loss RMS 統計，重設 AdamW、LR 排程、RNG 與本輪 history。新 log 的 step 從 0 計到 2000，來源 checkpoint、SHA-256、來源步數與累計來源更新數寫入 `initialized_from` 事件及新 checkpoint。測速與正式訓練各自從相同來源初始化，測速更新不接入正式權重。保留來源 `.pt` 與 `.pt.json`，後續恢復仍會核對來源 hash。
 
+若拆開執行 `benchmark` 和全新 `train`，兩個命令都要帶相同 `--init-from`。中斷恢復則只用 `train --checkpoint <本輪最新 checkpoint>`，不可同時帶 `--init-from`，也不要 `--restart`。
+
 依上一輪約 30 秒／更新估計，2000 次更新約 17 小時，另加載入、驗證與儲存；這是估計，沒有時間截止。預設每 50 次更新保留 checkpoint，完整一輪約需 60 GB。`--restart` 封存舊帳本，實際用量照常記錄。這次 A 取消原 4 小時限制，也不受原單輪 32 小時總上限截斷；其他階段仍使用各自既有額度。
 
 完成後檢查同一組圖的趨勢與完整 gate。若延長後改善停滯，再檢查 bottleneck、patch readout 或 loss 配比；2000 次不是收斂保證。Agent 不啟動或輪詢正式訓練，使用者完成後提供新輸出目錄。
