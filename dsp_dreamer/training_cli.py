@@ -43,12 +43,12 @@ def checkpoint_stage(path):
     return 'third' if value['schema'] == 'dsp-imagination-checkpoint/1' else 'second'
 
 
-def evaluate_stage(stage, path, index, metric, inputs, annotations, output, *, full, deadline, device='cuda'):
+def evaluate_stage(stage, path, index, metric, inputs, annotations, output, *, full, deadline, device='cuda', prediction_limit=200):
     if stage == 'A':
         return evaluate_reconstruction(path, index, metric, inputs, annotations, output,
             device=device, limit=200 if full else 8, deadline=deadline)
     prediction = evaluate_prediction(path, index, metric, inputs, output / 'prediction',
-        device=device, limit=200 if full else 4, deadline=deadline)
+        device=device, limit=prediction_limit if full else min(4, prediction_limit), deadline=deadline)
     if stage == 'B':
         return prediction
     agent = evaluate_agent(path, index, inputs, output / 'agent', device=device, deadline=deadline,
@@ -69,6 +69,8 @@ def main(stage=None):
     parser.add_argument('command', choices=['run', 'show-config', 'benchmark', 'train', 'imagine', 'evaluate', 'predict',
                                            'score', 'score-prediction', 'export'])
     parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument('--exploratory', action='store_true', help='B only: try an unqualified tokenizer without granting formal eligibility')
+    parser.add_argument('--prediction-limit', type=int, help='exploratory B only: number of final validation sequences (default 8)')
     parser.add_argument('--restart', action='store_true', help='run only: archive ledger and reset this stage before fresh training')
     parser.add_argument('--verify-data', action='store_true', help='recheck all RGB bytes instead of trusting immutable corpus')
     parser.add_argument('--catalog', default='docs/data-catalog.json')
@@ -90,15 +92,23 @@ def main(stage=None):
     parser.add_argument('--updates', type=int, help='本輪更新目標；有時間上限時只能縮減測速換算值')
     parser.add_argument('--microbatch', type=int, choices=[1, 2])
     args = parser.parse_args()
-    settings = read_settings(args.config)
     stage = stage or args.stage
     if stage == 'agent':
         stage = checkpoint_stage(args.checkpoint) if args.checkpoint else (
             'third' if args.command == 'imagine' or args.stage_two else 'second')
+    require(not args.exploratory or stage == 'B' and args.command in
+            ('run', 'show-config', 'benchmark', 'train', 'evaluate', 'predict'), '探索模式僅供 B 訓練或診斷評估')
+    require(args.prediction_limit is None or args.exploratory and 1 <= args.prediction_limit <= 200,
+            '--prediction-limit 僅供探索 B，範圍 1..200')
+    args.prediction_limit = args.prediction_limit or (8 if args.exploratory else 200)
+    settings = read_settings(args.config, exploratory_b=args.exploratory)
+    if args.exploratory:
+        settings['experiment'] = dict(name='B-unqualified-tokenizer/1', prediction_limit=args.prediction_limit)
     if args.command == 'show-config':
         print(json.dumps(settings, ensure_ascii=False, indent=2, allow_nan=False))
         return
-    args.output = args.output or Path('runs') / (stage + '-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
+    args.output = args.output or Path('runs') / (stage + ('-exploratory' if args.exploratory else '') +
+                                               '-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     require(not args.output.exists(), f'Output already exists: {args.output}')
     require(not args.restart or args.command == 'run' and args.checkpoint is None, '--restart needs a fresh run')
     require(args.init_from is None or stage == 'A' and args.command in ('run', 'benchmark', 'train') and args.checkpoint is None,
@@ -113,6 +123,8 @@ def main(stage=None):
 
 def execute(args, stage, settings, log):
     saved = {}
+    if args.exploratory and not args.checkpoint:
+        require(args.tokenizer is not None, '探索 B 需要 --tokenizer')
     if args.init_from:
         initial = read_checkpoint(args.init_from)
         require(initial['step'] > 0 and all(s['source_kind'] == 'live' for s in initial['sources'])
@@ -125,8 +137,9 @@ def execute(args, stage, settings, log):
         args.command = 'train'
     if args.checkpoint:
         saved = read_checkpoint(args.checkpoint) if stage == 'A' else read_dynamics_checkpoint(args.checkpoint)
-        require(all(s['source_kind'] == 'live' for s in saved['sources']) and saved.get('formal', True),
-                '工程 checkpoint 不可用於正式執行')
+        require(all(s['source_kind'] == 'live' for s in saved['sources']) and
+                saved.get('formal', True) is (not args.exploratory) and
+                saved.get('exploratory', False) == args.exploratory, 'Checkpoint 工程／探索／正式用途不符')
         expected = {'A': 'dsp-tokenizer-checkpoint/1', 'B': 'dsp-dynamics-checkpoint/1',
                     'second': 'dsp-agent-checkpoint/1', 'third': 'dsp-imagination-checkpoint/1'}
         require(saved['schema'] == expected[stage], 'Checkpoint 階段不同')
@@ -136,10 +149,15 @@ def execute(args, stage, settings, log):
         require(read_agent_checkpoint(args.stage_two)['formal'], '工程 checkpoint 不可用於正式執行')
     require(args.command != 'benchmark' or args.checkpoint is None, '測速不能恢復訓練 checkpoint')
     require(args.command in ('benchmark', 'run') or args.updates is None, '更新上限由 benchmark 固定，恢復時不能重設')
-    # 所有 GPU 工作與失敗均在同一把鎖、同一份不可回退的累計帳本下。
+    # 探索 B 使用獨立帳本，與正式入口共用鎖以拒絕並行 GPU 工作。
     root = Path(__file__).resolve().parents[1]
-    with TrainingBudget(root / 'runs/training-budget.json') as budget:
-        import_existing_usage(budget, root)
+    ledger = root / ('runs/B-exploratory-budget.json' if args.exploratory else 'runs/training-budget.json')
+    with TrainingBudget(ledger, formal=not args.exploratory, lock_path=root / 'runs/training-budget.lock') as budget:
+        if not args.exploratory:
+            import_existing_usage(budget, root)
+        else:
+            log.emit('exploratory_B', tokenizer_quality='unqualified', prediction_limit=args.prediction_limit,
+                     ledger=str(ledger), grants_downstream_eligibility=False)
         if args.restart:
             budget.restart_stage(stage, log.directory / 'previous-budget.json')
             log.emit('budget_restarted', stage=stage, path=str(log.directory / 'previous-budget.json'))
@@ -170,7 +188,7 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
     if args.command == 'evaluate':
         require(args.checkpoint is not None and saved.get('control') is not None
                 and saved['control']['budget_id'] == budget.state['id'], '評估需要本帳本 checkpoint')
-    if args.command in ('train', 'benchmark') and stage != 'A':
+    if args.command in ('train', 'benchmark') and stage != 'A' and not args.exploratory:
         source = (saved[dict(B='tokenizer_source', second='stage_one_source', third='stage_two_source')[stage]]['path']
                   if args.checkpoint else dict(B=args.tokenizer, second=args.stage_one, third=args.stage_two)[stage])
         budget.require_upstream(stage, source)
@@ -183,7 +201,7 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
         provenance = {k: freeze[k] for k in ('protocol_id', 'evaluation_inputs_id', 'annotations_id')}
         provenance['data_freeze_id'] = freeze['artifact_id']
         proof = None
-        if stage == 'B' and not args.checkpoint:
+        if stage == 'B' and not args.checkpoint and not args.exploratory:
             require(args.tokenizer and args.reconstruction_metrics and args.reconstruction_gate,
                     '需要 tokenizer 與完整重建 gate 證據')
             proof = dict(metrics=load(args.reconstruction_metrics), gate=load(args.reconstruction_gate),
@@ -210,6 +228,9 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
             log.emit('data_loaded', seconds=time.monotonic() - started, verify_rgb=settings['runtime']['verify_rgb'])
         index, inputs, annotations, provenance = corpus
         provenance = dict(provenance)
+        if args.exploratory:
+            provenance.update(experiment='B-unqualified-tokenizer/1', prediction_limit=args.prediction_limit,
+                              tokenizer_quality='unqualified')
         recipe = dict(settings['stages'][stage])
         recipe['microbatch'] = args.microbatch
         recipe['accumulation'] = 16 // args.microbatch
@@ -249,7 +270,7 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
 
             def evaluate(path, output, full, deadline):
                 gate = evaluate_stage(stage, path, index, metric, inputs, annotations, output,
-                                      full=full, deadline=deadline)
+                                      full=full, deadline=deadline, prediction_limit=args.prediction_limit)
                 if stage == 'A':
                     rows = load(output / 'metrics.json')['frames']
                     log.emit('reconstruction_diagnostics', step=load(str(path) + '.json')['step'],
@@ -260,7 +281,8 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
 
             if args.command in ('evaluate', 'predict'):
                 require(args.checkpoint is not None, '評估需要 --checkpoint')
-                result = (evaluate_prediction(args.checkpoint, index, metric, inputs, args.output, deadline=budget.deadline)
+                result = (evaluate_prediction(args.checkpoint, index, metric, inputs, args.output,
+                                              deadline=budget.deadline, limit=args.prediction_limit)
                           if args.command == 'predict' else evaluate(args.checkpoint, args.output, True, budget.deadline))
                 if args.command == 'evaluate':
                     budget.record_evaluation(stage, args.checkpoint, args.output, result)
@@ -289,7 +311,8 @@ def execute_phase(args, stage, settings, log, budget, saved, *, corpus=None):
                         trainer.initialize_from(args.init_from)
                         log.emit('initialized_from', stage=stage, **trainer.initialization)
                 elif stage == 'B':
-                    trainer = DynamicsTrainer(args.tokenizer, index, config, model_config=DynamicsConfig(**settings['dynamics']), formal=True,
+                    trainer = DynamicsTrainer(args.tokenizer, index, config, model_config=DynamicsConfig(**settings['dynamics']),
+                                              formal=not args.exploratory, exploratory=args.exploratory,
                                               reconstruction=proof, provenance=provenance)
                 elif stage == 'second':
                     trainer = AgentTrainer(args.stage_one, index, config, formal=True,

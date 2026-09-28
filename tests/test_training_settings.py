@@ -8,6 +8,20 @@ from dsp_dreamer.contract import InvalidRecording, load
 from dsp_dreamer.training_settings import DEFAULT_CONFIG, read_settings
 
 
+def test_episode_start_comparison_changes_only_sampling():
+    root = DEFAULT_CONFIG.parent
+    baseline = read_settings(root / 'training_config_A_uniform.py')
+    treatment = read_settings(root / 'training_config_A_episode_start.py')
+    assert baseline['stages']['A']['episode_start_sequences'] == 0
+    assert treatment['stages']['A']['episode_start_sequences'] == 1
+    treatment['stages']['A']['episode_start_sequences'] = 0
+    assert baseline == treatment
+    assert baseline['stages']['A']['updates'] == 100
+    assert baseline['stages']['A']['updates'] * baseline['stages']['A']['warmup_fraction'] == 10
+    assert baseline['stages']['A']['max_seconds'] is None
+    assert baseline['runtime']['verify_rgb'] is False
+
+
 def test_editable_recipe_reaches_optimizer_and_checkpoint(tmp_path):
     import torch
     from test_training_index import fixture, registry

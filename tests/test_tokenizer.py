@@ -52,9 +52,11 @@ def test_loader_update_resume_repeats_next_update(tmp_path):
     index = TrainingIndex([path], registry(("train", "demonstration")), length=2)
     metric = ReconstructionLoss("data/torch-cache")
     trainer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
-        TrainingConfig(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=2), device="cpu")
+        TrainingConfig(updates=4, microbatch=1, accumulation=1, short_length=2, long_length=2,
+                       episode_start_sequences=1), device="cpu")
     first = trainer.update()
     assert first['mse'] > 0 and first['lpips'] > 0 and first['samples']
+    assert first['episode_start_sequences'] == 1
     checkpoint = tmp_path / "step1.pt"
     random.random()
     np.random.random()
@@ -89,6 +91,53 @@ def test_loader_update_resume_repeats_next_update(tmp_path):
         TokenizerTrainer.restore(checkpoint, index, metric, device="cpu")
 
 
+def test_episode_start_sampling_changes_only_reserved_slots(tmp_path):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from test_training_index import fixture, registry
+    from dsp_dreamer.contract import InvalidRecording
+    from dsp_dreamer.training_index import TrainingIndex
+    from dsp_dreamer.tokenizer_training import TokenizerTrainer, TrainingConfig
+
+    index = TrainingIndex([fixture(tmp_path / 'source', group='train', retries=3, gap=True)],
+                          registry(('train', 'demonstration')), length=2)
+    artifact = index.report['sources'][0]['artifact_id']
+    view = index.views[artifact]
+    view.rows[0]['valid'] = False  # An invalid first row must not shift the opening to row 1.
+    index.report['sources'].append(dict(artifact_id='held-out', split='validation'))
+    index.views['held-out'] = view  # Same legal starts, but never eligible for training.
+    model = TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4)
+    config = TrainingConfig(updates=8, short_length=2, long_length=3)
+    baseline = TokenizerTrainer(index, SimpleNamespace(), model, config, device='cpu')
+    supplemented = TokenizerTrainer(index, SimpleNamespace(), model,
+                                    replace(config, episode_start_sequences=1), device='cpu')
+    assert supplemented.episode_start_pools == {2: [(artifact, 7), (artifact, 14)],
+                                               3: [(artifact, 7), (artifact, 14)]}
+    for step in range(8):
+        length, original = baseline.samples(step)
+        rng = random.Random(config.seed + step)
+        assert original == [rng.choice(baseline.pools[length]) for _ in range(16)]
+        slot = rng.sample(range(16), 1)[0]
+        expected = original.copy()
+        expected[slot] = rng.choice(supplemented.episode_start_pools[length])
+        assert supplemented.samples(step) == (length, expected)
+        assert all(a == artifact for a, _ in expected)
+        assert expected[slot][1] in (7, 14)
+        for a, start in expected:
+            batch = index.views[a].sequence(start, length)
+            assert batch['valid_mask'].all() and batch['loss_mask'].all()
+        supplemented.config = replace(supplemented.config, microbatch=1, accumulation=16)
+        assert supplemented.samples(step) == (length, expected)
+    for invalid in (-1, 17, True, .5):
+        with pytest.raises(InvalidRecording, match='episode_start_sequences'):
+            replace(config, episode_start_sequences=invalid)
+    for row in view.dataset.rows:
+        row['is_first'] = False
+    with pytest.raises(InvalidRecording, match='回合開頭'):
+        TokenizerTrainer(index, SimpleNamespace(), model,
+                         replace(config, episode_start_sequences=1), device='cpu')
+
+
 def test_warm_start_keeps_weights_and_rms_but_starts_a_new_update_schedule(tmp_path):
     from dsp_dreamer.contract import InvalidRecording
     from test_training_index import fixture, registry
@@ -107,7 +156,8 @@ def test_warm_start_keeps_weights_and_rms_but_starts_a_new_update_schedule(tmp_p
                              provenance=dict(evaluation_inputs_id='different-evaluation'))
     with pytest.raises(InvalidRecording, match='凍結身分'):
         wrong.initialize_from(source_path)
-    trained = TokenizerTrainer(index, loss, model, TrainingConfig(**config, max_seconds=None, learning_rate=3e-5), device='cpu')
+    trained = TokenizerTrainer(index, loss, model, TrainingConfig(**config, max_seconds=None, learning_rate=3e-5,
+                                                               episode_start_sequences=1), device='cpu')
     trained.initialize_from(source_path)
     assert trained.step == 0 and not trained.optimizer.state and trained.history == []
     assert trained.initialization['total_updates'] == 1

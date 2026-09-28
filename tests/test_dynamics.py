@@ -236,7 +236,8 @@ def test_reconstruction_gate_requires_passed_matching_evidence():
             require_reconstruction(proof, 'fixture-checkpoint', provenance)
 
 
-def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
+@pytest.mark.parametrize('exploratory', [False, True])
+def test_recording_to_free_prediction_exports_aligned_targets(tmp_path, exploratory):
     from test_training_index import fixture, registry, FFMPEG
     from dsp_dreamer import Recording, compile_recording
     from dsp_dreamer.contract import load, file_info
@@ -269,15 +270,28 @@ def test_recording_to_free_prediction_exports_aligned_targets(tmp_path):
         key_states=[dict(type='cursor', expected='fixture')], action_difference=dict(noop=True, shuffled=False, copy_last=True))
     inputs = seal(dict(index_id=index.report['artifact_id'], prediction=dict(selected=[sample])))
     metric = ReconstructionLoss('data/torch-cache')
+    source_provenance = {}
+    if exploratory:
+        # Exercise the live-data mode with isolated fixture metadata, not a real recording.
+        index.report['coverage_gate_passed'] = True
+        for row in index.report['sources']:
+            row['source_kind'] = 'live'
+        from pathlib import Path
+        source_provenance = dict(evaluation_inputs_id=inputs['artifact_id'], implementation={
+            str(p): file_info(p) for p in Path('dsp_dreamer').glob('*.py')})
     tokenizer = TokenizerTrainer(index, metric, TokenizerConfig(width=32, heads=4, encoder_blocks=4, decoder_blocks=4),
-        TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2), device='cpu')
+        TrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2),
+        device='cpu', provenance=source_provenance)
+    if exploratory:
+        tokenizer.update()
     initial = tmp_path / 'tokenizer.pt'
     tokenizer.save(initial)
     implementation = tmp_path / 'implementation.txt'
     implementation.write_text('original')
     trainer = DynamicsTrainer(initial, index,
-        DynamicsTrainingConfig(updates=1, microbatch=1, accumulation=1, short_length=2, long_length=2),
-        model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu', provenance=dict(evaluation_inputs_id=inputs['artifact_id'],
+        DynamicsTrainingConfig(updates=1, microbatch=1, accumulation=16 if exploratory else 1, short_length=2, long_length=2),
+        model_config=DynamicsConfig(width=32, heads=4, blocks=4, kv_heads=2), device='cpu', exploratory=exploratory,
+        provenance=dict(evaluation_inputs_id=inputs['artifact_id'], experiment='B-unqualified-tokenizer/1' if exploratory else None,
             implementation={str(implementation): file_info(implementation)}))
     trainer.update()
     checkpoint = tmp_path / 'dynamics.pt'

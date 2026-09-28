@@ -18,7 +18,7 @@ CONFIG_TYPES = dict(A=TrainingConfig, B=DynamicsTrainingConfig, second=AgentTrai
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / 'training_config.py'
 
 
-def read_settings(path=DEFAULT_CONFIG):
+def read_settings(path=DEFAULT_CONFIG, *, exploratory_b=False):
     value = runpy.run_path(str(path))
     runtime = dict(value['RUNTIME'])
     runtime.setdefault('cuda_memory_fraction', .75)
@@ -40,7 +40,8 @@ def read_settings(path=DEFAULT_CONFIG):
         require(limit is None or type(limit) is int and limit > 0, 'Invalid update limit')
         config = config_type(updates=limit or 4, **settings)
         config.validate_formal()
-        require(stage == 'A' or config.max_seconds is not None and config.max_seconds <= STAGE_SECONDS[stage],
+        require(stage == 'A' or stage == 'B' and exploratory_b or
+                config.max_seconds is not None and config.max_seconds <= STAGE_SECONDS[stage],
                 f'{stage} 超過正式階段預算上限')
         require(config.max_seconds is not None or limit is not None, '取消時間上限時必須指定更新次數')
         stages[stage] = dict(asdict(config), updates=limit)

@@ -33,7 +33,8 @@ STAGES = {
     'A': dict(**{**OPTIMIZER, 'warmup_fraction': .01, 'min_lr_fraction': 1/3},
               **{**SEQUENCES, 'short_length': 16, 'long_length': 48}, **LOSS_RMS,
               seed=2202, learning_rate=3e-5, max_seconds=None,
-              mask_max_probability=.9, mse_weight=1., lpips_weight=.2, updates=2000),
+              mask_max_probability=.9, mse_weight=1., lpips_weight=.2, updates=2000,
+              episode_start_sequences=0),  # Replace this many of 16 sequences with true episode starts.
     'B': dict(**OPTIMIZER, **SEQUENCES, **LOSS_RMS, seed=2203, learning_rate=1e-4, max_seconds=57600,
               flow_weight=1., bootstrap_weight=1., updates=None),
     'second': dict(**OPTIMIZER, **SEQUENCES, **LOSS_RMS, seed=2203, learning_rate=1e-4, world_learning_rate=1e-5,

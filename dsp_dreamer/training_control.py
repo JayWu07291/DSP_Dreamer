@@ -29,14 +29,15 @@ def plan_updates(seconds, durations, *, fraction=.9):
 
 
 class TrainingBudget:
-    def __init__(self, path, *, formal=True, clock=time.monotonic, wall_clock=time.time):
+    def __init__(self, path, *, formal=True, clock=time.monotonic, wall_clock=time.time, lock_path=None):
         self.path, self.formal = Path(path), formal
+        self.lock_path = Path(lock_path) if lock_path is not None else self.path.with_suffix('.lock')
         self.clock, self.wall_clock = clock, wall_clock
         self.active = None
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.lock = self.path.with_suffix('.lock').open('a+b')
+        self.lock = self.lock_path.open('a+b')
         try:
             self.lock.seek(0)
             if os.name == 'nt':
@@ -109,7 +110,7 @@ class TrainingBudget:
             if a['stage'] == stage), sum(limits.values()) - sum(a['seconds'] for a in self.state['attempts'])))
 
     def configure_limits(self, limits):
-        require(set(limits) == set(STAGE_SECONDS) and all(v is None and k == 'A' or
+        require(set(limits) == set(STAGE_SECONDS) and all(v is None and (k == 'A' or k == 'B' and not self.formal) or
                 v is not None and math.isfinite(v) and v > 0 for k, v in limits.items()),
                 'Invalid stage budgets')
         require(not self.formal or all(k == 'A' or v <= STAGE_SECONDS[k] for k, v in limits.items()), '超過正式階段預算上限')

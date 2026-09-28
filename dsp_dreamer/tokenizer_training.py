@@ -67,6 +67,7 @@ class TrainingConfig(OptimizerConfig):
     lpips_weight: float = .2
     loss_rms_decay: float = .99
     loss_rms_epsilon: float = 1e-8
+    episode_start_sequences: int = 0
 
     def __post_init__(self):
         super().__post_init__()
@@ -80,6 +81,9 @@ class TrainingConfig(OptimizerConfig):
                 and self.mse_weight + self.lpips_weight > 0, 'Invalid tokenizer loss/masking setting')
         require(math.isfinite(self.loss_rms_decay) and 0 <= self.loss_rms_decay < 1
                 and math.isfinite(self.loss_rms_epsilon) and self.loss_rms_epsilon > 0, '無效 loss RMS 設定')
+        require(type(self.episode_start_sequences) is int
+                and 0 <= self.episode_start_sequences <= self.microbatch * self.accumulation,
+                'episode_start_sequences 必須為有效 batch 範圍內的整數')
 
     def validate_formal(self):
         require((self.microbatch, self.accumulation) in ((2, 8), (1, 16)), "正式配方需 batch 16")
@@ -123,6 +127,11 @@ class TokenizerTrainer:
             if s['split'] == 'train' for start in index.views[s['artifact_id']].sequence_starts(length)]
             for length in {config.short_length, config.long_length}}
         require(all(self.pools.values()), "Train 缺少合法 sequence")
+        self.episode_start_pools = {length: [(artifact, start) for artifact, start in pool
+            if index.views[artifact].dataset.rows[index.views[artifact].rows[start]['start']]['is_first']]
+            for length, pool in self.pools.items()} if config.episode_start_sequences else {}
+        require(not config.episode_start_sequences or all(self.episode_start_pools.values()),
+                'Train 缺少完整合法的回合開頭 sequence')
 
     def initialize_from(self, path):
         """New experiment: reuse learned weights/RMS, reset optimizer and schedule."""
@@ -148,8 +157,12 @@ class TokenizerTrainer:
     def samples(self, step):
         length = self.config.long_length if step % self.config.long_every == self.config.long_every - 1 else self.config.short_length
         rng = random.Random(self.config.seed + step)
-        return length, [rng.choice(self.pools[length])
-                        for _ in range(self.config.microbatch * self.config.accumulation)]
+        samples = [rng.choice(self.pools[length])
+                   for _ in range(self.config.microbatch * self.config.accumulation)]
+        # Draw the original batch first so the comparison keeps every other slot identical.
+        for slot in rng.sample(range(len(samples)), self.config.episode_start_sequences):
+            samples[slot] = rng.choice(self.episode_start_pools[length])
+        return length, samples
 
     def update(self, *, deadline=None):
         cfg = self.config
@@ -197,7 +210,8 @@ class TokenizerTrainer:
         self.loss_rms.update(squares)
         self.step += 1
         self.elapsed_seconds += time.monotonic() - started
-        result = dict(step=self.step, length=length, samples=samples, loss=float(totals[0]),
+        result = dict(step=self.step, length=length, samples=samples,
+                      episode_start_sequences=cfg.episode_start_sequences, loss=float(totals[0]),
                       mse=float(totals[1]), lpips=float(totals[2]), grad_norm=norm.item(),
                       learning_rate=self.optimizer.param_groups[0]['lr'],
                       mse_rms=scales[0].item(), lpips_rms=scales[1].item(),

@@ -67,7 +67,7 @@ def evaluate_prediction(checkpoint_path, index, loss, inputs, output, *, device=
         require_reconstruction(value['reconstruction'], source['checkpoint']['sha256'], value['provenance'])
         require(all(s['source_kind'] == 'live' for s in index.report['sources'] if s['split'] == 'validation'),
                 '正式評估不可使用合成資料')
-    tokenizer, _ = load_tokenizer(source['path'], device=device)
+    tokenizer, _ = load_tokenizer(source['path'], device=device, model_only=value.get('exploratory', False))
     model = Dynamics(DynamicsConfig(**value['model_config'])).to(device).eval()
     model.load_state_dict(value['model'])
     output = Path(output)

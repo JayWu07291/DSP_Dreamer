@@ -28,7 +28,7 @@ class DynamicsTrainingConfig(OptimizerConfig):
     short_length: int = 32
     long_length: int = 80
     learning_rate: float = 1e-4
-    max_seconds: float = 57600
+    max_seconds: float | None = 57600
     flow_weight: float = 1.
     bootstrap_weight: float = 1.
     loss_rms_decay: float = .99
@@ -39,7 +39,8 @@ class DynamicsTrainingConfig(OptimizerConfig):
         require(all(type(v) is int and v > 0 for v in (self.updates, self.microbatch,
                 self.accumulation, self.short_length, self.long_length)), '無效訓練步數或 batch')
         require(type(self.seed) is int and math.isfinite(self.learning_rate) and self.learning_rate > 0
-                and math.isfinite(self.max_seconds) and self.max_seconds > 0, '無效訓練預算或配方')
+                and (self.max_seconds is None or math.isfinite(self.max_seconds) and self.max_seconds > 0),
+                '無效訓練預算或配方')
         require(all(math.isfinite(v) and v >= 0 for v in (self.flow_weight, self.bootstrap_weight))
                 and self.flow_weight + self.bootstrap_weight > 0, 'Invalid dynamics loss weights')
         require(math.isfinite(self.loss_rms_decay) and 0 <= self.loss_rms_decay < 1
@@ -66,6 +67,9 @@ def read_dynamics_checkpoint(path):
     value = torch.load(path, map_location='cpu', weights_only=True)
     require(value.get('schema') in ('dsp-dynamics-checkpoint/1', 'dsp-agent-checkpoint/1',
                                    'dsp-imagination-checkpoint/1'), '不支援的 dynamics checkpoint')
+    require(not value.get('exploratory', False) or
+            value['schema'] == 'dsp-dynamics-checkpoint/1' and value['formal'] is False,
+            '探索 B checkpoint 不可宣告正式資格')
     require(value['model_config'].get('architecture') == ARCHITECTURE, '舊 dynamics 架構不能續訓，請重新訓練')
     # Validate the entire codec before constructing or loading any model weights.
     validate_action_contract(value['action_codec'])
@@ -85,9 +89,15 @@ def verify_implementation(provenance):
             'Checkpoint 實作 checksum 不符')
 
 
-def load_tokenizer(path, *, device='cpu'):
+def load_tokenizer(path, *, device='cpu', model_only=False):
     payload = read_checkpoint(path)
-    if payload['provenance'].get('implementation'):
+    if model_only:
+        # An exploratory B may change training control, but never the frozen A model math.
+        files = payload['provenance'].get('implementation', {})
+        for name in ('tokenizer.py', 'transformer.py', 'optimization.py', 'actions.py'):
+            recorded = [v for p, v in files.items() if Path(p).name == name]
+            require(recorded == [file_info(Path(__file__).parent / name)], 'Tokenizer 模型實作 checksum 不符')
+    elif payload['provenance'].get('implementation'):
         verify_implementation(payload['provenance'])
     model = CausalTokenizer(TokenizerConfig(**payload['model_config'])).to(device).eval()
     model.load_state_dict(payload['model'])
@@ -97,16 +107,25 @@ def load_tokenizer(path, *, device='cpu'):
 
 class DynamicsTrainer:
     def __init__(self, tokenizer_path, index, config, *, model_config=DynamicsConfig(), device='cuda',
-                 formal=False, reconstruction=None, provenance=None):
+                 formal=False, reconstruction=None, provenance=None, exploratory=False):
         self.tokenizer_source = dict(path=str(Path(tokenizer_path).resolve()), checkpoint=file_info(tokenizer_path))
         self.index, self.config, self.formal = index, config, formal
         self.reconstruction, self.provenance = reconstruction, provenance or {}
+        require(type(exploratory) is bool and not (formal and exploratory), '探索 B 不可同時宣告正式資格')
+        self.exploratory = exploratory
         if formal:
+            require(config.max_seconds is not None, '正式 B 需有限時間預算')
             require_reconstruction(reconstruction, self.tokenizer_source['checkpoint']['sha256'], self.provenance)
             verify_implementation(self.provenance)
             config.validate_formal()
             require(model_config.latent_tokens == 64 and index.report['coverage_gate_passed'], '正式表徵或資料覆蓋不符')
             require(torch.device(device).type == 'cuda', '正式訓練需要 CUDA')
+        elif exploratory:
+            require(self.provenance.get('experiment') == 'B-unqualified-tokenizer/1', '缺少探索 B 身分')
+            verify_implementation(self.provenance)
+            config.validate_formal()
+            require(index.report['coverage_gate_passed'] and all(s['source_kind'] == 'live' for s in index.report['sources']),
+                    '探索 B 需要已凍結的真實資料')
         else:
             require(all(s['source_kind'] == 'synthetic' for s in index.report['sources']),
                     '工程 smoke 僅接受合成 fixtures；真實資料需要通過重建 gate')
@@ -117,11 +136,11 @@ class DynamicsTrainer:
         random.seed(config.seed)
         np.random.seed(config.seed)
         torch.manual_seed(config.seed)
-        self.tokenizer, payload = load_tokenizer(tokenizer_path, device=self.device)
+        self.tokenizer, payload = load_tokenizer(tokenizer_path, device=self.device, model_only=exploratory)
         require(payload['index_id'] == index.report['artifact_id'] and payload['sources'] == index.report['sources'],
                 'Tokenizer 資料身分不同')
         require(self.tokenizer.config.latent_tokens == 64, '正式 v1 dynamics 固定 64 tokens')
-        if formal:
+        if formal or exploratory:
             require(self.tokenizer.config.latent_tokens == 64 and payload['step'] > 0, '正式 tokenizer 表徵或進度不符')
             require(all(payload['provenance'].get(k) == self.provenance.get(k) for k in
                     ('protocol_id', 'data_freeze_id', 'evaluation_inputs_id', 'annotations_id')), 'Tokenizer 凍結資料不符')
@@ -150,9 +169,10 @@ class DynamicsTrainer:
 
     def update(self, *, deadline=None):
         cfg = self.config
-        require(self.step < cfg.updates and self.elapsed_seconds < cfg.max_seconds, '已達訓練預算')
+        require(self.step < cfg.updates and (cfg.max_seconds is None or self.elapsed_seconds < cfg.max_seconds), '已達訓練預算')
         started = time.monotonic()
-        deadline = min(deadline or float('inf'), started + cfg.max_seconds - self.elapsed_seconds)
+        deadline = min(deadline or float('inf'),
+                       started + cfg.max_seconds - self.elapsed_seconds if cfg.max_seconds is not None else float('inf'))
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
         factor = cfg.lr_factor(self.step)
@@ -215,7 +235,7 @@ class DynamicsTrainer:
             model_config=asdict(self.model.config), training_config=asdict(self.config),
             model=self.model.state_dict(), optimizer=self.optimizer.state_dict(), loss_rms=self.loss_rms.state_dict(),
             tokenizer_source=self.tokenizer_source, metric=self.metric_identity,
-            formal=self.formal, reconstruction=self.reconstruction, provenance=self.provenance,
+            formal=self.formal, exploratory=self.exploratory, reconstruction=self.reconstruction, provenance=self.provenance,
             index_id=self.index.report['artifact_id'], sources=self.index.report['sources'],
             step=self.step, elapsed_seconds=self.elapsed_seconds, history=self.history, control=getattr(self, 'control', None),
             python_rng=random.getstate(), numpy_rng=(state[0], state[1].tolist(), *state[2:]),
@@ -242,7 +262,7 @@ class DynamicsTrainer:
         require(file_info(source['path']) == source['checkpoint'], 'Tokenizer checkpoint 已改變')
         trainer = cls(source['path'], index, DynamicsTrainingConfig(**value['training_config']),
             model_config=DynamicsConfig(**value['model_config']), device=device, formal=value['formal'],
-            reconstruction=value['reconstruction'], provenance=value['provenance'])
+            reconstruction=value['reconstruction'], provenance=value['provenance'], exploratory=value.get('exploratory', False))
         require(trainer.metric_identity == value['metric'], 'Tokenizer metric 不同')
         trainer.model.load_state_dict(value['model'])
         trainer.optimizer.load_state_dict(value['optimizer'])

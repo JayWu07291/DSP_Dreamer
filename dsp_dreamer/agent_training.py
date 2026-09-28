@@ -28,6 +28,7 @@ class AgentTrainingConfig(DynamicsTrainingConfig):
 
     def __post_init__(self):
         super().__post_init__()
+        require(self.max_seconds is not None, '第二／三階段需有限時間預算')
         require(self.microbatch * self.accumulation % 2 == 0, '第二階段需 50/50 batch')
         require(math.isfinite(self.world_learning_rate) and self.world_learning_rate > 0
                 and all(math.isfinite(v) and v >= 0 for v in
