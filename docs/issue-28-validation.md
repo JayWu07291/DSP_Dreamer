@@ -36,7 +36,7 @@ git diff --check
 
 ## Standards
 
-獨立審查未見 AGENTS.md、CONTEXT.md 或 ADR 違規。初查發現部分更新不應升為最新 checkpoint，以及 CLI 接受無效 stage/command 組合；已修正並驗證。複核沒有剩餘問題。
+獨立審查未見 AGENTS.md、GLOSSARY.md 或 ADR 違規。初查發現部分更新不應升為最新 checkpoint，以及 CLI 接受無效 stage/command 組合；已修正並驗證。複核沒有剩餘問題。
 
 ## Spec
 

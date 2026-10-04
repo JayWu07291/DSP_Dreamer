@@ -32,7 +32,7 @@ Agent／imagination 八項整合測試通過，耗時 148.55 秒；mypy 檢查 2
 
 ## Standards
 
-獨立審查未發現 AGENTS.md、CONTEXT.md 或 ADR 違規。初查指出驗證文件連結尚未建立，以及匯出重複重算上游 gate；已補齊文件並保留 `combine_gates` 單一驗證入口，複核剩餘零項。
+獨立審查未發現 AGENTS.md、GLOSSARY.md 或 ADR 違規。初查指出驗證文件連結尚未建立，以及匯出重複重算上游 gate；已補齊文件並保留 `combine_gates` 單一驗證入口，複核剩餘零項。
 
 ## Spec
 

@@ -29,7 +29,7 @@
 
 ## Standards
 
-獨立審查未發現違反 AGENTS.md、CONTEXT.md 或相關 ADR。初次審查指出 policy 合法化重寫了禁止組合；已改為重用 `forbidden_buttons`，移除固定控制索引，並重跑該模型／動作測試。
+獨立審查未發現違反 AGENTS.md、GLOSSARY.md 或相關 ADR。初次審查指出 policy 合法化重寫了禁止組合；已改為重用 `forbidden_buttons`，移除固定控制索引，並重跑該模型／動作測試。
 
 ## Spec
 
